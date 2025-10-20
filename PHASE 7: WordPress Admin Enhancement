@@ -1,0 +1,1143 @@
+PHASE 7: WordPress Admin Enhancement
+🎯 Objective
+Modernize WordPress admin interface với consistent design system, enhanced functionality, at multi-location management capabilities based on Figma design: https://www.figma.com/community/file/1308435721888237413
+📋 Dependencies
+
+Phase 1: Design system CSS variables at base components
+Phase 4: Portal dashboard components at analytics
+Existing Backend: includes/class-admin.php, WordPress admin hooks
+
+📦 Deliverables
+
+modern-admin.css - WordPress admin styling
+modern-admin.js - Admin interactions at enhancements
+admin-dashboard.php - Super admin dashboard template
+class-modern-admin.php - WordPress integration layer
+
+🎨 Admin Interface Layout
+Admin Dashboard Overview
+┌─────────────────────────────────────────────────────────────────┐
+│ [WordPress Logo] Restaurant Booking Settings         [👤] Admin │ ← Top Bar
+├─────────────────────────────────────────────────────────────────┤
+│ [☰] [Dashboard] [Bookings] [Locations] [Settings] [Reports]     │ ← Navigation
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  📊 Multi-Location Overview                                     │
+│  ────────────────────────────────────────                       │
+│  ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐   │
+│  │   Downtown      │ │   Uptown        │ │   Mall Branch   │   │
+│  │   45 bookings   │ │   32 bookings   │ │   28 bookings   │   │
+│  │   $1,200 rev    │ │   $890 rev      │ │   $760 rev      │   │
+│  │   85% occupancy │ │   78% occupancy │ │   92% occupancy │   │
+│  └─────────────────┘ └─────────────────┘ └─────────────────┘   │
+│                                                                  │
+│  📈 System Analytics                   [View Full Report]       │
+│  ────────────────────────────────────────────────────────       │
+│  [Revenue Chart] [Booking Trends] [Performance Metrics]         │
+│                                                                  │
+│  📋 Quick Stats                                                 │
+│  ────────────────                                               │
+│  Total Bookings: 1,247 | Total Revenue: $45,230 | VIP: 89      │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Bookings Management Tab
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ Bookings Management                        [+ Add] [Import] [⚙️]  │
+├─────────────────────────────────────────────────────────────────┤
+│ [All] [Pending] [Confirmed] [Completed] [Cancelled]             │
+│ [📅 Date Range] [📍 Location] [🔍 Search] [Export] [Refresh]    │
+├─────────────────────────────────────────────────────────────────┤
+│ ┌─┬─────────────┬──────┬─────────┬──────┬──────────┬──────────┐ │
+│ │☐│Customer     │Date  │Party    │Table │Status    │Actions   │ │
+│ ├─┼─────────────┼──────┼─────────┼──────┼──────────┼──────────┤ │
+│ │☐│John Doe     │Mar15 │4 people │T5    │Confirmed │[✏️][×]   │ │
+│ │☐│Jane Smith   │Mar16 │2 people │T8    │Pending   │[✓][✏️][×]│ │
+│ │☐│Mike Johnson │Mar17 │6 people │T12   │Confirmed │[✏️][×]   │ │
+│ └─┴─────────────┴──────┴─────────┴──────┴──────────┴──────────┘ │
+│ Showing 1-50 of 1,247 bookings     [◀️ Previous] [1][2][3] [Next ▶️]
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Settings Panel
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ Settings                                              [Save]     │
+├─────────────────────────────────────────────────────────────────┤
+│ [General] [Locations] [Email] [Advanced] [Extensions]           │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│ ⚙️ GENERAL SETTINGS                                             │
+│ ─────────────────────                                           │
+│                                                                  │
+│ Restaurant Name: _____________________                          │
+│ Default Currency: [USD ▼]                                       │
+│ Booking Buffer Time: [30] minutes                               │
+│ Max Party Size: [20] people                                     │
+│ Allow Walk-ins: [Toggle]                                        │
+│ Enable Reviews: [Toggle]                                        │
+│ Enable Cancellations: [Toggle]                                  │
+│                                                                  │
+│ ⏰ BUSINESS HOURS                                               │
+│ ──────────────────                                              │
+│ Monday    - Friday: [09:00] to [22:00]                          │
+│ Saturday - Sunday: [10:00] to [23:00]                           │
+│ Closed Days: [Multiple Select]                                  │
+│                                                                  │
+│ [Save Changes] [Reset to Defaults]                              │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+🏗️ HTML Structure
+Admin Header Component
+html<!-- Admin header with navigation -->
+<div class="rb-admin-header">
+  <div class="rb-admin-branding">
+    <div class="rb-admin-logo">
+      <svg width="24" height="24" fill="#2563eb" viewBox="0 0 24 24">
+        <!-- Restaurant icon -->
+      </svg>
+      <span class="rb-admin-logo-text">Restaurant Booking</span>
+    </div>
+  </div>
+  
+  <div class="rb-admin-nav">
+    <nav class="rb-admin-menu">
+      <a href="?page=rb-dashboard" class="rb-admin-menu-item rb-active">
+        <svg class="rb-admin-menu-icon" width="20" height="20"><!-- Dashboard icon --></svg>
+        Dashboard
+      </a>
+      <a href="?page=rb-bookings" class="rb-admin-menu-item">
+        <svg class="rb-admin-menu-icon" width="20" height="20"><!-- Bookings icon --></svg>
+        Bookings
+        <span class="rb-admin-badge">12</span>
+      </a>
+      <a href="?page=rb-locations" class="rb-admin-menu-item">
+        <svg class="rb-admin-menu-icon" width="20" height="20"><!-- Locations icon --></svg>
+        Locations
+      </a>
+      <a href="?page=rb-settings" class="rb-admin-menu-item">
+        <svg class="rb-admin-menu-icon" width="20" height="20"><!-- Settings icon --></svg>
+        Settings
+      </a>
+      <a href="?page=rb-reports" class="rb-admin-menu-item">
+        <svg class="rb-admin-menu-icon" width="20" height="20"><!-- Reports icon --></svg>
+        Reports
+      </a>
+    </nav>
+  </div>
+  
+  <div class="rb-admin-user">
+    <button class="rb-admin-user-btn">
+      <div class="rb-admin-avatar">AD</div>
+      <span class="rb-admin-user-name">Admin User</span>
+      <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+        <path d="M7 10l5 5 5-5z"/>
+      </svg>
+    </button>
+  </div>
+</div>
+
+<!-- Admin main content area -->
+<div class="rb-admin-container">
+  <div class="rb-admin-sidebar">
+    <!-- Quick navigation and widgets -->
+  </div>
+  
+  <div class="rb-admin-content">
+    <!-- Main content area for different pages -->
+  </div>
+</div>
+Multi-Location Dashboard
+html<div class="rb-multi-location-dashboard">
+  <div class="rb-dashboard-header">
+    <h1 class="rb-dashboard-title">Multi-Location Overview</h1>
+    <div class="rb-dashboard-actions">
+      <button class="rb-btn rb-btn-sm rb-btn-outline">
+        <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M12 8v8m4-4H8m4-8C6.48 4 2 8.48 2 14s4.48 10 10 10 10-4.48 10-10S17.52 4 12 4z"/>
+        </svg>
+        Add Location
+      </button>
+      <button class="rb-btn rb-btn-sm rb-btn-outline">
+        <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+        </svg>
+        Refresh
+      </button>
+    </div>
+  </div>
+  
+  <div class="rb-locations-grid">
+    <!-- Location cards -->
+    <div class="rb-location-card">
+      <div class="rb-location-header">
+        <h3 class="rb-location-name">Downtown Branch</h3>
+        <button class="rb-btn rb-btn-sm rb-btn-icon" title="Edit">
+          <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z"/>
+          </svg>
+        </button>
+      </div>
+      
+      <div class="rb-location-stats">
+        <div class="rb-stat">
+          <div class="rb-stat-label">Today's Bookings</div>
+          <div class="rb-stat-value">24</div>
+          <div class="rb-stat-change rb-positive">+12%</div>
+        </div>
+        <div class="rb-stat">
+          <div class="rb-stat-label">Revenue</div>
+          <div class="rb-stat-value">$1,200</div>
+          <div class="rb-stat-change rb-positive">+8%</div>
+        </div>
+        <div class="rb-stat">
+          <div class="rb-stat-label">Occupancy</div>
+          <div class="rb-stat-value">85%</div>
+          <div class="rb-stat-change rb-negative">-5%</div>
+        </div>
+        <div class="rb-stat">
+          <div class="rb-stat-label">Tables</div>
+          <div class="rb-stat-value">12</div>
+          <div class="rb-stat-change rb-neutral">0%</div>
+        </div>
+      </div>
+      
+      <div class="rb-location-actions">
+        <a href="?page=rb-bookings&location=1" class="rb-btn rb-btn-sm rb-btn-outline">
+          View Bookings
+        </a>
+        <a href="?page=rb-tables&location=1" class="rb-btn rb-btn-sm rb-btn-outline">
+          Manage Tables
+        </a>
+      </div>
+    </div>
+    
+    <!-- More location cards... -->
+  </div>
+</div>
+Bookings Management Table
+html<div class="rb-bookings-admin">
+  <div class="rb-filter-bar">
+    <div class="rb-filters">
+      <select class="rb-select" id="status-filter">
+        <option value="">All Statuses</option>
+        <option value="pending">Pending</option>
+        <option value="confirmed">Confirmed</option>
+        <option value="completed">Completed</option>
+        <option value="cancelled">Cancelled</option>
+      </select>
+      
+      <input type="date" class="rb-input" id="date-filter">
+      
+      <select class="rb-select" id="location-filter">
+        <option value="">All Locations</option>
+        <!-- Dynamic locations -->
+      </select>
+      
+      <input type="text" class="rb-input" placeholder="Search..." id="search-filter">
+    </div>
+    
+    <div class="rb-actions">
+      <button class="rb-btn rb-btn-sm rb-btn-outline">
+        <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+        </svg>
+        Refresh
+      </button>
+      <button class="rb-btn rb-btn-sm rb-btn-outline">
+        <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/>
+        </svg>
+        Export
+      </button>
+    </div>
+  </div>
+  
+  <table class="rb-admin-table">
+    <thead>
+      <tr>
+        <th>Customer</th>
+        <th>Date & Time</th>
+        <th>Party Size</th>
+        <th>Location</th>
+        <th>Status</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody id="bookings-tbody">
+      <!-- Dynamic rows -->
+    </tbody>
+  </table>
+  
+  <div class="rb-pagination">
+    <span>Showing 1-50 of 1,247</span>
+    <div class="rb-pagination-controls">
+      <button class="rb-btn rb-btn-sm" disabled>Previous</button>
+      <span>Page 1 of 25</span>
+      <button class="rb-btn rb-btn-sm">Next</button>
+    </div>
+  </div>
+</div>
+🎨 CSS Styling
+Admin Header & Navigation
+css.rb-admin-header {
+  background: var(--rb-bg-primary);
+  border-bottom: 1px solid var(--rb-border);
+  padding: var(--rb-space-4) var(--rb-space-6);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.rb-admin-branding {
+  display: flex;
+  align-items: center;
+  gap: var(--rb-space-3);
+}
+
+.rb-admin-logo {
+  display: flex;
+  align-items: center;
+  gap: var(--rb-space-2);
+}
+
+.rb-admin-logo-text {
+  font-size: var(--rb-text-lg);
+  font-weight: var(--rb-font-bold);
+  color: var(--rb-text-primary);
+}
+
+.rb-admin-nav {
+  flex: 1;
+  margin-left: var(--rb-space-8);
+}
+
+.rb-admin-menu {
+  display: flex;
+  gap: var(--rb-space-1);
+}
+
+.rb-admin-menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--rb-space-2);
+  padding: var(--rb-space-3) var(--rb-space-4);
+  border-radius: var(--rb-radius);
+  color: var(--rb-text-secondary);
+  text-decoration: none;
+  transition: all var(--rb-transition-fast);
+  position: relative;
+}
+
+.rb-admin-menu-item:hover {
+  background: var(--rb-bg-secondary);
+  color: var(--rb-text-primary);
+}
+
+.rb-admin-menu-item.rb-active {
+  background: var(--rb-primary-500);
+  color: white;
+}
+
+.rb-admin-badge {
+  background: var(--rb-error);
+  color: white;
+  font-size: var(--rb-text-xs);
+  font-weight: var(--rb-font-bold);
+  padding: 2px 6px;
+  border-radius: var(--rb-radius-full);
+  margin-left: var(--rb-space-1);
+}
+
+.rb-admin-user {
+  display: flex;
+  align-items: center;
+}
+
+.rb-admin-user-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--rb-space-2);
+  background: transparent;
+  border: 1px solid var(--rb-border);
+  border-radius: var(--rb-radius);
+  padding: var(--rb-space-2) var(--rb-space-3);
+  cursor: pointer;
+  transition: all var(--rb-transition-fast);
+}
+
+.rb-admin-user-btn:hover {
+  border-color: var(--rb-primary-300);
+  background: var(--rb-bg-secondary);
+}
+
+.rb-admin-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--rb-primary-500);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: var(--rb-font-bold);
+  font-size: var(--rb-text-sm);
+}
+Admin Container & Layout
+css.rb-admin-container {
+  display: grid;
+  grid-template-columns: 250px 1fr;
+  gap: var(--rb-space-6);
+  padding: var(--rb-space-6);
+  min-height: calc(100vh - 72px);
+}
+
+.rb-admin-sidebar {
+  background: var(--rb-bg-primary);
+  border: 1px solid var(--rb-border);
+  border-radius: var(--rb-radius-lg);
+  padding: var(--rb-space-6);
+  height: fit-content;
+  position: sticky;
+  top: 80px;
+}
+
+.rb-admin-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rb-space-6);
+}
+
+.rb-dashboard-title {
+  font-size: var(--rb-text-2xl);
+  font-weight: var(--rb-font-bold);
+  color: var(--rb-text-primary);
+  margin: 0 0 var(--rb-space-4) 0;
+}
+
+.rb-locations-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: var(--rb-space-6);
+}
+
+.rb-location-card {
+  background: var(--rb-bg-primary);
+  border: 1px solid var(--rb-border);
+  border-radius: var(--rb-radius-lg);
+  padding: var(--rb-space-6);
+  transition: all var(--rb-transition-base);
+}
+
+.rb-location-card:hover {
+  border-color: var(--rb-primary-300);
+  box-shadow: var(--rb-shadow-lg);
+  transform: translateY(-2px);
+}
+
+.rb-location-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--rb-space-6);
+  padding-bottom: var(--rb-space-4);
+  border-bottom: 1px solid var(--rb-border);
+}
+
+.rb-location-name {
+  font-size: var(--rb-text-lg);
+  font-weight: var(--rb-font-semibold);
+  color: var(--rb-text-primary);
+  margin: 0;
+}
+
+.rb-location-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--rb-space-4);
+  margin-bottom: var(--rb-space-6);
+}
+
+.rb-stat {
+  background: var(--rb-bg-secondary);
+  border-radius: var(--rb-radius);
+  padding: var(--rb-space-4);
+}
+
+.rb-stat-label {
+  font-size: var(--rb-text-xs);
+  color: var(--rb-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: var(--rb-font-medium);
+  margin-bottom: var(--rb-space-2);
+}
+
+.rb-stat-value {
+  font-size: var(--rb-text-2xl);
+  font-weight: var(--rb-font-bold);
+  color: var(--rb-text-primary);
+}
+
+.rb-stat-change {
+  font-size: var(--rb-text-sm);
+  font-weight: var(--rb-font-medium);
+  margin-top: var(--rb-space-1);
+}
+
+.rb-stat-change.rb-positive {
+  color: var(--rb-success);
+}
+
+.rb-stat-change.rb-negative {
+  color: var(--rb-error);
+}
+
+.rb-stat-change.rb-neutral {
+  color: var(--rb-text-secondary);
+}
+
+.rb-location-actions {
+  display: flex;
+  gap: var(--rb-space-2);
+}
+
+.rb-location-actions .rb-btn {
+  flex: 1;
+}
+Admin Table Styles
+css.rb-admin-table {
+  width: 100%;
+  background: var(--rb-bg-primary);
+  border: 1px solid var(--rb-border);
+  border-radius: var(--rb-radius-lg);
+  overflow: hidden;
+  border-collapse: collapse;
+}
+
+.rb-admin-table thead {
+  background: var(--rb-bg-secondary);
+  border-bottom: 1px solid var(--rb-border);
+}
+
+.rb-admin-table th {
+  padding: var(--rb-space-4);
+  text-align: left;
+  font-weight: var(--rb-font-semibold);
+  color: var(--rb-text-primary);
+  font-size: var(--rb-text-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.rb-admin-table tbody tr {
+  border-bottom: 1px solid var(--rb-border);
+  transition: background-color var(--rb-transition-fast);
+}
+
+.rb-admin-table tbody tr:hover {
+  background: var(--rb-bg-secondary);
+}
+
+.rb-admin-table td {
+  padding: var(--rb-space-4);
+  vertical-align: middle;
+}
+
+.rb-admin-table .rb-status-badge {
+  display: inline-block;
+  padding: var(--rb-space-1) var(--rb-space-2);
+  border-radius: var(--rb-radius-full);
+  font-size: var(--rb-text-xs);
+  font-weight: var(--rb-font-medium);
+}
+
+.rb-admin-table .rb-status-confirmed {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--rb-success);
+}
+
+.rb-admin-table .rb-status-pending {
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--rb-warning);
+}
+
+.rb-admin-table .rb-status-cancelled {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--rb-error);
+}
+💻 JavaScript Implementation
+Modern Admin Manager Class
+javascriptclass ModernAdminManager {
+  constructor() {
+    this.currentTab = 'dashboard';
+    this.activeLocation = this.getDefaultLocation();
+    this.refreshInterval = 60000; // 1 minute
+    
+    this.init();
+  }
+  
+  init() {
+    this.bindEvents();
+    this.loadDashboard();
+    this.startAutoRefresh();
+  }
+  
+  bindEvents() {
+    // Navigation clicks
+    document.querySelectorAll('.rb-admin-menu-item').forEach(item => {
+      item.addEventListener('click', (e) => {
+        e.preventDefault();
+        const page = new URL(item.href).searchParams.get('page');
+        this.navigateTo(page);
+      });
+    });
+    
+    // Location selector
+    document.getElementById('location-filter')?.addEventListener('change', (e) => {
+      this.activeLocation = e.target.value;
+      this.reloadContent();
+    });
+    
+    // Filter buttons
+    document.querySelectorAll('[id$="-filter"]').forEach(filter => {
+      filter.addEventListener('change', () => {
+        this.applyFilters();
+      });
+    });
+    
+    // Refresh buttons
+    document.querySelectorAll('[data-action="refresh"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.reloadContent();
+      });
+    });
+  }
+  
+  async navigateTo(page) {
+    // Update active menu item
+    document.querySelectorAll('.rb-admin-menu-item').forEach(item => {
+      item.classList.remove('rb-active');
+      const href = new URL(item.href);
+      if (href.searchParams.get('page') === page) {
+        item.classList.add('rb-active');
+      }
+    });
+    
+    // Load page content
+    switch(page) {
+      case 'rb-dashboard':
+        await this.loadDashboard();
+        break;
+      case 'rb-bookings':
+        await this.loadBookings();
+        break;
+      case 'rb-locations':
+        await this.loadLocations();
+        break;
+      case 'rb-settings':
+        await this.loadSettings();
+        break;
+      case 'rb-reports':
+        await this.loadReports();
+        break;
+    }
+  }
+  
+  async loadDashboard() {
+    const loader = document.getElementById('admin-loader');
+    if (loader) loader.style.display = 'flex';
+    
+    try {
+      const response = await fetch(ajaxurl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          action: 'rb_admin_get_dashboard',
+          nonce: rbAdmin.nonce
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        this.renderDashboard(data.data);
+      }
+    } catch (error) {
+      console.error('Failed to load dashboard:', error);
+    } finally {
+      if (loader) loader.style.display = 'none';
+    }
+  }
+  
+  renderDashboard(data) {
+    const content = document.querySelector('.rb-admin-content');
+    if (!content) return;
+    
+    content.innerHTML = `
+      <div class="rb-multi-location-dashboard">
+        <div class="rb-dashboard-header">
+          <h1 class="rb-dashboard-title">Multi-Location Overview</h1>
+          <button class="rb-btn rb-btn-sm rb-btn-outline" data-action="refresh">
+            Refresh
+          </button>
+        </div>
+        
+        <div class="rb-locations-grid">
+          ${data.locations.map(loc => this.renderLocationCard(loc)).join('')}
+        </div>
+      </div>
+    `;
+    
+    this.bindLocationCardEvents();
+  }
+  
+  renderLocationCard(location) {
+    return `
+      <div class="rb-location-card">
+        <div class="rb-location-header">
+          <h3 class="rb-location-name">${location.name}</h3>
+          <button class="rb-btn rb-btn-sm rb-btn-icon" title="Edit">
+            <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z"/>
+            </svg>
+          </button>
+        </div>
+        
+        <div class="rb-location-stats">
+          <div class="rb-stat">
+            <div class="rb-stat-label">Today's Bookings</div>
+            <div class="rb-stat-value">${location.stats.bookings}</div>
+            <div class="rb-stat-change rb-${location.stats.bookings_trend > 0 ? 'positive' : 'negative'}">
+              ${location.stats.bookings_trend > 0 ? '+' : ''}${location.stats.bookings_trend}%
+            </div>
+          </div>
+          <div class="rb-stat">
+            <div class="rb-stat-label">Revenue</div>
+            <div class="rb-stat-value">${location.stats.revenue}</div>
+            <div class="rb-stat-change rb-${location.stats.revenue_trend > 0 ? 'positive' : 'negative'}">
+              ${location.stats.revenue_trend > 0 ? '+' : ''}${location.stats.revenue_trend}%
+            </div>
+          </div>
+          <div class="rb-stat">
+            <div class="rb-stat-label">Occupancy</div>
+            <div class="rb-stat-value">${location.stats.occupancy}%</div>
+            <div class="rb-stat-change rb-${location.stats.occupancy_trend > 0 ? 'positive' : 'negative'}">
+              ${location.stats.occupancy_trend > 0 ? '+' : ''}${location.stats.occupancy_trend}%
+            </div>
+          </div>
+          <div class="rb-stat">
+            <div class="rb-stat-label">Tables</div>
+            <div class="rb-stat-value">${location.stats.tables}</div>
+            <div class="rb-stat-change rb-neutral">0%</div>
+          </div>
+        </div>
+        
+        <div class="rb-location-actions">
+          <a href="?page=rb-bookings&location=${location.id}" class="rb-btn rb-btn-sm rb-btn-outline">
+            View Bookings
+          </a>
+          <a href="?page=rb-tables&location=${location.id}" class="rb-btn rb-btn-sm rb-btn-outline">
+            Manage Tables
+          </a>
+        </div>
+      </div>
+    `;
+  }
+  
+  startAutoRefresh() {
+    this.refreshTimer = setInterval(() => {
+      if (this.currentTab === 'dashboard') {
+        this.loadDashboard();
+      }
+    }, this.refreshInterval);
+  }
+  
+  getDefaultLocation() {
+    return localStorage.getItem('rb_admin_location') || '1';
+  }
+}
+
+// Initialize on DOM ready
+document.addEventListener('DOMContentLoaded', () => {
+  if (document.querySelector('.rb-admin-header')) {
+    new ModernAdminManager();
+  }
+});
+🔧 WordPress Integration
+Modern Admin Class
+php<?php
+// admin/class-modern-admin.php
+
+class RB_Modern_Admin {
+    
+    public function __construct() {
+        add_action('admin_menu', array($this, 'add_admin_pages'));
+        add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_assets'));
+        add_action('wp_ajax_rb_admin_get_dashboard', array($this, 'ajax_get_dashboard'));
+        add_action('wp_ajax_rb_admin_get_bookings', array($this, 'ajax_get_bookings'));
+        add_action('wp_ajax_rb_admin_get_locations', array($this, 'ajax_get_locations'));
+    }
+    
+    public function add_admin_pages() {
+        // Main menu
+        add_menu_page(
+            'Restaurant Booking',
+            'Bookings',
+            'manage_options',
+            'rb-dashboard',
+            array($this, 'render_dashboard'),
+            'dashicons-calendar',
+            3
+        );
+        
+        // Submenu pages
+        add_submenu_page(
+            'rb-dashboard',
+            'Dashboard',
+            'Dashboard',
+            'manage_options',
+            'rb-dashboard',
+            array($this, 'render_dashboard')
+        );
+        
+        add_submenu_page(
+            'rb-dashboard',
+            'Bookings',
+            'Bookings',
+            'manage_options',
+            'rb-bookings',
+            array($this, 'render_bookings')
+        );
+        
+        add_submenu_page(
+            'rb-dashboard',
+            'Locations',
+            'Locations',
+            'manage_options',
+            'rb-locations',
+            array($this, 'render_locations')
+        );
+        
+        add_submenu_page(
+            'rb-dashboard',
+            'Settings',
+            'Settings',
+            'manage_options',
+            'rb-settings',
+            array($this, 'render_settings')
+        );
+        
+        add_submenu_page(
+            'rb-dashboard',
+            'Reports',
+            'Reports',
+            'manage_options',
+            'rb-reports',
+            array($this, 'render_reports')
+        );
+    }
+    
+    public function enqueue_admin_assets($hook) {
+        // Only enqueue on our plugin pages
+        if (strpos($hook, 'rb-') === false) {
+            return;
+        }
+        
+        // Enqueue styles
+        wp_enqueue_style('rb-modern-admin',
+            plugin_dir_url(__FILE__) . '../assets/css/modern-admin.css',
+            array('rb-design-system'),
+            '1.0.0'
+        );
+        
+        // Enqueue scripts
+        wp_enqueue_script('rb-modern-admin',
+            plugin_dir_url(__FILE__) . '../assets/js/modern-admin.js',
+            array('jquery'),
+            '1.0.0',
+            true
+        );
+        
+        // Localize
+        wp_localize_script('rb-modern-admin', 'rbAdmin', array(
+            'ajax_url' => admin_url('admin-ajax.php'),
+            'nonce' => wp_create_nonce('rb_admin_nonce'),
+            'strings' => array(
+                'loading' => __('Loading...', 'restaurant-booking'),
+                'error' => __('Error loading data', 'restaurant-booking')
+            )
+        ));
+    }
+    
+    public function render_dashboard() {
+        include plugin_dir_path(__FILE__) . '../admin/partials/admin-dashboard.php';
+    }
+    
+    public function render_bookings() {
+        include plugin_dir_path(__FILE__) . '../admin/partials/bookings-table.php';
+    }
+    
+    public function render_locations() {
+        include plugin_dir_path(__FILE__) . '../admin/partials/locations-management.php';
+    }
+    
+    public function render_settings() {
+        include plugin_dir_path(__FILE__) . '../admin/partials/settings-panel.php';
+    }
+    
+    public function render_reports() {
+        include plugin_dir_path(__FILE__) . '../admin/partials/reports-analytics.php';
+    }
+    
+    public function ajax_get_dashboard() {
+        check_ajax_referer('rb_admin_nonce', 'nonce');
+        
+        try {
+            $locations = RB_Location::get_all_locations();
+            $dashboard_data = array(
+                'locations' => array_map(array($this, 'format_location_stats'), $locations)
+            );
+            
+            wp_send_json_success($dashboard_data);
+        } catch (Exception $e) {
+            wp_send_json_error(array('message' => $e->getMessage()));
+        }
+    }
+    
+    public function ajax_get_bookings() {
+        check_ajax_referer('rb_admin_nonce', 'nonce');
+        
+        $location = sanitize_text_field($_POST['location'] ?? '');
+        $status = sanitize_text_field($_POST['status'] ?? '');
+        $page = intval($_POST['page'] ?? 1);
+        
+        try {
+            // Get bookings filtered by parameters
+            $bookings = RB_Booking::get_admin_bookings($location, $status, $page);
+            
+            wp_send_json_success($bookings);
+        } catch (Exception $e) {
+            wp_send_json_error(array('message' => $e->getMessage()));
+        }
+    }
+    
+    private function format_location_stats($location) {
+        $today = date('Y-m-d');
+        $yesterday = date('Y-m-d', strtotime('-1 day'));
+        
+        // Get today's stats
+        $today_bookings = RB_Booking::count_by_date_and_location($today, $location->id);
+        $yesterday_bookings = RB_Booking::count_by_date_and_location($yesterday, $location->id);
+        $bookings_trend = $yesterday_bookings > 0 
+            ? round((($today_bookings - $yesterday_bookings) / $yesterday_bookings) * 100)
+            : 0;
+        
+        // Calculate revenue
+        $today_revenue = RB_Booking::sum_revenue_by_date_and_location($today, $location->id);
+        $yesterday_revenue = RB_Booking::sum_revenue_by_date_and_location($yesterday, $location->id);
+        $revenue_trend = $yesterday_revenue > 0
+            ? round((($today_revenue - $yesterday_revenue) / $yesterday_revenue) * 100)
+            : 0;
+        
+        // Calculate occupancy
+        $occupancy = RB_Table::get_occupancy_rate($location->id);
+        $previous_occupancy = RB_Table::get_occupancy_rate($location->id, $yesterday);
+        $occupancy_trend = $occupancy - $previous_occupancy;
+        
+        return array(
+            'id' => $location->id,
+            'name' => $location->name,
+            'stats' => array(
+                'bookings' => $today_bookings,
+                'bookings_trend' => $bookings_trend,
+                'revenue' => '$' . number_format($today_revenue, 0),
+                'revenue_trend' => $revenue_trend,
+                'occupancy' => $occupancy,
+                'occupancy_trend' => $occupancy_trend,
+                'tables' => RB_Table::count_by_location($location->id)
+            )
+        );
+    }
+}
+
+// Initialize
+new RB_Modern_Admin();
+🎨 Admin Template Files
+Main Admin Dashboard Template
+php<!-- admin/partials/admin-dashboard.php -->
+<div class="rb-admin-header-bar">
+    <div class="rb-admin-branding">
+        <div class="rb-admin-logo">
+            <svg width="24" height="24" fill="#2563eb" viewBox="0 0 24 24">
+                <!-- Restaurant icon -->
+            </svg>
+            <span class="rb-admin-logo-text"><?php _e('Restaurant Booking', 'restaurant-booking'); ?></span>
+        </div>
+    </div>
+    
+    <nav class="rb-admin-nav">
+        <a href="?page=rb-dashboard" class="rb-admin-menu-item rb-active">
+            <svg class="rb-admin-menu-icon" width="20" height="20"><!-- Dashboard --></svg>
+            <?php _e('Dashboard', 'restaurant-booking'); ?>
+        </a>
+        <a href="?page=rb-bookings" class="rb-admin-menu-item">
+            <svg class="rb-admin-menu-icon" width="20" height="20"><!-- Bookings --></svg>
+            <?php _e('Bookings', 'restaurant-booking'); ?>
+            <span class="rb-admin-badge">12</span>
+        </a>
+        <a href="?page=rb-locations" class="rb-admin-menu-item">
+            <svg class="rb-admin-menu-icon" width="20" height="20"><!-- Locations --></svg>
+            <?php _e('Locations', 'restaurant-booking'); ?>
+        </a>
+        <a href="?page=rb-settings" class="rb-admin-menu-item">
+            <svg class="rb-admin-menu-icon" width="20" height="20"><!-- Settings --></svg>
+            <?php _e('Settings', 'restaurant-booking'); ?>
+        </a>
+        <a href="?page=rb-reports" class="rb-admin-menu-item">
+            <svg class="rb-admin-menu-icon" width="20" height="20"><!-- Reports --></svg>
+            <?php _e('Reports', 'restaurant-booking'); ?>
+        </a>
+    </nav>
+</div>
+
+<div class="rb-admin-container">
+    <div class="rb-admin-content">
+        <div id="admin-loader" class="rb-loading-overlay" style="display: none;">
+            <div class="rb-loading-spinner"></div>
+        </div>
+        
+        <!-- Dashboard content loaded via JavaScript -->
+    </div>
+</div>
+
+<?php wp_enqueue_script('rb-modern-admin'); ?>
+📱 Mobile Responsiveness
+Mobile Admin Styles
+css@media (max-width: 768px) {
+  .rb-admin-header {
+    flex-direction: column;
+    gap: var(--rb-space-3);
+  }
+  
+  .rb-admin-nav {
+    margin-left: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .rb-admin-menu {
+    flex-wrap: nowrap;
+  }
+  
+  .rb-admin-container {
+    grid-template-columns: 1fr;
+    gap: var(--rb-space-4);
+    padding: var(--rb-space-4);
+  }
+  
+  .rb-admin-sidebar {
+    position: fixed;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100vh;
+    z-index: 1000;
+    background: var(--rb-bg-primary);
+    transition: left 0.3s ease;
+  }
+  
+  .rb-admin-sidebar.rb-open {
+    left: 0;
+  }
+  
+  .rb-locations-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .rb-admin-table {
+    font-size: var(--rb-text-sm);
+    overflow-x: auto;
+  }
+  
+  .rb-admin-table th,
+  .rb-admin-table td {
+    padding: var(--rb-space-2);
+  }
+}
+
+@media (max-width: 640px) {
+  .rb-admin-menu-item {
+    padding: var(--rb-space-2);
+  }
+  
+  .rb-admin-logo-text {
+    display: none;
+  }
+  
+  .rb-location-stats {
+    grid-template-columns: 1fr;
+  }
+}
+```
+
+## 🧪 Testing Requirements
+
+### Functional Testing
+- [ ] All admin pages load correctly
+- [ ] Multi-location overview displays accurate data
+- [ ] Bookings table filters work
+- [ ] Settings save properly
+- [ ] Reports generate correctly
+
+### Performance Testing
+- [ ] Admin pages load in <2s
+- [ ] Dashboard updates smoothly
+- [ ] No memory leaks
+- [ ] Efficient database queries
+
+### Accessibility Testing
+- [ ] Keyboard navigation works
+- [ ] Screen reader friendly
+- [ ] Color contrast compliance
+- [ ] Focus management
+
+## 🎯 Success Criteria
+
+### Visual Requirements
+- [ ] Consistent with Phase 1 design system
+- [ ] Modern, professional appearance
+- [ ] Smooth transitions and animations
+- [ ] Responsive across devices
+
+### Functional Requirements
+- [ ] All admin features working
+- [ ] Multi-location management functional
+- [ ] Advanced filtering operational
+- [ ] Export functionality working
+
+### Integration Requirements
+- [ ] Works with existing WordPress admin
+- [ ] Maintains backward compatibility
+- [ ] Preserves all business logic
+- [ ] Compatible with other plugins
+
+## 📁 Expected File Outputs
+```
+admin/class-modern-admin.php              # Main admin class
+admin/partials/
+├── admin-dashboard.php                   # Dashboard template
+├── bookings-table.php                    # Bookings management
+├── locations-management.php              # Location management
+├── settings-panel.php                    # Settings interface
+└── reports-analytics.php                 # Reports dashboard
+assets/css/modern-admin.css              # Admin styles
+assets/js/modern-admin.js                # Admin interactions
+Focus on creating a modern, efficient WordPress admin interface that empowers super administrators to manage complex multi-location operations! 🚀
