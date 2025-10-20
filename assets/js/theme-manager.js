@@ -1,110 +1,119 @@
 /**
- * Theme Manager
- * Handles light/dark theme toggling and persistence across sessions.
+ * Global Theme Manager
+ * Manages light/dark mode across entire application.
  */
 class ThemeManager {
-  constructor({ toggleSelector = '#themeToggle', storageKey = 'rb-theme' } = {}) {
-    this.toggleSelector = toggleSelector;
-    this.storageKey = storageKey;
-    this.toggleButton = null;
+  constructor() {
+    this.STORAGE_KEY = 'rb_theme_preference';
+    this.THEME_ATTRIBUTE = 'data-theme';
+    this.THEMES = {
+      LIGHT: 'light',
+      DARK: 'dark'
+    };
 
-    this.handleToggleClick = this.handleToggleClick.bind(this);
-    this.handleSystemChange = this.handleSystemChange.bind(this);
-
-    document.addEventListener('DOMContentLoaded', () => this.init());
+    this.init();
   }
 
   init() {
-    this.toggleButton = document.querySelector(this.toggleSelector);
-    this.applySavedTheme();
-    this.setupToggle();
-    this.observeSystemPreference();
+    const savedTheme = this.getSavedTheme();
+    const preferredTheme = savedTheme || this.getSystemPreference();
+
+    this.setTheme(preferredTheme);
+    this.setupToggleListener();
+    this.watchSystemPreference();
   }
 
-  applySavedTheme() {
-    const savedTheme = this.getStoredTheme();
-
-    if (savedTheme) {
-      this.setTheme(savedTheme);
-    } else {
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      this.setTheme(prefersDark ? 'dark' : 'light');
-    }
-  }
-
-  setupToggle() {
-    if (!this.toggleButton) return;
-
-    this.updateToggleState();
-    this.toggleButton.addEventListener('click', this.handleToggleClick);
-    this.toggleButton.addEventListener('keydown', (event) => {
-      if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault();
-        this.handleToggleClick();
+  getSavedTheme() {
+    if (typeof Storage !== 'undefined') {
+      try {
+        return localStorage.getItem(this.STORAGE_KEY);
+      } catch (error) {
+        console.warn('ThemeManager: Unable to access localStorage.', error);
       }
-    });
+    }
+    return null;
   }
 
-  handleToggleClick() {
-    const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
-    const nextTheme = currentTheme === 'light' ? 'dark' : 'light';
-    this.setTheme(nextTheme);
-    this.storeTheme(nextTheme);
-    this.updateToggleState();
-  }
-
-  observeSystemPreference() {
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    mediaQuery.addEventListener('change', this.handleSystemChange);
-  }
-
-  handleSystemChange(event) {
-    const savedTheme = this.getStoredTheme();
-    if (savedTheme) return; // respect explicit user choice
-
-    const nextTheme = event.matches ? 'dark' : 'light';
-    this.setTheme(nextTheme);
-    this.updateToggleState();
-  }
-
-  updateToggleState() {
-    if (!this.toggleButton) return;
-
-    const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
-    const isDark = currentTheme === 'dark';
-    this.toggleButton.setAttribute('aria-pressed', String(isDark));
-
-    const sunIcon = this.toggleButton.querySelector('.rb-sun-icon');
-    const moonIcon = this.toggleButton.querySelector('.rb-moon-icon');
-
-    if (sunIcon) sunIcon.style.opacity = isDark ? '0.4' : '1';
-    if (moonIcon) moonIcon.style.opacity = isDark ? '1' : '0.4';
-
-    const label = isDark ? 'Switch to light mode' : 'Switch to dark mode';
-    this.toggleButton.setAttribute('aria-label', label);
+  getSystemPreference() {
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      return this.THEMES.DARK;
+    }
+    return this.THEMES.LIGHT;
   }
 
   setTheme(theme) {
-    document.documentElement.setAttribute('data-theme', theme);
+    if (!Object.values(this.THEMES).includes(theme)) {
+      theme = this.THEMES.LIGHT;
+    }
+
+    document.documentElement.setAttribute(this.THEME_ATTRIBUTE, theme);
+
+    if (typeof Storage !== 'undefined') {
+      try {
+        localStorage.setItem(this.STORAGE_KEY, theme);
+      } catch (error) {
+        console.warn('ThemeManager: Unable to persist theme preference.', error);
+      }
+    }
+
+    document.dispatchEvent(new CustomEvent('themechange', {
+      detail: { theme }
+    }));
   }
 
-  storeTheme(theme) {
-    try {
-      localStorage.setItem(this.storageKey, theme);
-    } catch (error) {
-      console.warn('ThemeManager: Unable to persist theme preference.', error);
+  toggleTheme() {
+    const current = this.getCurrentTheme();
+    const next = current === this.THEMES.DARK ? this.THEMES.LIGHT : this.THEMES.DARK;
+    this.setTheme(next);
+  }
+
+  getCurrentTheme() {
+    return document.documentElement.getAttribute(this.THEME_ATTRIBUTE) || this.THEMES.LIGHT;
+  }
+
+  setupToggleListener() {
+    const toggles = document.querySelectorAll('[id*="theme-toggle"], .rb-theme-toggle');
+
+    toggles.forEach((btn) => {
+      btn.addEventListener('click', (event) => {
+        event.preventDefault();
+        this.toggleTheme();
+      });
+    });
+  }
+
+  watchSystemPreference() {
+    if (!window.matchMedia) return;
+
+    const darkModeQuery = window.matchMedia('(prefers-color-scheme: dark)');
+
+    const listener = (event) => {
+      if (!this.getSavedTheme()) {
+        this.setTheme(event.matches ? this.THEMES.DARK : this.THEMES.LIGHT);
+      }
+    };
+
+    if (typeof darkModeQuery.addEventListener === 'function') {
+      darkModeQuery.addEventListener('change', listener);
+    } else if (typeof darkModeQuery.addListener === 'function') {
+      darkModeQuery.addListener(listener);
     }
   }
 
-  getStoredTheme() {
-    try {
-      return localStorage.getItem(this.storageKey);
-    } catch (error) {
-      console.warn('ThemeManager: Unable to read stored theme.', error);
-      return null;
-    }
+  onThemeChange(callback) {
+    document.addEventListener('themechange', (event) => {
+      callback(event.detail.theme);
+    });
   }
 }
 
-// Initialize with default options
-new ThemeManager();
+if (typeof window !== 'undefined') {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      window.rbThemeManager = new ThemeManager();
+    });
+  } else {
+    window.rbThemeManager = new ThemeManager();
+  }
+}
+

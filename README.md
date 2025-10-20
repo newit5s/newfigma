@@ -77,52 +77,169 @@ UI Components:
 ## 📦 Cấu trúc file
 
 ```
-restaurant-booking-manager/
-├── restaurant-booking-manager.php      # Plugin bootstrap
-├── admin/
-│   ├── class-admin.php                 # Modern admin interface
-│   ├── class-admin-dashboard.php       # Super admin dashboard
-│   └── partials/
-│       ├── admin-dashboard.php         # Main admin view
-│       ├── locations-management.php    # Multi-location manager
-│       ├── analytics-reports.php       # Advanced analytics
-│       └── email-templates.php         # Email customization
+modern-restaurant-booking/
+├── restaurant-booking-manager.php          # ⭐ Plugin bootstrap (NEW)
 ├── includes/
-│   ├── class-booking-manager.php       # Core booking logic
-│   ├── class-modern-ui.php             # UI component manager
-│   ├── class-theme-manager.php         # Dark/Light mode handler
-│   ├── class-analytics.php             # Advanced analytics engine
-│   ├── class-notification-system.php   # Real-time notifications
+│   ├── class-plugin-loader.php            # ⭐ Hook orchestration (NEW)
+│   ├── class-plugin-manager.php           # ⭐ Dependency container (NEW)
+│   ├── class-plugin-activator.php         # ⭐ Activation routines (NEW)
+│   ├── class-plugin-deactivator.php       # ⭐ Cleanup routines (NEW)
+│   ├── database/
+│   │   └── schema.php                     # ⭐ Database schema helpers (NEW)
+│   ├── models/
+│   │   ├── class-booking.php              # Booking entity model
+│   │   ├── class-location.php             # Location entity model
+│   │   ├── class-table.php                # Table entity model
+│   │   └── class-customer.php             # Customer entity model
 │   └── services/
-│       ├── class-calendar-service.php  # Calendar operations
-│       ├── class-analytics-service.php # Data analysis
-│       └── class-export-service.php    # Data export functionality
-├── public/
-│   ├── class-modern-booking-widget.php # New booking interface
-│   ├── class-modern-portal.php         # Restaurant manager portal
+│       ├── class-analytics-service.php    # Analytics domain service
+│       ├── class-calendar-service.php     # Calendar orchestration
+│       └── class-notification-service.php # Notification delivery
+├── admin/
+│   ├── class-modern-admin.php             # Modern admin controller
 │   └── partials/
-│       ├── modern-booking-modal.php    # Booking widget template
-│       ├── modern-dashboard.php        # Manager dashboard
-│       ├── calendar-view.php           # Calendar interface
-│       └── table-management.php        # Table floor plan
+│       ├── admin-dashboard.php            # Overview & charts
+│       ├── bookings-table.php             # Booking table management
+│       ├── locations-management.php       # Multi-location tools
+│       ├── reports-analytics.php          # Analytics reporting
+│       └── settings-panel.php             # Settings UI
+├── public/
+│   ├── class-modern-booking-manager.php   # Frontend booking entrypoint
+│   ├── class-modern-booking-widget.php    # Customer booking modal
+│   ├── class-modern-dashboard.php         # Manager dashboard surface
+│   ├── class-modern-portal-auth.php       # Portal auth flows
+│   └── class-modern-table-manager.php     # Table management frontend
+├── public/partials/
+│   ├── booking-modal.php                  # Booking modal template
+│   ├── booking-management.php             # Booking management layout
+│   ├── booking-calendar-view.php          # Availability calendar
+│   ├── customer-profiles.php              # Customer detail view
+│   ├── portal-dashboard.php               # Manager portal UI
+│   └── table-management.php               # Table floor plan
 ├── assets/
 │   ├── css/
-│   │   ├── modern-booking.css          # Customer booking styles
-│   │   ├── modern-portal.css           # Manager portal styles
-│   │   ├── modern-admin.css            # Admin panel styles
-│   │   └── components/                 # Reusable CSS components
+│   │   ├── design-system.css              # Core design tokens
+│   │   ├── animations.css                 # ⭐ Animation tokens (NEW)
+│   │   ├── booking-modal.css              # Booking modal styles
+│   │   ├── booking-management.css         # Back-office booking styles
+│   │   ├── portal-dashboard.css           # Portal dashboard styles
+│   │   ├── table-management.css           # Floor plan styles
+│   │   └── components.css                 # Shared component styles
 │   ├── js/
-│   │   ├── modern-booking.js           # Booking widget logic
-│   │   ├── modern-portal.js            # Portal interactions
-│   │   ├── analytics-charts.js         # Charts & visualization
-│   │   └── theme-switcher.js           # Dark/Light mode toggle
+│   │   ├── theme-manager.js               # ✓ Theme persistence (Updated)
+│   │   ├── booking-widget.js              # Booking widget logic
+│   │   ├── portal-dashboard.js            # Portal interactions
+│   │   ├── dashboard-charts.js            # Chart integrations
+│   │   ├── booking-management.js          # Admin booking scripts
+│   │   ├── table-management.js            # Table visualization scripts
+│   │   └── modern-admin.js                # Admin enhancements
 │   └── images/
-│       ├── icons/                      # SVG icon set
-│       └── illustrations/              # UI illustrations
+│       ├── icons/                         # SVG icon set
+│       └── illustrations/                 # UI illustrations
 ├── templates/
-│   ├── emails/                         # Modern email templates
-│   └── pdf/                           # PDF receipt templates
-└── languages/                         # Multi-language support
+│   ├── emails/                            # Email templates
+│   └── pdf/                               # PDF exports
+├── languages/                             # Translation files
+├── tests/
+│   ├── unit/                              # PHPUnit tests
+│   └── e2e/                               # Playwright tests
+├── README.md                              # ✓ Tài liệu tổng quan
+├── CHANGELOG.md                           # Lịch sử thay đổi
+├── composer.json                          # PHP dependencies
+├── package.json                           # JS tooling
+└── .gitignore
+```
+
+## 🔧 Plugin Architecture & Initialization
+
+### How Plugin Initializes
+
+```text
+1. restaurant-booking-manager.php (Bootstrap)
+   ↓
+2. Định nghĩa plugin constants & đường dẫn
+   ↓
+3. Require class-plugin-loader.php & class-plugin-manager.php
+   ↓
+4. Hook vào sự kiện plugins_loaded
+   ↓
+5. Restaurant_Booking_Plugin_Manager::instance() khởi tạo dependencies
+   ↓
+6. Đăng ký toàn bộ hooks/thành phần qua RB_Plugin_Loader
+   ↓
+7. Frontend, Admin & AJAX handlers sẵn sàng
+```
+
+### Plugin Manager Flow
+
+```text
+Restaurant_Booking_Plugin_Manager
+├── Load Core Classes
+│   ├── Booking
+│   ├── Location
+│   ├── Table
+│   └── Customer
+├── Load Services
+│   ├── Analytics Service
+│   ├── Calendar Service
+│   └── Notification Service
+├── Load Interfaces
+│   ├── Modern Admin (is_admin)
+│   ├── Modern Booking Widget (frontend)
+│   ├── Modern Dashboard (frontend)
+│   └── Modern Portal Auth (frontend)
+└── Register All Hooks & Filters
+```
+
+### Key Classes
+
+| Class | Purpose | Location |
+|-------|---------|----------|
+| `RB_Plugin_Loader` | Quản lý hooks & filters | `includes/class-plugin-loader.php` |
+| `Restaurant_Booking_Plugin_Manager` | Bootstrap & dependency injection | `includes/class-plugin-manager.php` |
+| `Restaurant_Booking_Plugin_Activator` | Tạo database & defaults | `includes/class-plugin-activator.php` |
+| `Restaurant_Booking_Plugin_Deactivator` | Cleanup & scheduler removal | `includes/class-plugin-deactivator.php` |
+| `RB_Modern_Admin` | Giao diện WordPress admin | `admin/class-modern-admin.php` |
+| `RB_Modern_Booking_Widget` | Widget đặt bàn frontend | `public/class-modern-booking-widget.php` |
+| `RB_Modern_Booking_Manager` | Điều phối booking frontend | `public/class-modern-booking-manager.php` |
+| `RB_Modern_Portal_Auth` | Đăng nhập portal & session | `public/class-modern-portal-auth.php` |
+| `RB_Modern_Dashboard` | Dashboard & analytics frontend | `public/class-modern-dashboard.php` |
+| `RB_Analytics_Service` | Xử lý dữ liệu analytics | `includes/services/class-analytics-service.php` |
+
+### Theme Manager Global Integration
+
+- `assets/js/theme-manager.js` được enqueue ở admin, portal, dashboard và booking widget
+- Lưu theme preference trong `localStorage` và đồng bộ với `prefers-color-scheme`
+- Cung cấp API `window.rbThemeManager` với các phương thức `getCurrentTheme`, `setTheme`, `onThemeChange`
+- Phát sự kiện `themechange` để component lắng nghe và cập nhật UI theo thời gian thực
+
+### CSS Animation System
+
+- `assets/css/animations.css` tập trung 20+ `@keyframes` tái sử dụng
+- Bao gồm token tốc độ chuyển động (`--rb-transition-*`)
+- Chứa hàm easing chuẩn hóa cho toàn bộ interface
+- Tôn trọng `prefers-reduced-motion` để đảm bảo accessibility
+- Cung cấp utility classes (`.rb-animate-fade-in`, `.rb-animate-slide-up`, ...)
+
+### Asynchronous AJAX Architecture
+
+```php
+// 1. Verify nonce
+check_ajax_referer( 'rb_nonce', 'nonce' );
+
+// 2. Sanitize input
+$param = sanitize_text_field( $_POST['param'] ?? '' );
+
+// 3. Validate capability
+if ( ! current_user_can( 'manage_bookings' ) ) {
+    wp_send_json_error( [ 'message' => __( 'Permission denied', 'restaurant-booking' ) ], 403 );
+}
+
+// 4. Process request
+$result = RB_Analytics_Service::get_instance()->process( $param );
+
+// 5. Return JSON
+wp_send_json_success( [ 'data' => $result ] );
 ```
 
 ## 🚀 Tính năng mới so với phiên bản cũ
@@ -282,17 +399,86 @@ npm run test:a11y
 
 ## 🚀 Installation & Setup
 
+### Requirements
+- WordPress 5.0 hoặc cao hơn
+- PHP 7.2 hoặc cao hơn
+- MySQL 5.6 hoặc cao hơn
+- Trình duyệt hiện đại hỗ trợ ES6
+
+### Installation
+
+#### Method 1: WordPress Admin (Recommended)
+1. Vào **Plugins → Add New**
+2. Chọn **Upload Plugin**
+3. Tải lên file `modern-restaurant-booking.zip`
+4. Click **Install Now**
+5. Click **Activate Plugin**
+6. Vào menu **Restaurant Booking** trong WordPress admin
+
+#### Method 2: Manual Upload
+1. Tải bản phát hành mới nhất từ GitHub
+2. Giải nén vào `wp-content/plugins/modern-restaurant-booking/`
+3. Vào menu **Plugins**
+4. Tìm "Modern Restaurant Booking Manager"
+5. Click **Activate**
+
+#### Method 3: CLI (Developer)
+```bash
+wp plugin install modern-restaurant-booking --activate
+```
+
 ### Quick Start
-1. Upload plugin folder vào `wp-content/plugins/`
-2. Activate plugin trong WordPress admin
-3. Vào **Restaurant Booking → Setup Wizard**
-4. Follow guided setup cho initial configuration
-5. Customize design trong **Appearance → Theme Settings**
+1. Upload plugin folder `modern-restaurant-booking/` vào `wp-content/plugins/`
+2. Vào menu **Plugins** trong WordPress admin
+3. Tìm "Modern Restaurant Booking Manager" và click **Activate**
+4. Plugin sẽ tự động:
+   - Tạo database tables
+   - Enqueue design system assets
+   - Initialize theme manager
+   - Register AJAX endpoints
+5. Vào **Restaurant Booking → Settings** để cấu hình:
+   - Thiết lập multiple locations
+   - Customize booking settings
+   - Cấu hình email templates
+
+### First Time Setup
+
+Sau khi kích hoạt, plugin sẽ tự động:
+- ✅ Tạo database tables cần thiết
+- ✅ Thiết lập cấu hình mặc định
+- ✅ Đăng ký custom post types & taxonomies
+- ✅ Khởi tạo design system assets
+- ✅ Đăng ký AJAX endpoints
+
+**Next Steps:**
+1. **Configure Locations**
+   - Vào **Restaurant Booking → Locations**
+   - Thêm các chi nhánh
+   - Cấu hình giờ hoạt động & số lượng bàn
+
+2. **Customize Settings**
+   - Vào **Restaurant Booking → Settings**
+   - Thiết lập advance notice (mặc định: 90 ngày)
+   - Cấu hình buffer time (mặc định: 30 phút)
+   - Bật/tắt các tính năng bổ sung
+
+3. **Setup Email Templates**
+   - Vào **Restaurant Booking → Email Templates**
+   - Tùy chỉnh nội dung email xác nhận
+   - Thêm branding của nhà hàng
+
+4. **Test Booking Widget**
+   - Tạo một trang test
+   - Thêm shortcode: `[modern_restaurant_booking]`
+   - Kiểm tra 3 bước đặt bàn
 
 ### Advanced Setup
+
+#### Development Environment
 ```bash
 # Clone repository
 git clone https://github.com/your-repo/modern-restaurant-booking.git
+cd modern-restaurant-booking
 
 # Install dependencies
 composer install
@@ -301,41 +487,208 @@ npm install
 # Build assets
 npm run build
 
-# Setup development environment
+# Start development server
 npm run dev
+
+# Run tests
+npm test
+npm run test:e2e
 ```
+
+#### Docker Setup (Optional)
+```bash
+docker-compose up -d
+cd docker/wordpress
+wordpress setup
+```
+
+### Migration from v1.x
+Plugin sẽ tự động migrate dữ liệu khi nâng cấp:
+1. Backup database trước khi nâng cấp
+2. Deactivate phiên bản cũ
+3. Upload phiên bản mới
+4. Activate plugin
+5. Vào **Restaurant Booking → Migration Status**
+6. Plugin sẽ migrate toàn bộ bookings, customers, locations
+
+**Lưu ý:** Shortcode widget cũ vẫn hoạt động nhưng sử dụng giao diện hiện đại mới.
+
+### Troubleshooting Installation
+
+**Plugin không xuất hiện trong menu:**
+- Xóa cache trình duyệt
+- Xóa WordPress transients: `wp transient delete-expired`
+- Kiểm tra PHP error logs
+
+**Database tables không được tạo:**
+- Đảm bảo user WordPress có quyền CREATE TABLE
+- Kiểm tra log trong `wp-content/debug.log`
+- Chạy thủ công: `wp db query < includes/database/schema.sql`
+
+**Theme không áp dụng:**
+- Xóa toàn bộ cache (trình duyệt, plugin, server)
+- Kiểm tra console browser xem có lỗi CSS/JS
+- Xác minh `assets/css/design-system.css` đã được load
+
+**Dark mode không hoạt động:**
+- Xác minh `theme-manager.js` được enqueue
+- Kiểm tra localStorage trong trình duyệt
+- Thử ở chế độ incognito để loại bỏ extension
 
 ## 🎨 Customization Guide
 
 ### CSS Customization
+
+#### Theme Colors
 ```css
-/* Override CSS variables */
+/* In your child theme hoặc custom CSS */
 :root {
-  --rb-primary: #your-color;
-  --rb-border-radius: 8px;
-  --rb-font-family: 'Your Font', sans-serif;
+  /* Primary colors */
+  --rb-primary-50: #eff6ff;
+  --rb-primary-500: #your-primary;
+  --rb-primary-600: #your-primary-dark;
+
+  /* Accent colors */
+  --rb-success: #10b981;
+  --rb-warning: #f59e0b;
+  --rb-error: #ef4444;
+}
+```
+
+#### Typography
+```css
+:root {
+  --rb-font-sans: 'Your Font', system-ui, sans-serif;
+  --rb-text-base: 1rem;
+  --rb-text-lg: 1.125rem;
+  --rb-text-sm: 0.875rem;
+}
+```
+
+#### Animation Speed
+```css
+:root {
+  --rb-transition-fast: 150ms ease-in-out;
+  --rb-transition-base: 250ms ease-in-out;
+  --rb-transition-slow: 350ms ease-in-out;
 }
 
-/* Custom component styles */
-.rb-booking-widget.my-theme {
-  /* Your custom styles */
+/* Disable animations for specific component */
+.my-component {
+  --rb-transition-base: 0ms;
 }
 ```
 
 ### JavaScript Hooks
+
+#### Booking Widget Events
 ```javascript
 // Before booking submission
-rbBooking.addHook('beforeSubmit', function(data) {
-  // Modify booking data
+rbBooking.addHook('beforeSubmit', (data) => {
+  gtag('event', 'booking_submit', data);
   return data;
 });
 
 // After successful booking
-rbBooking.addHook('bookingSuccess', function(response) {
-  // Custom success handling
+rbBooking.addHook('bookingSuccess', (response) => {
+  alert(`Booking confirmed: ${response.booking_id}`);
+});
+
+// On booking error
+rbBooking.addHook('bookingError', (error) => {
+  console.error('Booking failed:', error);
 });
 ```
 
+#### Theme Change Events
+```javascript
+rbThemeManager.onThemeChange((theme) => {
+  console.log('Theme changed to:', theme);
+  // Update component state if needed
+});
+
+rbThemeManager.setTheme('dark');
+
+const current = rbThemeManager.getCurrentTheme();
+```
+
+#### Dashboard Events
+```javascript
+rbDashboard.addHook('statsLoaded', (stats) => {
+  mixpanel.track('Dashboard Stats', stats);
+});
+
+rbDashboard.addHook('locationChange', (locationId) => {
+  console.log('Switched to location:', locationId);
+});
+```
+
+### WordPress Filters
+
+#### Customize Booking Settings
+```php
+add_filter( 'rb_booking_settings', function( $settings ) {
+    $settings['advance_days'] = 60; // Instead of default 90
+    $settings['buffer_time'] = 45;  // Instead of default 30
+    return $settings;
+} );
+```
+
+#### Modify Email Template
+```php
+add_filter( 'rb_confirmation_email_body', function( $body, $booking ) {
+    $body .= '\nThank you for booking with us!';
+    return $body;
+}, 10, 2 );
+```
+
+#### Add Custom Dashboard Widget
+```php
+add_filter( 'rb_dashboard_widgets', function( $widgets ) {
+    $widgets[] = [
+        'id'    => 'weather',
+        'title' => 'Restaurant Weather',
+        'callback' => 'my_weather_widget',
+    ];
+    return $widgets;
+} );
+
+function my_weather_widget() {
+    echo '<div id="weather-widget"></div>';
+}
+```
+
+### Extending Components
+
+#### Custom Booking Step
+```php
+add_filter( 'rb_booking_steps', function( $steps ) {
+    $steps['step4'] = [
+        'title'    => 'Special Requests',
+        'template' => 'booking-step-4.php',
+    ];
+    return $steps;
+} );
+```
+
+#### Custom Admin Page
+```php
+add_action( 'admin_menu', function() {
+    add_submenu_page(
+        'rb-dashboard',
+        'Custom Reports',
+        'Custom Reports',
+        'manage_options',
+        'rb-custom-reports',
+        'render_custom_reports'
+    );
+} );
+
+function render_custom_reports() {
+    echo '<div class="wrap"><h1>Custom Reports</h1></div>';
+}
+```
+ 
 ## 🤝 Contributing
 
 ### Development Workflow

@@ -130,16 +130,31 @@ if ( ! class_exists( 'RB_Modern_Portal_Auth' ) ) {
             );
 
             wp_enqueue_style(
+                'rb-animations',
+                $base_dir . 'assets/css/animations.css',
+                array( 'rb-design-system' ),
+                $version
+            );
+
+            wp_enqueue_style(
                 'rb-portal-auth',
                 $base_dir . 'assets/css/portal-auth.css',
-                array( 'rb-design-system', 'rb-components' ),
+                array( 'rb-design-system', 'rb-components', 'rb-animations' ),
                 $version
+            );
+
+            wp_enqueue_script(
+                'rb-theme-manager',
+                $base_dir . 'assets/js/theme-manager.js',
+                array(),
+                $version,
+                true
             );
 
             wp_enqueue_script(
                 'rb-portal-auth',
                 $base_dir . 'assets/js/portal-auth.js',
-                array(),
+                array( 'rb-theme-manager' ),
                 $version,
                 true
             );

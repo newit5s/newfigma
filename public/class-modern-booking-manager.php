@@ -101,16 +101,31 @@ if ( ! class_exists( 'RB_Modern_Booking_Manager' ) ) {
             );
 
             wp_enqueue_style(
+                'rb-animations',
+                $base_url . 'assets/css/animations.css',
+                array( 'rb-design-system' ),
+                $version
+            );
+
+            wp_enqueue_style(
                 'rb-booking-management',
                 $base_url . 'assets/css/booking-management.css',
-                array( 'rb-design-system', 'rb-components' ),
+                array( 'rb-design-system', 'rb-components', 'rb-animations' ),
                 $version
+            );
+
+            wp_enqueue_script(
+                'rb-theme-manager',
+                $base_url . 'assets/js/theme-manager.js',
+                array(),
+                $version,
+                true
             );
 
             wp_enqueue_script(
                 'rb-booking-management',
                 $base_url . 'assets/js/booking-management.js',
-                array(),
+                array( 'rb-theme-manager' ),
                 $version,
                 true
             );

@@ -91,9 +91,16 @@ if ( ! class_exists( 'RB_Modern_Dashboard' ) ) {
             );
 
             wp_enqueue_style(
+                'rb-animations',
+                $base_url . 'assets/css/animations.css',
+                array( 'rb-design-system' ),
+                $version
+            );
+
+            wp_enqueue_style(
                 'rb-portal-dashboard',
                 $base_url . 'assets/css/portal-dashboard.css',
-                array( 'rb-design-system', 'rb-components' ),
+                array( 'rb-design-system', 'rb-components', 'rb-animations' ),
                 $version
             );
 
@@ -114,9 +121,17 @@ if ( ! class_exists( 'RB_Modern_Dashboard' ) ) {
             );
 
             wp_enqueue_script(
+                'rb-theme-manager',
+                $base_url . 'assets/js/theme-manager.js',
+                array(),
+                $version,
+                true
+            );
+
+            wp_enqueue_script(
                 'rb-portal-dashboard',
                 $base_url . 'assets/js/portal-dashboard.js',
-                array( 'rb-dashboard-charts' ),
+                array( 'rb-dashboard-charts', 'rb-theme-manager' ),
                 $version,
                 true
             );
