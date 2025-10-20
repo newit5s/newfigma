@@ -34,7 +34,7 @@ if ( ! class_exists( 'RB_Modern_Dashboard' ) ) {
          */
         public function __construct() {
             if ( class_exists( 'RB_Analytics' ) ) {
-                $this->analytics = new RB_Analytics();
+                $this->analytics = RB_Analytics::get_instance();
             } else {
                 $this->analytics = null;
             }

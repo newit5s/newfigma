@@ -52,6 +52,7 @@ if ( ! class_exists( 'Restaurant_Booking_Plugin_Manager' ) ) {
             require_once RESTAURANT_BOOKING_PATH . 'includes/models/class-customer.php';
 
             require_once RESTAURANT_BOOKING_PATH . 'includes/services/class-analytics-service.php';
+            require_once RESTAURANT_BOOKING_PATH . 'includes/services/class-rb-analytics.php';
             require_once RESTAURANT_BOOKING_PATH . 'includes/services/class-calendar-service.php';
             require_once RESTAURANT_BOOKING_PATH . 'includes/services/class-notification-service.php';
 
