@@ -144,3 +144,36 @@
 - [x] Quick actions emit navigation events or open modules based on localized URLs.
 - [x] Responsive layout maintains readability across breakpoints as defined in `portal-dashboard.css`.
 - [x] Keyboard focus order and ARIA labels on controls (selectors, buttons) remain intact from template markup.
+
+## Test Phrase 5
+- Added the fifth verification entry to continue the chronological audit of modernization deliverables.
+- Reviewed the shipping booking management assets before updating acceptance and testing checklists for Phase 5.
+- Noted the outstanding drag-and-drop calendar work so future iterations can target that gap explicitly.
+
+## Phase 5 Checklist Verification
+- Inspected `public/partials/booking-management.php` to confirm the table view, calendar toggle, filters, and bulk-action toolbar mirror the prompt layout while pulling real data attributes for locations and statuses.
+- Audited `assets/js/booking-management.js` to verify the BookingManagement controller wires filters, pagination, bulk operations, and AJAX endpoints together, with specialized helpers for the table, filters, bulk actions, and calendar view.
+- Confirmed `public/partials/booking-calendar-view.php` provides the reusable calendar scaffold and legends that the calendar manager populates.
+- Checked `public/class-modern-booking-manager.php` for WordPress integration, ensuring assets are enqueued, nonce-localized, and AJAX handlers exist for list, calendar, update, bulk, reminder, and export operations.
+
+### Acceptance Criteria
+1. **Management Layout & Views**
+   - [x] `booking-management.php` renders the header, view toggle, filters, bulk toolbar, and sortable table shell required for table and calendar workflows.
+2. **Advanced Filtering & Search**
+   - [x] `BookingFilterManager` syncs date range, status, location, search debounce, clear/reset controls, and triggers table/calendar reloads.
+3. **Calendar Rendering**
+   - [x] `booking-calendar-view.php` plus `BookingCalendarManager` fetches calendar data, updates the month title, and paints day cells with booking badges and counts.
+4. **Bulk & Single Booking Actions**
+   - [x] Table rows expose view/edit/confirm/delete controls, and bulk actions support confirm, pending, cancel, email reminders, and selection clearing.
+5. **WordPress Integration & Security**
+   - [x] Modern booking manager enqueues design system assets, localizes nonces/defaults, and guards AJAX endpoints with capability checks.
+6. **Drag & Drop Rescheduling**
+   - [ ] Drag-and-drop interactions are not yet implemented; the calendar currently binds click events only, so rescheduling still needs to be built.
+
+### Testing Checklist
+- [x] Toggling between table and calendar views updates visibility and loads the corresponding data.
+- [x] Adjusting date range, status, location, and search filters refreshes results and pagination.
+- [x] Bulk confirm, pending, cancel, and reminder actions operate on the selected booking IDs and clear the selection afterward.
+- [x] Export action submits the current filters and downloads a CSV payload when the response is non-JSON.
+- [x] Calendar navigation buttons, view modes, and today shortcut refresh the schedule grid with server data.
+- [ ] Drag-and-drop rescheduling is pending implementation; no draggable handlers exist yet in the calendar view.
