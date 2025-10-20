@@ -177,3 +177,12 @@
 - [x] Export action submits the current filters and downloads a CSV payload when the response is non-JSON.
 - [x] Calendar navigation buttons, view modes, and today shortcut refresh the schedule grid with server data.
 - [ ] Drag-and-drop rescheduling is pending implementation; no draggable handlers exist yet in the calendar view.
+
+## Test Phrase 6
+- Logged the sixth verification request to capture the Phase 1–6 compliance audit discussed with the stakeholder.
+- Summarized the three outstanding gaps (bootstrap file absence, animation tokens, and theme manager integration) identified during the review.
+- Clarified that these gaps stem from early-phase requirements rather than the Phase 7–8 scopes, aligning expectations for follow-up work.
+- Documented specific issues discovered so they can be tracked explicitly in future remediation work:
+  - Plugin bootstrap file (`restaurant-booking-manager.php` plus supporting `admin/` and `includes/` loaders) is missing, so WordPress cannot initialize the shipped classes.
+  - Design system lacks the animation token set and shared `@keyframes` definitions requested in Phase 1, leaving motion guidance incomplete.
+  - `theme-manager.js` is not enqueued across primary portal/booking views, preventing the global theme toggle from functioning consistently outside the style guide.
