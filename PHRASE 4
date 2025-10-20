@@ -1,69 +1,408 @@
-</div>
-      <div class="rb-action-content">
-        <div class="rb-action-title">Settings</div>
-        <div class="rb-action-description">Portal preferences</div>
-      </div>
-    </div>
-  </div>
-</div>
+# PHASE 4: Portal Dashboard
 
-## 📅 Today's Schedule Widget
+## 🎯 Objective
+Create a modern restaurant manager dashboard with real-time statistics, interactive charts, and quick action widgets based on Figma design: https://www.figma.com/community/file/1308435721888237413
+
+## 📋 Dependencies
+- **Phase 1**: Design system CSS variables and base components
+- **Phase 3**: Portal authentication system
+- **Existing Backend**: `RB_Booking::get_location_stats()`, `RB_Analytics` class, booking data
+
+## 📦 Deliverables
+1. **portal-dashboard.css** - Dashboard specific styles
+2. **dashboard-charts.js** - Interactive charts and data visualization
+3. **portal-dashboard.php** - Dashboard template structure
+4. **class-modern-dashboard.php** - WordPress integration and data management
+
+## 🎨 Dashboard Layout Specifications
+
+### Main Layout Structure
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ [☰] Dashboard    Today: March 15, 2024    [🌙][🔔][👤] John Doe │ ← Header
+├─────────────────────────────────────────────────────────────────┤
+│ 📍 Downtown Branch  ▼                                 [Switch]   │ ← Location Selector
+├─────────────────────────────────────────────────────────────────┤
+│ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ │
+│ │     24      │ │   $2,450    │ │     85%     │ │     12      │ │ ← Stats Row
+│ │Today's      │ │Today's      │ │Table        │ │Pending      │ │
+│ │Bookings     │ │Revenue      │ │Occupancy    │ │Approvals    │ │
+│ │↗ +12%      │ │↗ +8%       │ │↘ -5%       │ │⚠ Review    │ │
+│ └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘ │
+├─────────────────────────────────────────────────────────────────┤
+│ ┌──────────────────────────────┐ ┌─────────────────────────────┐ │
+│ │         Booking Trends       │ │       Quick Actions         │ │
+│ │  ┌────────────────────────┐  │ │  ┌─────────────────────────┐ │ │
+│ │  │                        │  │ │  │ 📋 Confirm Booking      │ │ │
+│ │  │      Chart Area        │  │ │  │ 🚶 Add Walk-in          │ │ │
+│ │  │                        │  │ │  │ 📅 View Calendar        │ │ │
+│ │  └────────────────────────┘  │ │  │ 👥 Manage Tables        │ │ │
+│ └──────────────────────────────┘ │  │ 📊 View Reports         │ │ │
+│                                  │  │ ⚙️ Settings             │ │ │
+│ ┌──────────────────────────────┐ │  └─────────────────────────┘ │ │
+│ │      Today's Schedule        │ └─────────────────────────────┘ │
+│ │  7:00 PM ── John Doe (T1)   │                                 │
+│ │  7:30 PM ── Jane S. (T5)    │                                 │
+│ │  8:00 PM ── Mike W. (T2)    │                                 │
+│ └──────────────────────────────┘                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+## 📊 Statistics Cards Component
 
 ### HTML Structure
 ```html
-<div class="rb-todays-schedule">
-  <div class="rb-widget-header">
-    <h3 class="rb-widget-title">Today's Schedule</h3>
-    <div class="rb-schedule-date" id="schedule-date">March 15, 2024</div>
-  </div>
-  
-  <div class="rb-schedule-timeline" id="schedule-timeline">
-    <div class="rb-schedule-time-slot" data-time="17:00">
-      <div class="rb-time-label">5:00 PM</div>
-      <div class="rb-bookings-list">
-        <div class="rb-booking-item" data-booking-id="123">
-          <div class="rb-booking-customer">John Doe</div>
-          <div class="rb-booking-details">Table 5 • 4 people</div>
-          <div class="rb-booking-status rb-status-confirmed">Confirmed</div>
-        </div>
-        <div class="rb-booking-item" data-booking-id="124">
-          <div class="rb-booking-customer">Sarah Wilson</div>
-          <div class="rb-booking-details">Table 8 • 2 people</div>
-          <div class="rb-booking-status rb-status-pending">Pending</div>
-        </div>
-      </div>
+<div class="rb-dashboard-container">
+  <!-- Dashboard Header -->
+  <div class="rb-dashboard-header">
+    <div class="rb-dashboard-title-section">
+      <h1 class="rb-dashboard-title">Dashboard</h1>
+      <div class="rb-dashboard-date" id="current-date">Today: March 15, 2024</div>
     </div>
     
-    <div class="rb-schedule-time-slot" data-time="18:00">
-      <div class="rb-time-label">6:00 PM</div>
-      <div class="rb-bookings-list">
-        <div class="rb-booking-item" data-booking-id="125">
-          <div class="rb-booking-customer">Mike Johnson</div>
-          <div class="rb-booking-details">Table 3 • 6 people</div>
-          <div class="rb-booking-status rb-status-confirmed">Confirmed</div>
-        </div>
+    <div class="rb-dashboard-controls">
+      <div class="rb-location-selector">
+        <select class="rb-location-select" id="location-selector">
+          <option value="1">📍 Downtown Branch</option>
+          <option value="2">📍 Uptown Location</option>
+          <option value="3">📍 Mall Branch</option>
+        </select>
       </div>
-    </div>
-    
-    <div class="rb-schedule-time-slot rb-no-bookings" data-time="19:00">
-      <div class="rb-time-label">7:00 PM</div>
-      <div class="rb-bookings-list">
-        <div class="rb-empty-slot">
-          <span class="rb-empty-text">No bookings</span>
-          <button class="rb-btn rb-btn-sm rb-btn-outline">Add Booking</button>
-        </div>
+      
+      <button class="rb-btn rb-btn-icon" id="theme-toggle" title="Toggle theme">
+        <svg class="rb-theme-icon" width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.37a5.389 5.389 0 01-4.4 2.37 5.403 5.403 0 01-3.4-9.73A8.81 8.81 0 0012 3z"/>
+        </svg>
+      </button>
+      
+      <button class="rb-btn rb-btn-icon" id="notifications-toggle" title="Notifications">
+        <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
+        </svg>
+        <span class="rb-notification-badge">3</span>
+      </button>
+      
+      <div class="rb-user-menu">
+        <div class="rb-user-avatar">JD</div>
+        <span class="rb-user-name">John Doe</span>
       </div>
     </div>
   </div>
   
-  <div class="rb-schedule-summary">
-    <div class="rb-summary-item">
-      <span class="rb-summary-label">Total Bookings:</span>
-      <span class="rb-summary-value">24</span>
+  <!-- Stats Cards Grid -->
+  <div class="rb-dashboard-stats">
+    <div class="rb-stat-card" data-metric="bookings">
+      <div class="rb-stat-header">
+        <div class="rb-stat-icon rb-stat-icon-booking">
+          <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/>
+          </svg>
+        </div>
+        <div class="rb-stat-period">
+          <select class="rb-stat-period-select" data-metric="bookings">
+            <option value="today">Today</option>
+            <option value="week">This Week</option>
+            <option value="month">This Month</option>
+          </select>
+        </div>
+      </div>
+      
+      <div class="rb-stat-body">
+        <div class="rb-stat-number" id="stat-bookings">24</div>
+        <div class="rb-stat-label">Today's Bookings</div>
+        <div class="rb-stat-change rb-positive" id="stat-bookings-change">
+          <svg class="rb-stat-trend-icon" width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M7 14l5-5 5 5z"/>
+          </svg>
+          <span>+12% from yesterday</span>
+        </div>
+      </div>
+      
+      <div class="rb-stat-loading" style="display: none;">
+        <div class="rb-loading-spinner"></div>
+      </div>
     </div>
-    <div class="rb-summary-item">
-      <span class="rb-summary-label">Expected Revenue:</span>
-      <span class="rb-summary-value">$2,450</span>
+    
+    <div class="rb-stat-card" data-metric="revenue">
+      <div class="rb-stat-header">
+        <div class="rb-stat-icon rb-stat-icon-revenue">
+          <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/>
+          </svg>
+        </div>
+        <div class="rb-stat-period">
+          <select class="rb-stat-period-select" data-metric="revenue">
+            <option value="today">Today</option>
+            <option value="week">This Week</option>
+            <option value="month">This Month</option>
+          </select>
+        </div>
+      </div>
+      
+      <div class="rb-stat-body">
+        <div class="rb-stat-number" id="stat-revenue">$2,450</div>
+        <div class="rb-stat-label">Today's Revenue</div>
+        <div class="rb-stat-change rb-positive" id="stat-revenue-change">
+          <svg class="rb-stat-trend-icon" width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M7 14l5-5 5 5z"/>
+          </svg>
+          <span>+8% from yesterday</span>
+        </div>
+      </div>
+    </div>
+    
+    <div class="rb-stat-card" data-metric="occupancy">
+      <div class="rb-stat-header">
+        <div class="rb-stat-icon rb-stat-icon-occupancy">
+          <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M20 6v2h-2v6h-1.5v-6h-5v6H10V8H8V6h12zM6 10v2H4v6H2.5v-6H1v-2h5z"/>
+          </svg>
+        </div>
+        <div class="rb-stat-period">
+          <select class="rb-stat-period-select" data-metric="occupancy">
+            <option value="now">Right Now</option>
+            <option value="today">Today</option>
+            <option value="week">This Week</option>
+          </select>
+        </div>
+      </div>
+      
+      <div class="rb-stat-body">
+        <div class="rb-stat-number" id="stat-occupancy">85%</div>
+        <div class="rb-stat-label">Table Occupancy</div>
+        <div class="rb-stat-change rb-negative" id="stat-occupancy-change">
+          <svg class="rb-stat-trend-icon" width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M7 14l5-5 5 5z"/>
+          </svg>
+          <span>-5% from yesterday</span>
+        </div>
+      </div>
+    </div>
+    
+    <div class="rb-stat-card" data-metric="pending">
+      <div class="rb-stat-header">
+        <div class="rb-stat-icon rb-stat-icon-pending">
+          <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+          </svg>
+        </div>
+        <div class="rb-stat-badge rb-badge-warning">
+          Review Required
+        </div>
+      </div>
+      
+      <div class="rb-stat-body">
+        <div class="rb-stat-number" id="stat-pending">12</div>
+        <div class="rb-stat-label">Pending Approvals</div>
+        <div class="rb-stat-actions">
+          <button class="rb-btn rb-btn-sm rb-btn-primary">Review All</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+```
+
+## 📈 Interactive Charts Component
+
+### Chart Container Structure
+```html
+<div class="rb-dashboard-content">
+  <div class="rb-dashboard-main">
+    <!-- Booking Trends Chart -->
+    <div class="rb-chart-container">
+      <div class="rb-chart-header">
+        <h3 class="rb-chart-title">Booking Trends</h3>
+        <div class="rb-chart-controls">
+          <div class="rb-chart-period">
+            <button class="rb-btn rb-btn-sm rb-active" data-period="7d">7 Days</button>
+            <button class="rb-btn rb-btn-sm" data-period="30d">30 Days</button>
+            <button class="rb-btn rb-btn-sm" data-period="90d">90 Days</button>
+          </div>
+          <button class="rb-btn rb-btn-sm rb-btn-outline" id="export-chart">
+            <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/>
+              <polyline points="14,2 14,8 20,8"/>
+              <line x1="16" y1="13" x2="8" y2="13"/>
+              <line x1="16" y1="17" x2="8" y2="17"/>
+              <polyline points="10,9 9,9 8,9"/>
+            </svg>
+            Export
+          </button>
+        </div>
+      </div>
+      
+      <div class="rb-chart-body">
+        <canvas id="bookingTrendsChart" width="400" height="200"></canvas>
+        <div class="rb-chart-loading" id="chart-loading" style="display: none;">
+          <div class="rb-loading-spinner"></div>
+          <span>Loading chart data...</span>
+        </div>
+      </div>
+      
+      <div class="rb-chart-legend">
+        <div class="rb-legend-item">
+          <span class="rb-legend-color" style="background: var(--rb-primary-500);"></span>
+          <span class="rb-legend-label">Total Bookings</span>
+        </div>
+        <div class="rb-legend-item">
+          <span class="rb-legend-color" style="background: var(--rb-success);"></span>
+          <span class="rb-legend-label">Confirmed</span>
+        </div>
+        <div class="rb-legend-item">
+          <span class="rb-legend-color" style="background: var(--rb-warning);"></span>
+          <span class="rb-legend-label">Pending</span>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Today's Schedule -->
+    <div class="rb-todays-schedule">
+      <div class="rb-widget-header">
+        <h3 class="rb-widget-title">Today's Schedule</h3>
+        <div class="rb-schedule-date" id="schedule-date">March 15, 2024</div>
+      </div>
+      
+      <div class="rb-schedule-timeline" id="schedule-timeline">
+        <div class="rb-schedule-time-slot" data-time="17:00">
+          <div class="rb-time-label">5:00 PM</div>
+          <div class="rb-bookings-list">
+            <div class="rb-booking-item" data-booking-id="123">
+              <div class="rb-booking-customer">John Doe</div>
+              <div class="rb-booking-details">Table 5 • 4 people</div>
+              <div class="rb-booking-status rb-status-confirmed">Confirmed</div>
+            </div>
+            <div class="rb-booking-item" data-booking-id="124">
+              <div class="rb-booking-customer">Sarah Wilson</div>
+              <div class="rb-booking-details">Table 8 • 2 people</div>
+              <div class="rb-booking-status rb-status-pending">Pending</div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="rb-schedule-time-slot" data-time="18:00">
+          <div class="rb-time-label">6:00 PM</div>
+          <div class="rb-bookings-list">
+            <div class="rb-booking-item" data-booking-id="125">
+              <div class="rb-booking-customer">Mike Johnson</div>
+              <div class="rb-booking-details">Table 3 • 6 people</div>
+              <div class="rb-booking-status rb-status-confirmed">Confirmed</div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="rb-schedule-time-slot rb-no-bookings" data-time="19:00">
+          <div class="rb-time-label">7:00 PM</div>
+          <div class="rb-bookings-list">
+            <div class="rb-empty-slot">
+              <span class="rb-empty-text">No bookings</span>
+              <button class="rb-btn rb-btn-sm rb-btn-outline">Add Booking</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="rb-schedule-summary">
+        <div class="rb-summary-item">
+          <span class="rb-summary-label">Total Bookings:</span>
+          <span class="rb-summary-value">24</span>
+        </div>
+        <div class="rb-summary-item">
+          <span class="rb-summary-label">Expected Revenue:</span>
+          <span class="rb-summary-value">$2,450</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Sidebar -->
+  <div class="rb-dashboard-sidebar">
+    <!-- Quick Actions -->
+    <div class="rb-quick-actions">
+      <div class="rb-widget-header">
+        <h3 class="rb-widget-title">Quick Actions</h3>
+        <button class="rb-btn rb-btn-sm rb-btn-outline" id="customize-actions">
+          <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12 15.5A3.5 3.5 0 0 1 8.5 12A3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5m7.43-2.53c.04-.32.07-.64.07-.97c0-.33-.03-.66-.07-1l2.11-1.63c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.31-.61-.22l-2.49 1c-.52-.39-1.06-.73-1.69-.98l-.37-2.65A.506.506 0 0 0 14 2h-4c-.25 0-.46.18-.5.42l-.37 2.65c-.63.25-1.17.59-1.69.98l-2.49-1c-.22-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64L4.57 11c-.04.34-.07.67-.07 1c0 .33.03.65.07.97l-2.11 1.66c-.19.15-.25.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1.01c.52.4 1.06.74 1.69.99l.37 2.65c.04.24.25.42.5.42h4c.25 0 .46-.18.5-.42l.37-2.65c.63-.26 1.17-.59 1.69-.99l2.49 1.01c.22.08.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.66Z"/>
+          </svg>
+          Customize
+        </button>
+      </div>
+      
+      <div class="rb-actions-grid" id="quick-actions-grid">
+        <div class="rb-action-item" data-action="confirm-booking">
+          <div class="rb-action-icon">
+            <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+            </svg>
+          </div>
+          <div class="rb-action-content">
+            <div class="rb-action-title">Confirm Booking</div>
+            <div class="rb-action-description">Quick confirm pending reservations</div>
+            <div class="rb-action-badge">3 pending</div>
+          </div>
+        </div>
+        
+        <div class="rb-action-item" data-action="add-walkin">
+          <div class="rb-action-icon">
+            <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 5.9c1.16 0 2.1.94 2.1 2.1s-.94 2.1-2.1 2.1S9.9 9.16 9.9 8s.94-2.1 2.1-2.1m0 9c2.97 0 6.1 1.46 6.1 2.1v1.1H5.9V17c0-.64 3.13-2.1 6.1-2.1M12 4C9.79 4 8 5.79 8 8s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm0 9c-2.67 0-8 1.34-8 4v3h16v-3c0-2.66-5.33-4-8-4z"/>
+            </svg>
+          </div>
+          <div class="rb-action-content">
+            <div class="rb-action-title">Add Walk-in</div>
+            <div class="rb-action-description">Register walk-in customers</div>
+          </div>
+        </div>
+        
+        <div class="rb-action-item" data-action="view-calendar">
+          <div class="rb-action-icon">
+            <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/>
+            </svg>
+          </div>
+          <div class="rb-action-content">
+            <div class="rb-action-title">View Calendar</div>
+            <div class="rb-action-description">Open booking calendar view</div>
+          </div>
+        </div>
+        
+        <div class="rb-action-item" data-action="manage-tables">
+          <div class="rb-action-icon">
+            <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M20 6v2h-2v6h-1.5v-6h-5v6H10V8H8V6h12zM6 10v2H4v6H2.5v-6H1v-2h5z"/>
+            </svg>
+          </div>
+          <div class="rb-action-content">
+            <div class="rb-action-title">Manage Tables</div>
+            <div class="rb-action-description">Edit table arrangements</div>
+          </div>
+        </div>
+        
+        <div class="rb-action-item" data-action="view-reports">
+          <div class="rb-action-icon">
+            <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/>
+            </svg>
+          </div>
+          <div class="rb-action-content">
+            <div class="rb-action-title">View Reports</div>
+            <div class="rb-action-description">Analytics and insights</div>
+          </div>
+        </div>
+        
+        <div class="rb-action-item" data-action="settings">
+          <div class="rb-action-icon">
+            <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 15.5A3.5 3.5 0 0 1 8.5 12A3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5m7.43-2.53c.04-.32.07-.64.07-.97 0-.33-.03-.66-.07-1l2.11-1.63c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.31-.61-.22l-2.49 1c-.52-.39-1.06-.73-1.69-.98l-.37-2.65C14.46 2.18 14.25 2 14 2h-4c-.25 0-.46.18-.5.42l-.37 2.65c-.63.25-1.17.59-1.69.98l-2.49-1c-.22-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64L4.57 11c-.04.34-.07.67-.07 1 0 .33.03.65.07.97l-2.11 1.66c-.19.15-.25.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1.01c.52.4 1.06.74 1.69.99l.37 2.65c.04.24.25.42.5.42h4c.25 0 .46-.18.5-.42l.37-2.65c.63-.26 1.17-.59 1.69-.99l2.49 1.01c.22.08.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.66Z"/>
+            </svg>
+          </div>
+          <div class="rb-action-content">
+            <div class="rb-action-title">Settings</div>
+            <div class="rb-action-description">Portal preferences</div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -79,6 +418,11 @@
   padding: var(--rb-space-6);
 }
 
+.rb-dashboard-container {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
 .rb-dashboard-header {
   background: var(--rb-bg-primary);
   border: 1px solid var(--rb-border);
@@ -90,11 +434,15 @@
   align-items: center;
 }
 
+.rb-dashboard-title-section {
+  flex: 1;
+}
+
 .rb-dashboard-title {
   font-size: var(--rb-text-2xl);
   font-weight: var(--rb-font-bold);
   color: var(--rb-text-primary);
-  margin: 0;
+  margin: 0 0 var(--rb-space-1) 0;
 }
 
 .rb-dashboard-date {
@@ -121,6 +469,7 @@
   font-size: var(--rb-text-base);
   cursor: pointer;
   min-width: 200px;
+  color: var(--rb-text-primary);
 }
 
 .rb-location-select:focus {
@@ -142,17 +491,221 @@
   border-top: 4px solid var(--rb-text-secondary);
   pointer-events: none;
 }
+
+.rb-user-menu {
+  display: flex;
+  align-items: center;
+  gap: var(--rb-space-3);
+}
+
+.rb-user-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--rb-primary-500);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: var(--rb-font-semibold);
+}
+
+.rb-user-name {
+  color: var(--rb-text-primary);
+  font-weight: var(--rb-font-medium);
+}
+
+.rb-notification-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: var(--rb-error);
+  color: white;
+  font-size: var(--rb-text-xs);
+  font-weight: var(--rb-font-bold);
+  padding: 2px 6px;
+  border-radius: var(--rb-radius-full);
+  min-width: 18px;
+  text-align: center;
+}
+```
+
+### Stats Cards Styling
+```css
+.rb-dashboard-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--rb-space-6);
+  margin-bottom: var(--rb-space-8);
+}
+
+.rb-stat-card {
+  background: var(--rb-bg-primary);
+  border: 1px solid var(--rb-border);
+  border-radius: var(--rb-radius-lg);
+  padding: var(--rb-space-6);
+  transition: all var(--rb-transition-base);
+  position: relative;
+  overflow: hidden;
+}
+
+.rb-stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--rb-primary-500), var(--rb-primary-600));
+  opacity: 0;
+  transition: opacity var(--rb-transition-base);
+}
+
+.rb-stat-card:hover {
+  border-color: var(--rb-primary-300);
+  box-shadow: var(--rb-shadow-lg);
+  transform: translateY(-2px);
+}
+
+.rb-stat-card:hover::before {
+  opacity: 1;
+}
+
+.rb-stat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--rb-space-4);
+}
+
+.rb-stat-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--rb-radius);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--rb-transition-base);
+}
+
+.rb-stat-icon-booking {
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--rb-primary-500);
+}
+
+.rb-stat-icon-revenue {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--rb-success);
+}
+
+.rb-stat-icon-occupancy {
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--rb-warning);
+}
+
+.rb-stat-icon-pending {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--rb-error);
+}
+
+.rb-stat-period-select {
+  background: transparent;
+  border: 1px solid var(--rb-border);
+  border-radius: var(--rb-radius-sm);
+  padding: var(--rb-space-1) var(--rb-space-2);
+  font-size: var(--rb-text-xs);
+  color: var(--rb-text-secondary);
+  cursor: pointer;
+}
+
+.rb-stat-number {
+  font-size: var(--rb-text-4xl);
+  font-weight: var(--rb-font-bold);
+  color: var(--rb-text-primary);
+  line-height: 1;
+  margin-bottom: var(--rb-space-1);
+}
+
+.rb-stat-label {
+  font-size: var(--rb-text-sm);
+  color: var(--rb-text-secondary);
+  margin-bottom: var(--rb-space-3);
+}
+
+.rb-stat-change {
+  display: flex;
+  align-items: center;
+  font-size: var(--rb-text-sm);
+  font-weight: var(--rb-font-medium);
+}
+
+.rb-stat-change.rb-positive {
+  color: var(--rb-success);
+}
+
+.rb-stat-change.rb-negative {
+  color: var(--rb-error);
+}
+
+.rb-stat-change.rb-neutral {
+  color: var(--rb-text-secondary);
+}
+
+.rb-stat-trend-icon {
+  margin-right: var(--rb-space-1);
+}
+
+.rb-stat-change.rb-negative .rb-stat-trend-icon {
+  transform: rotate(180deg);
+}
+
+.rb-stat-badge {
+  background: var(--rb-warning);
+  color: white;
+  font-size: var(--rb-text-xs);
+  font-weight: var(--rb-font-medium);
+  padding: var(--rb-space-1) var(--rb-space-2);
+  border-radius: var(--rb-radius-full);
+}
+
+.rb-stat-actions {
+  margin-top: var(--rb-space-3);
+}
+```
+
+### Dashboard Content Layout
+```css
+.rb-dashboard-content {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: var(--rb-space-6);
+}
+
+.rb-dashboard-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rb-space-6);
+}
+
+.rb-dashboard-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rb-space-6);
+}
+
+@media (max-width: 1024px) {
+  .rb-dashboard-content {
+    grid-template-columns: 1fr;
+  }
+  
+  .rb-dashboard-sidebar {
+    order: -1;
+  }
+}
 ```
 
 ### Chart Container Styles
 ```css
-.rb-dashboard-charts {
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: var(--rb-space-6);
-  margin-bottom: var(--rb-space-6);
-}
-
 .rb-chart-container {
   background: var(--rb-bg-primary);
   border: 1px solid var(--rb-border);
@@ -479,6 +1032,7 @@ class PortalDashboard {
     this.bindEvents();
     this.loadInitialData();
     this.startAutoRefresh();
+    this.updateDateTime();
   }
   
   bindEvents() {
@@ -510,15 +1064,24 @@ class PortalDashboard {
   async changeLocation(locationId) {
     this.currentLocation = locationId;
     
-    // Update all dashboard components
-    await Promise.all([
-      this.stats.loadStats(locationId),
-      this.charts.loadChartData(),
-      this.schedule.loadSchedule(locationId)
-    ]);
+    // Show loading state
+    this.showGlobalLoading(true);
     
-    // Save preference
-    this.saveLocationPreference(locationId);
+    try {
+      // Update all dashboard components
+      await Promise.all([
+        this.stats.loadStats(locationId),
+        this.charts.loadChartData(),
+        this.schedule.loadSchedule(locationId)
+      ]);
+      
+      // Save preference
+      this.saveLocationPreference(locationId);
+    } catch (error) {
+      this.showError('Failed to load location data');
+    } finally {
+      this.showGlobalLoading(false);
+    }
   }
   
   async loadInitialData() {
@@ -584,12 +1147,42 @@ class PortalDashboard {
     }
   }
   
+  showError(message) {
+    // Implement error notification
+    console.error('Dashboard error:', message);
+  }
+  
   toggleTheme() {
     const currentTheme = document.documentElement.dataset.theme;
     const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
     
     document.documentElement.dataset.theme = newTheme;
     localStorage.setItem('rb_theme', newTheme);
+  }
+  
+  toggleNotifications() {
+    // Implement notifications panel
+    const panel = document.getElementById('notifications-panel');
+    if (panel) {
+      panel.classList.toggle('rb-active');
+    }
+  }
+  
+  updateDateTime() {
+    const dateElement = document.getElementById('current-date');
+    if (dateElement) {
+      const now = new Date();
+      const options = { 
+        weekday: 'long', 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      };
+      dateElement.textContent = `Today: ${now.toLocaleDateString('en-US', options)}`;
+    }
+    
+    // Update every minute
+    setTimeout(() => this.updateDateTime(), 60000);
   }
   
   saveLocationPreference(locationId) {
@@ -648,327 +1241,82 @@ class DashboardStats {
     const revenueChange = document.getElementById('stat-revenue-change');
     
     if (revenueNumber) {
-      this.animateNumber(revenueNumber, stats.revenue.amount, '# PHASE 4: Portal Dashboard
-
-## 🎯 Objective
-Create a modern restaurant manager dashboard with real-time statistics, interactive charts, and quick action widgets based on Figma design: https://www.figma.com/community/file/1308435721888237413
-
-## 📋 Dependencies
-- **Phase 1**: Design system CSS variables and base components
-- **Phase 3**: Portal authentication system
-- **Existing Backend**: `RB_Booking::get_location_stats()`, `RB_Analytics` class, booking data
-
-## 📦 Deliverables
-1. **portal-dashboard.css** - Dashboard specific styles
-2. **dashboard-charts.js** - Interactive charts and data visualization
-3. **portal-dashboard.php** - Dashboard template structure
-4. **class-modern-dashboard.php** - WordPress integration and data management
-
-## 🎨 Dashboard Layout Specifications
-
-### Main Layout Structure
-```
-┌─────────────────────────────────────────────────────────────────┐
-│ [☰] Dashboard    Today: March 15, 2024    [🌙][🔔][👤] John Doe │ ← Header
-├─────────────────────────────────────────────────────────────────┤
-│ 📍 Downtown Branch  ▼                                 [Switch]   │ ← Location Selector
-├─────────────────────────────────────────────────────────────────┤
-│ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ │
-│ │     24      │ │   $2,450    │ │     85%     │ │     12      │ │ ← Stats Row
-│ │Today's      │ │Today's      │ │Table        │ │Pending      │ │
-│ │Bookings     │ │Revenue      │ │Occupancy    │ │Approvals    │ │
-│ │↗ +12%      │ │↗ +8%       │ │↘ -5%       │ │⚠ Review    │ │
-│ └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘ │
-├─────────────────────────────────────────────────────────────────┤
-│ ┌──────────────────────────────┐ ┌─────────────────────────────┐ │
-│ │         Booking Trends       │ │       Quick Actions         │ │
-│ │  ┌────────────────────────┐  │ │  ┌─────────────────────────┐ │ │
-│ │  │                        │  │ │  │ 📋 Confirm Booking      │ │ │
-│ │  │      Chart Area        │  │ │  │ 🚶 Add Walk-in          │ │ │
-│ │  │                        │  │ │  │ 📅 View Calendar        │ │ │
-│ │  └────────────────────────┘  │ │  │ 👥 Manage Tables        │ │ │
-│ └──────────────────────────────┘ │  │ 📊 View Reports         │ │ │
-│                                  │  │ ⚙️ Settings             │ │ │
-│ ┌──────────────────────────────┐ │  └─────────────────────────┘ │ │
-│ │      Recent Bookings         │ └─────────────────────────────┘ │
-│ │  📋 John Doe - 7:00 PM      │                                 │
-│ │  📋 Jane Smith - 7:30 PM    │ ┌─────────────────────────────┐ │
-│ │  📋 Mike Wilson - 8:00 PM   │ │     Today's Schedule        │ │
-│ │                              │ │  7:00 PM ────────── T1-T3  │ │
-│ └──────────────────────────────┘ │  7:30 PM ────────── T5-T7  │ │
-│                                  │  8:00 PM ────────── T2-T4  │ │
-│                                  └─────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-## 📊 Statistics Cards Component
-
-### HTML Structure
-```html
-<div class="rb-dashboard-stats">
-  <div class="rb-stat-card" data-metric="bookings">
-    <div class="rb-stat-header">
-      <div class="rb-stat-icon rb-stat-icon-booking">
-        <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/>
-        </svg>
-      </div>
-      <div class="rb-stat-period">
-        <select class="rb-stat-period-select" data-metric="bookings">
-          <option value="today">Today</option>
-          <option value="week">This Week</option>
-          <option value="month">This Month</option>
-        </select>
-      </div>
-    </div>
+      this.animateNumber(revenueNumber, stats.revenue.amount, ');
+    }
     
-    <div class="rb-stat-body">
-      <div class="rb-stat-number" id="stat-bookings">24</div>
-      <div class="rb-stat-label">Bookings</div>
-      <div class="rb-stat-change rb-positive" id="stat-bookings-change">
-        <svg class="rb-stat-trend-icon" width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M7 14l5-5 5 5z"/>
-        </svg>
-        <span>+12% from yesterday</span>
-      </div>
-    </div>
+    if (revenueChange) {
+      this.updateChangeIndicator(revenueChange, stats.revenue.change);
+    }
     
-    <div class="rb-stat-loading" style="display: none;">
-      <div class="rb-loading-spinner"></div>
-    </div>
-  </div>
+    // Update occupancy stat
+    const occupancyNumber = document.getElementById('stat-occupancy');
+    const occupancyChange = document.getElementById('stat-occupancy-change');
+    
+    if (occupancyNumber) {
+      this.animateNumber(occupancyNumber, stats.occupancy.percentage, '', '%');
+    }
+    
+    if (occupancyChange) {
+      this.updateChangeIndicator(occupancyChange, stats.occupancy.change);
+    }
+    
+    // Update pending stat
+    const pendingNumber = document.getElementById('stat-pending');
+    
+    if (pendingNumber) {
+      this.animateNumber(pendingNumber, stats.pending.count);
+    }
+  }
   
-  <div class="rb-stat-card" data-metric="revenue">
-    <div class="rb-stat-header">
-      <div class="rb-stat-icon rb-stat-icon-revenue">
-        <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-        </svg>
-      </div>
-      <div class="rb-stat-period">
-        <select class="rb-stat-period-select" data-metric="revenue">
-          <option value="today">Today</option>
-          <option value="week">This Week</option>
-          <option value="month">This Month</option>
-        </select>
-      </div>
-    </div>
+  animateNumber(element, targetValue, prefix = '', suffix = '') {
+    const startValue = parseInt(element.textContent.replace(/[^\d.-]/g, '')) || 0;
+    const duration = 1000;
+    const startTime = performance.now();
     
-    <div class="rb-stat-body">
-      <div class="rb-stat-number" id="stat-revenue">$2,450</div>
-      <div class="rb-stat-label">Revenue</div>
-      <div class="rb-stat-change rb-positive" id="stat-revenue-change">
-        <svg class="rb-stat-trend-icon" width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M7 14l5-5 5 5z"/>
-        </svg>
-        <span>+8% from yesterday</span>
-      </div>
-    </div>
-  </div>
+    const animate = (currentTime) => {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      
+      const easeOutQuart = 1 - Math.pow(1 - progress, 4);
+      const currentValue = Math.round(startValue + (targetValue - startValue) * easeOutQuart);
+      
+      element.textContent = prefix + currentValue.toLocaleString() + suffix;
+      
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      }
+    };
+    
+    requestAnimationFrame(animate);
+  }
   
-  <!-- Similar structure for Occupancy and Pending Approvals -->
-</div>
+  updateChangeIndicator(element, change) {
+    const isPositive = change.percentage > 0;
+    const isNegative = change.percentage < 0;
+    
+    element.className = `rb-stat-change ${isPositive ? 'rb-positive' : isNegative ? 'rb-negative' : 'rb-neutral'}`;
+    
+    const icon = element.querySelector('.rb-stat-trend-icon');
+    const text = element.querySelector('span');
+    
+    if (text) {
+      const sign = isPositive ? '+' : '';
+      text.textContent = `${sign}${change.percentage}% ${change.period}`;
+    }
+  }
+}
+
+// Initialize dashboard when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+  if (document.querySelector('.rb-portal-dashboard')) {
+    new PortalDashboard();
+  }
+});
 ```
 
-### CSS Styling
-```css
-.rb-dashboard-stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: var(--rb-space-6);
-  margin-bottom: var(--rb-space-8);
-}
+## 📊 Chart Implementation
 
-.rb-stat-card {
-  background: var(--rb-bg-primary);
-  border: 1px solid var(--rb-border);
-  border-radius: var(--rb-radius-lg);
-  padding: var(--rb-space-6);
-  transition: all var(--rb-transition-base);
-  position: relative;
-  overflow: hidden;
-}
-
-.rb-stat-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 4px;
-  background: linear-gradient(90deg, var(--rb-primary-500), var(--rb-primary-600));
-  opacity: 0;
-  transition: opacity var(--rb-transition-base);
-}
-
-.rb-stat-card:hover {
-  border-color: var(--rb-primary-300);
-  box-shadow: var(--rb-shadow-lg);
-  transform: translateY(-2px);
-}
-
-.rb-stat-card:hover::before {
-  opacity: 1;
-}
-
-.rb-stat-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--rb-space-4);
-}
-
-.rb-stat-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: var(--rb-radius);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all var(--rb-transition-base);
-}
-
-.rb-stat-icon-booking {
-  background: rgba(59, 130, 246, 0.1);
-  color: var(--rb-primary-500);
-}
-
-.rb-stat-icon-revenue {
-  background: rgba(16, 185, 129, 0.1);
-  color: var(--rb-success);
-}
-
-.rb-stat-icon-occupancy {
-  background: rgba(245, 158, 11, 0.1);
-  color: var(--rb-warning);
-}
-
-.rb-stat-icon-pending {
-  background: rgba(239, 68, 68, 0.1);
-  color: var(--rb-error);
-}
-
-.rb-stat-period-select {
-  background: transparent;
-  border: 1px solid var(--rb-border);
-  border-radius: var(--rb-radius-sm);
-  padding: var(--rb-space-1) var(--rb-space-2);
-  font-size: var(--rb-text-xs);
-  color: var(--rb-text-secondary);
-  cursor: pointer;
-}
-
-.rb-stat-number {
-  font-size: var(--rb-text-4xl);
-  font-weight: var(--rb-font-bold);
-  color: var(--rb-text-primary);
-  line-height: 1;
-  margin-bottom: var(--rb-space-1);
-}
-
-.rb-stat-label {
-  font-size: var(--rb-text-sm);
-  color: var(--rb-text-secondary);
-  margin-bottom: var(--rb-space-3);
-}
-
-.rb-stat-change {
-  display: flex;
-  align-items: center;
-  font-size: var(--rb-text-sm);
-  font-weight: var(--rb-font-medium);
-}
-
-.rb-stat-change.rb-positive {
-  color: var(--rb-success);
-}
-
-.rb-stat-change.rb-negative {
-  color: var(--rb-error);
-}
-
-.rb-stat-change.rb-neutral {
-  color: var(--rb-text-secondary);
-}
-
-.rb-stat-trend-icon {
-  margin-right: var(--rb-space-1);
-}
-
-.rb-stat-change.rb-negative .rb-stat-trend-icon {
-  transform: rotate(180deg);
-}
-```
-
-## 📈 Interactive Charts Component
-
-### Chart Container Structure
-```html
-<div class="rb-dashboard-charts">
-  <div class="rb-chart-container">
-    <div class="rb-chart-header">
-      <h3 class="rb-chart-title">Booking Trends</h3>
-      <div class="rb-chart-controls">
-        <div class="rb-chart-period">
-          <button class="rb-btn rb-btn-sm rb-active" data-period="7d">7 Days</button>
-          <button class="rb-btn rb-btn-sm" data-period="30d">30 Days</button>
-          <button class="rb-btn rb-btn-sm" data-period="90d">90 Days</button>
-        </div>
-        <button class="rb-btn rb-btn-sm rb-btn-outline" id="export-chart">
-          <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/>
-            <polyline points="14,2 14,8 20,8"/>
-            <line x1="16" y1="13" x2="8" y2="13"/>
-            <line x1="16" y1="17" x2="8" y2="17"/>
-            <polyline points="10,9 9,9 8,9"/>
-          </svg>
-          Export
-        </button>
-      </div>
-    </div>
-    
-    <div class="rb-chart-body">
-      <canvas id="bookingTrendsChart" width="400" height="200"></canvas>
-      <div class="rb-chart-loading" id="chart-loading" style="display: none;">
-        <div class="rb-loading-spinner"></div>
-        <span>Loading chart data...</span>
-      </div>
-    </div>
-    
-    <div class="rb-chart-legend">
-      <div class="rb-legend-item">
-        <span class="rb-legend-color" style="background: var(--rb-primary-500);"></span>
-        <span class="rb-legend-label">Bookings</span>
-      </div>
-      <div class="rb-legend-item">
-        <span class="rb-legend-color" style="background: var(--rb-success);"></span>
-        <span class="rb-legend-label">Confirmed</span>
-      </div>
-      <div class="rb-legend-item">
-        <span class="rb-legend-color" style="background: var(--rb-warning);"></span>
-        <span class="rb-legend-label">Pending</span>
-      </div>
-    </div>
-  </div>
-  
-  <!-- Revenue Chart -->
-  <div class="rb-chart-container">
-    <div class="rb-chart-header">
-      <h3 class="rb-chart-title">Revenue Overview</h3>
-      <div class="rb-chart-type-toggle">
-        <button class="rb-btn rb-btn-sm rb-active" data-chart-type="line">Line</button>
-        <button class="rb-btn rb-btn-sm" data-chart-type="bar">Bar</button>
-      </div>
-    </div>
-    
-    <div class="rb-chart-body">
-      <canvas id="revenueChart" width="400" height="200"></canvas>
-    </div>
-  </div>
-</div>
-```
-
-### JavaScript Chart Implementation
+### JavaScript Chart Management
 ```javascript
 class DashboardCharts {
   constructor() {
@@ -982,13 +1330,13 @@ class DashboardCharts {
   
   init() {
     this.initBookingTrendsChart();
-    this.initRevenueChart();
     this.bindEvents();
     this.loadInitialData();
   }
   
   async initBookingTrendsChart() {
-    const ctx = document.getElementById('bookingTrendsChart').getContext('2d');
+    const ctx = document.getElementById('bookingTrendsChart')?.getContext('2d');
+    if (!ctx) return;
     
     this.charts.bookingTrends = new Chart(ctx, {
       type: 'line',
@@ -1060,62 +1408,11 @@ class DashboardCharts {
     });
   }
   
-  async initRevenueChart() {
-    const ctx = document.getElementById('revenueChart').getContext('2d');
-    
-    this.charts.revenue = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels: [],
-        datasets: [{
-          label: 'Revenue',
-          data: [],
-          backgroundColor: 'rgba(16, 185, 129, 0.8)',
-          borderColor: 'rgb(16, 185, 129)',
-          borderWidth: 1
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: {
-          y: {
-            beginAtZero: true,
-            ticks: {
-              callback: function(value) {
-                return '$' + value.toLocaleString();
-              }
-            }
-          }
-        },
-        plugins: {
-          legend: {
-            display: false
-          },
-          tooltip: {
-            callbacks: {
-              label: function(context) {
-                return 'Revenue: $' + context.parsed.y.toLocaleString();
-              }
-            }
-          }
-        }
-      }
-    });
-  }
-  
   bindEvents() {
     // Period selection
     document.querySelectorAll('[data-period]').forEach(btn => {
       btn.addEventListener('click', (e) => {
         this.changePeriod(e.target.dataset.period);
-      });
-    });
-    
-    // Chart type toggle
-    document.querySelectorAll('[data-chart-type]').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        this.changeChartType(e.target.dataset.chartType);
       });
     });
     
@@ -1180,13 +1477,6 @@ class DashboardCharts {
       this.charts.bookingTrends.data.datasets[2].data = data.bookingTrends.pending;
       this.charts.bookingTrends.update('active');
     }
-    
-    // Update revenue chart
-    if (this.charts.revenue && data.revenue) {
-      this.charts.revenue.data.labels = data.revenue.labels;
-      this.charts.revenue.data.datasets[0].data = data.revenue.amounts;
-      this.charts.revenue.update('active');
-    }
   }
   
   showChartLoading(show) {
@@ -1197,163 +1487,16 @@ class DashboardCharts {
   }
   
   showChartError(message) {
-    // Implement error display
     console.error('Chart error:', message);
   }
   
   exportChart() {
-    // Implement chart export functionality
+    if (!this.charts.bookingTrends) return;
+    
     const link = document.createElement('a');
     link.download = `booking-trends-${this.currentPeriod}.png`;
     link.href = this.charts.bookingTrends.toBase64Image();
     link.click();
-  }
-}
-```
-
-## 🎯 Quick Actions Widget
-
-### HTML Structure
-```html
-<div class="rb-quick-actions">
-  <div class="rb-widget-header">
-    <h3 class="rb-widget-title">Quick Actions</h3>
-    <button class="rb-btn rb-btn-sm rb-btn-outline" id="customize-actions">
-      <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
-        <path d="M12 15.5A3.5 3.5 0 0 1 8.5 12A3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5m7.43-2.53c.04-.32.07-.64.07-.97c0-.33-.03-.66-.07-1l2.11-1.63c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.31-.61-.22l-2.49 1c-.52-.39-1.06-.73-1.69-.98l-.37-2.65A.506.506 0 0 0 14 2h-4c-.25 0-.46.18-.5.42l-.37 2.65c-.63.25-1.17.59-1.69.98l-2.49-1c-.22-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64L4.57 11c-.04.34-.07.67-.07 1c0 .33.03.65.07.97l-2.11 1.66c-.19.15-.25.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1.01c.52.4 1.06.74 1.69.99l.37 2.65c.04.24.25.42.5.42h4c.25 0 .46-.18.5-.42l.37-2.65c.63-.26 1.17-.59 1.69-.99l2.49 1.01c.22.08.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.66Z"/>
-      </svg>
-      Customize
-    </button>
-  </div>
-  
-  <div class="rb-actions-grid" id="quick-actions-grid">
-    <div class="rb-action-item" data-action="confirm-booking">
-      <div class="rb-action-icon">
-        <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
-        </svg>
-      </div>
-      <div class="rb-action-content">
-        <div class="rb-action-title">Confirm Booking</div>
-        <div class="rb-action-description">Quick confirm pending reservations</div>
-        <div class="rb-action-badge">3 pending</div>
-      </div>
-    </div>
-    
-    <div class="rb-action-item" data-action="add-walkin">
-      <div class="rb-action-icon">
-        <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M12 5.9c1.16 0 2.1.94 2.1 2.1s-.94 2.1-2.1 2.1S9.9 9.16 9.9 8s.94-2.1 2.1-2.1m0 9c2.97 0 6.1 1.46 6.1 2.1v1.1H5.9V17c0-.64 3.13-2.1 6.1-2.1M12 4C9.79 4 8 5.79 8 8s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm0 9c-2.67 0-8 1.34-8 4v3h16v-3c0-2.66-5.33-4-8-4z"/>
-        </svg>
-      </div>
-      <div class="rb-action-content">
-        <div class="rb-action-title">Add Walk-in</div>
-        <div class="rb-action-description">Register walk-in customers</div>
-      </div>
-    </div>
-    
-    <div class="rb-action-item" data-action="view-calendar">
-      <div class="rb-action-icon">
-        <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/>
-        </svg>
-      </div>
-      <div class="rb-action-content">
-        <div class="rb-action-title">View Calendar</div>
-        <div class="rb-action-description">Open booking calendar view</div>
-      </div>
-    </div>
-    
-    <div class="rb-action-item" data-action="manage-tables">
-      <div class="rb-action-icon">
-        <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M20 6v2h-2v6h-1.5v-6h-5v6H10V8H8V6h12zM6 10v2H4v6H2.5v-6H1v-2h5z"/>
-        </svg>
-      </div>
-      <div class="rb-action-content">
-        <div class="rb-action-title">Manage Tables</div>
-        <div class="rb-action-description">Edit table arrangements</div>
-      </div>
-    </div>
-    
-    <div class="rb-action-item" data-action="view-reports">
-      <div class="rb-action-icon">
-        <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/>
-        </svg>
-      </div>
-      <div class="rb-action-content">
-        <div class="rb-action-title">View Reports</div>
-        <div class="rb-action-description">Analytics and insights</div>
-      </div>
-    </div>
-    
-    <div class="rb-action-item" data-action="settings">
-              <div class="rb-action-icon">
-        <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M12 15.5A3.5 3.5 0 0 1 8.5 12A3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5m7.43-2.53c.04-.32.07-.64.07-.97 0-.33-.03-.66-.07-1l2.11-1.63c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.31-.61-.22l-2.49 1c-.52-.39-1.06-.73-1.69-.98l-.37-2.65C14.46 2.18 14.25 2 14 2h-4c-.25 0-.46.18-.5.42l-.37 2.65c-.63.25-1.17.59-1.69.98l-2.49-1c-.22-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64L4.57 11c-.04.34-.07.67-.07 1 0 .33.03.65.07.97l-2.11 1.66c-.19.15-.25.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1.01c.52.4 1.06.74 1.69.99l.37 2.65c.04.24.25.42.5.42h4c.25 0 .46-.18.5-.42l.37-2.65c.63-.26 1.17-.59 1.69-.99l2.49 1.01c.22.08.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.66Z"/>
-        </svg>);
-    }
-    
-    if (revenueChange) {
-      this.updateChangeIndicator(revenueChange, stats.revenue.change);
-    }
-    
-    // Update occupancy stat
-    const occupancyNumber = document.getElementById('stat-occupancy');
-    const occupancyChange = document.getElementById('stat-occupancy-change');
-    
-    if (occupancyNumber) {
-      this.animateNumber(occupancyNumber, stats.occupancy.percentage, '', '%');
-    }
-    
-    if (occupancyChange) {
-      this.updateChangeIndicator(occupancyChange, stats.occupancy.change);
-    }
-    
-    // Update pending stat
-    const pendingNumber = document.getElementById('stat-pending');
-    
-    if (pendingNumber) {
-      this.animateNumber(pendingNumber, stats.pending.count);
-    }
-  }
-  
-  animateNumber(element, targetValue, prefix = '', suffix = '') {
-    const startValue = parseInt(element.textContent.replace(/[^\d.-]/g, '')) || 0;
-    const duration = 1000;
-    const startTime = performance.now();
-    
-    const animate = (currentTime) => {
-      const elapsed = currentTime - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      
-      const easeOutQuart = 1 - Math.pow(1 - progress, 4);
-      const currentValue = Math.round(startValue + (targetValue - startValue) * easeOutQuart);
-      
-      element.textContent = prefix + currentValue.toLocaleString() + suffix;
-      
-      if (progress < 1) {
-        requestAnimationFrame(animate);
-      }
-    };
-    
-    requestAnimationFrame(animate);
-  }
-  
-  updateChangeIndicator(element, change) {
-    const isPositive = change.percentage > 0;
-    const isNegative = change.percentage < 0;
-    
-    element.className = `rb-stat-change ${isPositive ? 'rb-positive' : isNegative ? 'rb-negative' : 'rb-neutral'}`;
-    
-    const icon = element.querySelector('.rb-stat-trend-icon');
-    const text = element.querySelector('span');
-    
-    if (text) {
-      const sign = isPositive ? '+' : '';
-      text.textContent = `${sign}${change.percentage}% ${change.period}`;
-    }
   }
 }
 
@@ -1503,648 +1646,567 @@ class TodaysSchedule {
     
     if (totalBookings) {
       totalBookings.textContent = summary.totalBookings;
-    # PHASE 4: Portal Dashboard
-
-## 🎯 Objective
-Create a modern restaurant manager dashboard with real-time statistics, interactive charts, and quick action widgets based on Figma design: https://www.figma.com/community/file/1308435721888237413
-
-## 📋 Dependencies
-- **Phase 1**: Design system CSS variables and base components
-- **Phase 3**: Portal authentication system
-- **Existing Backend**: `RB_Booking::get_location_stats()`, `RB_Analytics` class, booking data
-
-## 📦 Deliverables
-1. **portal-dashboard.css** - Dashboard specific styles
-2. **dashboard-charts.js** - Interactive charts and data visualization
-3. **portal-dashboard.php** - Dashboard template structure
-4. **class-modern-dashboard.php** - WordPress integration and data management
-
-## 🎨 Dashboard Layout Specifications
-
-### Main Layout Structure
-```
-┌─────────────────────────────────────────────────────────────────┐
-│ [☰] Dashboard    Today: March 15, 2024    [🌙][🔔][👤] John Doe │ ← Header
-├─────────────────────────────────────────────────────────────────┤
-│ 📍 Downtown Branch  ▼                                 [Switch]   │ ← Location Selector
-├─────────────────────────────────────────────────────────────────┤
-│ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ │
-│ │     24      │ │   $2,450    │ │     85%     │ │     12      │ │ ← Stats Row
-│ │Today's      │ │Today's      │ │Table        │ │Pending      │ │
-│ │Bookings     │ │Revenue      │ │Occupancy    │ │Approvals    │ │
-│ │↗ +12%      │ │↗ +8%       │ │↘ -5%       │ │⚠ Review    │ │
-│ └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘ │
-├─────────────────────────────────────────────────────────────────┤
-│ ┌──────────────────────────────┐ ┌─────────────────────────────┐ │
-│ │         Booking Trends       │ │       Quick Actions         │ │
-│ │  ┌────────────────────────┐  │ │  ┌─────────────────────────┐ │ │
-│ │  │                        │  │ │  │ 📋 Confirm Booking      │ │ │
-│ │  │      Chart Area        │  │ │  │ 🚶 Add Walk-in          │ │ │
-│ │  │                        │  │ │  │ 📅 View Calendar        │ │ │
-│ │  └────────────────────────┘  │ │  │ 👥 Manage Tables        │ │ │
-│ └──────────────────────────────┘ │  │ 📊 View Reports         │ │ │
-│                                  │  │ ⚙️ Settings             │ │ │
-│ ┌──────────────────────────────┐ │  └─────────────────────────┘ │ │
-│ │      Recent Bookings         │ └─────────────────────────────┘ │
-│ │  📋 John Doe - 7:00 PM      │                                 │
-│ │  📋 Jane Smith - 7:30 PM    │ ┌─────────────────────────────┐ │
-│ │  📋 Mike Wilson - 8:00 PM   │ │     Today's Schedule        │ │
-│ │                              │ │  7:00 PM ────────── T1-T3  │ │
-│ └──────────────────────────────┘ │  7:30 PM ────────── T5-T7  │ │
-│                                  │  8:00 PM ────────── T2-T4  │ │
-│                                  └─────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-## 📊 Statistics Cards Component
-
-### HTML Structure
-```html
-<div class="rb-dashboard-stats">
-  <div class="rb-stat-card" data-metric="bookings">
-    <div class="rb-stat-header">
-      <div class="rb-stat-icon rb-stat-icon-booking">
-        <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/>
-        </svg>
-      </div>
-      <div class="rb-stat-period">
-        <select class="rb-stat-period-select" data-metric="bookings">
-          <option value="today">Today</option>
-          <option value="week">This Week</option>
-          <option value="month">This Month</option>
-        </select>
-      </div>
-    </div>
+    }
     
-    <div class="rb-stat-body">
-      <div class="rb-stat-number" id="stat-bookings">24</div>
-      <div class="rb-stat-label">Bookings</div>
-      <div class="rb-stat-change rb-positive" id="stat-bookings-change">
-        <svg class="rb-stat-trend-icon" width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M7 14l5-5 5 5z"/>
-        </svg>
-        <span>+12% from yesterday</span>
-      </div>
-    </div>
-    
-    <div class="rb-stat-loading" style="display: none;">
-      <div class="rb-loading-spinner"></div>
-    </div>
-  </div>
+    if (expectedRevenue) {
+      expectedRevenue.textContent = summary.expectedRevenue;
+    }
+  }
   
-  <div class="rb-stat-card" data-metric="revenue">
-    <div class="rb-stat-header">
-      <div class="rb-stat-icon rb-stat-icon-revenue">
-        <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-        </svg>
-      </div>
-      <div class="rb-stat-period">
-        <select class="rb-stat-period-select" data-metric="revenue">
-          <option value="today">Today</option>
-          <option value="week">This Week</option>
-          <option value="month">This Month</option>
-        </select>
-      </div>
-    </div>
-    
-    <div class="rb-stat-body">
-      <div class="rb-stat-number" id="stat-revenue">$2,450</div>
-      <div class="rb-stat-label">Revenue</div>
-      <div class="rb-stat-change rb-positive" id="stat-revenue-change">
-        <svg class="rb-stat-trend-icon" width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M7 14l5-5 5 5z"/>
-        </svg>
-        <span>+8% from yesterday</span>
-      </div>
-    </div>
-  </div>
-  
-  <!-- Similar structure for Occupancy and Pending Approvals -->
-</div>
-```
-
-### CSS Styling
-```css
-.rb-dashboard-stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: var(--rb-space-6);
-  margin-bottom: var(--rb-space-8);
-}
-
-.rb-stat-card {
-  background: var(--rb-bg-primary);
-  border: 1px solid var(--rb-border);
-  border-radius: var(--rb-radius-lg);
-  padding: var(--rb-space-6);
-  transition: all var(--rb-transition-base);
-  position: relative;
-  overflow: hidden;
-}
-
-.rb-stat-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 4px;
-  background: linear-gradient(90deg, var(--rb-primary-500), var(--rb-primary-600));
-  opacity: 0;
-  transition: opacity var(--rb-transition-base);
-}
-
-.rb-stat-card:hover {
-  border-color: var(--rb-primary-300);
-  box-shadow: var(--rb-shadow-lg);
-  transform: translateY(-2px);
-}
-
-.rb-stat-card:hover::before {
-  opacity: 1;
-}
-
-.rb-stat-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--rb-space-4);
-}
-
-.rb-stat-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: var(--rb-radius);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all var(--rb-transition-base);
-}
-
-.rb-stat-icon-booking {
-  background: rgba(59, 130, 246, 0.1);
-  color: var(--rb-primary-500);
-}
-
-.rb-stat-icon-revenue {
-  background: rgba(16, 185, 129, 0.1);
-  color: var(--rb-success);
-}
-
-.rb-stat-icon-occupancy {
-  background: rgba(245, 158, 11, 0.1);
-  color: var(--rb-warning);
-}
-
-.rb-stat-icon-pending {
-  background: rgba(239, 68, 68, 0.1);
-  color: var(--rb-error);
-}
-
-.rb-stat-period-select {
-  background: transparent;
-  border: 1px solid var(--rb-border);
-  border-radius: var(--rb-radius-sm);
-  padding: var(--rb-space-1) var(--rb-space-2);
-  font-size: var(--rb-text-xs);
-  color: var(--rb-text-secondary);
-  cursor: pointer;
-}
-
-.rb-stat-number {
-  font-size: var(--rb-text-4xl);
-  font-weight: var(--rb-font-bold);
-  color: var(--rb-text-primary);
-  line-height: 1;
-  margin-bottom: var(--rb-space-1);
-}
-
-.rb-stat-label {
-  font-size: var(--rb-text-sm);
-  color: var(--rb-text-secondary);
-  margin-bottom: var(--rb-space-3);
-}
-
-.rb-stat-change {
-  display: flex;
-  align-items: center;
-  font-size: var(--rb-text-sm);
-  font-weight: var(--rb-font-medium);
-}
-
-.rb-stat-change.rb-positive {
-  color: var(--rb-success);
-}
-
-.rb-stat-change.rb-negative {
-  color: var(--rb-error);
-}
-
-.rb-stat-change.rb-neutral {
-  color: var(--rb-text-secondary);
-}
-
-.rb-stat-trend-icon {
-  margin-right: var(--rb-space-1);
-}
-
-.rb-stat-change.rb-negative .rb-stat-trend-icon {
-  transform: rotate(180deg);
+  openBookingDetails(bookingId) {
+    // Implementation for Phase 5
+    console.log('Opening booking details for:', bookingId);
+  }
 }
 ```
 
-## 📈 Interactive Charts Component
+## 🔧 WordPress Integration
 
-### Chart Container Structure
-```html
-<div class="rb-dashboard-charts">
-  <div class="rb-chart-container">
-    <div class="rb-chart-header">
-      <h3 class="rb-chart-title">Booking Trends</h3>
-      <div class="rb-chart-controls">
-        <div class="rb-chart-period">
-          <button class="rb-btn rb-btn-sm rb-active" data-period="7d">7 Days</button>
-          <button class="rb-btn rb-btn-sm" data-period="30d">30 Days</button>
-          <button class="rb-btn rb-btn-sm" data-period="90d">90 Days</button>
-        </div>
-        <button class="rb-btn rb-btn-sm rb-btn-outline" id="export-chart">
-          <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/>
-            <polyline points="14,2 14,8 20,8"/>
-            <line x1="16" y1="13" x2="8" y2="13"/>
-            <line x1="16" y1="17" x2="8" y2="17"/>
-            <polyline points="10,9 9,9 8,9"/>
-          </svg>
-          Export
-        </button>
-      </div>
-    </div>
+### Modern Dashboard Class
+```php
+<?php
+// public/class-modern-dashboard.php
+
+class RB_Modern_Dashboard {
     
-    <div class="rb-chart-body">
-      <canvas id="bookingTrendsChart" width="400" height="200"></canvas>
-      <div class="rb-chart-loading" id="chart-loading" style="display: none;">
+    private $analytics;
+    private $current_user;
+    
+    public function __construct() {
+        $this->analytics = new RB_Analytics();
+        
+        add_action('init', array($this, 'init'));
+        add_action('wp_enqueue_scripts', array($this, 'enqueue_dashboard_assets'));
+        
+        // AJAX endpoints
+        add_action('wp_ajax_rb_get_dashboard_stats', array($this, 'get_dashboard_stats'));
+        add_action('wp_ajax_rb_get_dashboard_chart_data', array($this, 'get_chart_data'));
+        add_action('wp_ajax_rb_get_todays_schedule', array($this, 'get_todays_schedule'));
+        add_action('wp_ajax_rb_update_stat_period', array($this, 'update_stat_period'));
+    }
+    
+    public function init() {
+        // Check if user is accessing dashboard
+        if (isset($_GET['rb_portal']) && $_GET['rb_portal'] === 'dashboard') {
+            $this->render_dashboard();
+            exit;
+        }
+    }
+    
+    public function enqueue_dashboard_assets() {
+        if (!$this->is_dashboard_page()) {
+            return;
+        }
+        
+        // Enqueue Chart.js
+        wp_enqueue_script('chart-js', 
+            'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js',
+            array(),
+            '3.9.1',
+            true
+        );
+        
+        // Dashboard styles
+        wp_enqueue_style('rb-portal-dashboard',
+            plugin_dir_url(__FILE__) . '../assets/css/portal-dashboard.css',
+            array('rb-design-system'), // Dependency on Phase 1
+            '1.0.0'
+        );
+        
+        // Dashboard scripts
+        wp_enqueue_script('rb-dashboard-charts',
+            plugin_dir_url(__FILE__) . '../assets/js/dashboard-charts.js',
+            array('chart-js'),
+            '1.0.0',
+            true
+        );
+        
+        wp_enqueue_script('rb-portal-dashboard',
+            plugin_dir_url(__FILE__) . '../assets/js/portal-dashboard.js',
+            array('rb-dashboard-charts'),
+            '1.0.0',
+            true
+        );
+        
+        // Localize script data
+        wp_localize_script('rb-portal-dashboard', 'rbDashboard', array(
+            'ajax_url' => admin_url('admin-ajax.php'),
+            'nonce' => wp_create_nonce('rb_dashboard_nonce'),
+            'current_location' => $this->get_current_location(),
+            'calendar_url' => add_query_arg('rb_portal', 'calendar', home_url()),
+            'tables_url' => add_query_arg('rb_portal', 'tables', home_url()),
+            'reports_url' => add_query_arg('rb_portal', 'reports', home_url()),
+            'settings_url' => add_query_arg('rb_portal', 'settings', home_url()),
+            'strings' => array(
+                'loading' => __('Loading...', 'restaurant-booking'),
+                'error' => __('Error loading data', 'restaurant-booking'),
+                'no_data' => __('No data available', 'restaurant-booking')
+            )
+        ));
+    }
+    
+    public function render_dashboard() {
+        // Check authentication
+        $session_manager = new RB_Portal_Session_Manager();
+        if (!$session_manager->is_logged_in()) {
+            wp_redirect(home_url('/portal'));
+            exit;
+        }
+        
+        $this->current_user = $session_manager->get_current_user();
+        
+        // Enqueue assets
+        $this->enqueue_dashboard_assets();
+        
+        // Set page title
+        add_filter('pre_get_document_title', function() {
+            return 'Dashboard - Restaurant Manager';
+        });
+        
+        // Load template
+        include plugin_dir_path(__FILE__) . 'partials/portal-dashboard.php';
+    }
+    
+    public function get_dashboard_stats() {
+        check_ajax_referer('rb_dashboard_nonce', 'nonce');
+        
+        $location_id = sanitize_text_field($_POST['location_id']);
+        $period = isset($_POST['period']) ? sanitize_text_field($_POST['period']) : 'today';
+        
+        try {
+            $stats = $this->analytics->get_location_stats($location_id, $period);
+            
+            $response_data = array(
+                'bookings' => array(
+                    'count' => $stats['bookings_count'],
+                    'change' => array(
+                        'percentage' => $stats['bookings_change'],
+                        'period' => $this->get_period_label($period)
+                    )
+                ),
+                'revenue' => array(
+                    'amount' => $stats['revenue_amount'],
+                    'change' => array(
+                        'percentage' => $stats['revenue_change'],
+                        'period' => $this->get_period_label($period)
+                    )
+                ),
+                'occupancy' => array(
+                    'percentage' => $stats['occupancy_rate'],
+                    'change' => array(
+                        'percentage' => $stats['occupancy_change'],
+                        'period' => $this->get_period_label($period)
+                    )
+                ),
+                'pending' => array(
+                    'count' => $stats['pending_count']
+                )
+            );
+            
+            wp_send_json_success($response_data);
+            
+        } catch (Exception $e) {
+            wp_send_json_error(array(
+                'message' => __('Failed to load statistics', 'restaurant-booking')
+            ));
+        }
+    }
+    
+    public function get_chart_data() {
+        check_ajax_referer('rb_dashboard_nonce', 'nonce');
+        
+        $location_id = sanitize_text_field($_POST['location_id']);
+        $period = sanitize_text_field($_POST['period']);
+        
+        try {
+            $chart_data = $this->analytics->get_chart_data($location_id, $period);
+            
+            wp_send_json_success($chart_data);
+            
+        } catch (Exception $e) {
+            wp_send_json_error(array(
+                'message' => __('Failed to load chart data', 'restaurant-booking')
+            ));
+        }
+    }
+    
+    public function get_todays_schedule() {
+        check_ajax_referer('rb_dashboard_nonce', 'nonce');
+        
+        $location_id = sanitize_text_field($_POST['location_id']);
+        $date = date('Y-m-d'); // Today
+        
+        try {
+            $bookings = RB_Booking::get_bookings_by_date($location_id, $date);
+            $schedule_data = $this->format_schedule_data($bookings);
+            
+            wp_send_json_success($schedule_data);
+            
+        } catch (Exception $e) {
+            wp_send_json_error(array(
+                'message' => __('Failed to load schedule', 'restaurant-booking')
+            ));
+        }
+    }
+    
+    private function format_schedule_data($bookings) {
+        $time_slots = array();
+        $grouped_bookings = array();
+        
+        // Group bookings by time
+        foreach ($bookings as $booking) {
+            $time = date('H:i', strtotime($booking->booking_time));
+            if (!isset($grouped_bookings[$time])) {
+                $grouped_bookings[$time] = array();
+            }
+            $grouped_bookings[$time][] = $booking;
+        }
+        
+        // Create time slots from 17:00 to 22:00
+        for ($hour = 17; $hour <= 22; $hour++) {
+            $time = sprintf('%02d:00', $hour);
+            $time_label = date('g:i A', strtotime($time));
+            
+            $slot_bookings = isset($grouped_bookings[$time]) ? $grouped_bookings[$time] : array();
+            
+            $time_slots[] = array(
+                'time' => $time,
+                'timeLabel' => $time_label,
+                'bookings' => array_map(array($this, 'format_booking_item'), $slot_bookings)
+            );
+        }
+        
+        // Calculate summary
+        $total_bookings = count($bookings);
+        $expected_revenue = array_sum(array_map(function($booking) {
+            return floatval($booking->estimated_total);
+        }, $bookings));
+        
+        return array(
+            'timeSlots' => $time_slots,
+            'summary' => array(
+                'totalBookings' => $total_bookings,
+                'expectedRevenue' => ' . number_format($expected_revenue, 0)
+            )
+        );
+    }
+    
+    private function format_booking_item($booking) {
+        return array(
+            'id' => $booking->id,
+            'customerName' => $booking->customer_name,
+            'tableNumber' => $booking->table_number,
+            'partySize' => $booking->party_size,
+            'status' => ucfirst($booking->status)
+        );
+    }
+    
+    private function get_period_label($period) {
+        $labels = array(
+            'today' => 'from yesterday',
+            'week' => 'from last week',
+            'month' => 'from last month'
+        );
+        
+        return isset($labels[$period]) ? $labels[$period] : 'from previous period';
+    }
+    
+    private function get_current_location() {
+        // Get user's preferred location or default
+        $session_manager = new RB_Portal_Session_Manager();
+        $user = $session_manager->get_current_user();
+        
+        if ($user && isset($user['location_id'])) {
+            return $user['location_id'];
+        }
+        
+        // Return first available location
+        $locations = RB_Location::get_all_locations();
+        return !empty($locations) ? $locations[0]->id : 1;
+    }
+    
+    private function is_dashboard_page() {
+        return isset($_GET['rb_portal']) && $_GET['rb_portal'] === 'dashboard';
+    }
+}
+
+// Initialize the dashboard
+new RB_Modern_Dashboard();
+```
+
+### Dashboard Template
+```php
+<!-- public/partials/portal-dashboard.php -->
+<!DOCTYPE html>
+<html <?php language_attributes(); ?>>
+<head>
+    <meta charset="<?php bloginfo('charset'); ?>">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Dashboard - Restaurant Manager</title>
+    <?php wp_head(); ?>
+</head>
+<body class="rb-portal-dashboard">
+    
+    <!-- Global Loading Overlay -->
+    <div class="rb-dashboard-loading" id="dashboard-loader" style="display: none;">
         <div class="rb-loading-spinner"></div>
-        <span>Loading chart data...</span>
-      </div>
+        <span>Loading dashboard...</span>
     </div>
     
-    <div class="rb-chart-legend">
-      <div class="rb-legend-item">
-        <span class="rb-legend-color" style="background: var(--rb-primary-500);"></span>
-        <span class="rb-legend-label">Bookings</span>
-      </div>
-      <div class="rb-legend-item">
-        <span class="rb-legend-color" style="background: var(--rb-success);"></span>
-        <span class="rb-legend-label">Confirmed</span>
-      </div>
-      <div class="rb-legend-item">
-        <span class="rb-legend-color" style="background: var(--rb-warning);"></span>
-        <span class="rb-legend-label">Pending</span>
-      </div>
-    </div>
-  </div>
-  
-  <!-- Revenue Chart -->
-  <div class="rb-chart-container">
-    <div class="rb-chart-header">
-      <h3 class="rb-chart-title">Revenue Overview</h3>
-      <div class="rb-chart-type-toggle">
-        <button class="rb-btn rb-btn-sm rb-active" data-chart-type="line">Line</button>
-        <button class="rb-btn rb-btn-sm" data-chart-type="bar">Bar</button>
-      </div>
+    <!-- Refresh Indicator -->
+    <div class="rb-refresh-indicator" id="refresh-indicator" style="display: none;">
+        <span>Dashboard updated</span>
     </div>
     
-    <div class="rb-chart-body">
-      <canvas id="revenueChart" width="400" height="200"></canvas>
+    <!-- Dashboard Container -->
+    <div class="rb-dashboard-container">
+        
+        <!-- Dashboard Header -->
+        <div class="rb-dashboard-header">
+            <div class="rb-dashboard-title-section">
+                <h1 class="rb-dashboard-title"><?php _e('Dashboard', 'restaurant-booking'); ?></h1>
+                <div class="rb-dashboard-date" id="current-date">Today: <?php echo date('F j, Y'); ?></div>
+            </div>
+            
+            <div class="rb-dashboard-controls">
+                <div class="rb-location-selector">
+                    <select class="rb-location-select" id="location-selector">
+                        <?php
+                        $locations = RB_Location::get_all_locations();
+                        $current_location = $this->get_current_location();
+                        
+                        foreach ($locations as $location) {
+                            $selected = ($location->id == $current_location) ? 'selected' : '';
+                            echo sprintf(
+                                '<option value="%d" %s>📍 %s</option>',
+                                $location->id,
+                                $selected,
+                                esc_html($location->name)
+                            );
+                        }
+                        ?>
+                    </select>
+                </div>
+                
+                <button class="rb-btn rb-btn-icon" id="theme-toggle" title="<?php esc_attr_e('Toggle theme', 'restaurant-booking'); ?>">
+                    <svg class="rb-theme-icon" width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.37a5.389 5.389 0 01-4.4 2.37 5.403 5.403 0 01-3.4-9.73A8.81 8.81 0 0012 3z"/>
+                    </svg>
+                </button>
+                
+                <button class="rb-btn rb-btn-icon" id="notifications-toggle" title="<?php esc_attr_e('Notifications', 'restaurant-booking'); ?>">
+                    <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
+                    </svg>
+                    <span class="rb-notification-badge">3</span>
+                </button>
+                
+                <div class="rb-user-menu">
+                    <div class="rb-user-avatar">
+                        <?php echo strtoupper(substr($this->current_user['name'], 0, 2)); ?>
+                    </div>
+                    <span class="rb-user-name"><?php echo esc_html($this->current_user['name']); ?></span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Include the stats and content sections from the HTML structure above -->
+        <?php include 'dashboard-stats-section.php'; ?>
+        <?php include 'dashboard-content-section.php'; ?>
+        
     </div>
-  </div>
-</div>
+    
+    <?php wp_footer(); ?>
+</body>
+</html>
 ```
 
-### JavaScript Chart Implementation
-```javascript
-class DashboardCharts {
-  constructor() {
-    this.charts = {};
-    this.currentPeriod = '7d';
-    this.ajaxUrl = rbDashboard.ajax_url;
-    this.nonce = rbDashboard.nonce;
-    
-    this.init();
+## 📱 Mobile Responsiveness
+
+### Mobile-Specific Styles
+```css
+@media (max-width: 768px) {
+  .rb-portal-dashboard {
+    padding: var(--rb-space-4);
   }
   
-  init() {
-    this.initBookingTrendsChart();
-    this.initRevenueChart();
-    this.bindEvents();
-    this.loadInitialData();
+  .rb-dashboard-header {
+    flex-direction: column;
+    gap: var(--rb-space-4);
+    align-items: stretch;
   }
   
-  async initBookingTrendsChart() {
-    const ctx = document.getElementById('bookingTrendsChart').getContext('2d');
-    
-    this.charts.bookingTrends = new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels: [],
-        datasets: [
-          {
-            label: 'Total Bookings',
-            data: [],
-            borderColor: 'rgb(59, 130, 246)',
-            backgroundColor: 'rgba(59, 130, 246, 0.1)',
-            tension: 0.4,
-            fill: true
-          },
-          {
-            label: 'Confirmed',
-            data: [],
-            borderColor: 'rgb(16, 185, 129)',
-            backgroundColor: 'rgba(16, 185, 129, 0.1)',
-            tension: 0.4,
-            fill: true
-          },
-          {
-            label: 'Pending',
-            data: [],
-            borderColor: 'rgb(245, 158, 11)',
-            backgroundColor: 'rgba(245, 158, 11, 0.1)',
-            tension: 0.4,
-            fill: true
-          }
-        ]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: {
-          y: {
-            beginAtZero: true,
-            grid: {
-              color: 'rgba(0, 0, 0, 0.1)'
-            }
-          },
-          x: {
-            grid: {
-              display: false
-            }
-          }
-        },
-        plugins: {
-          legend: {
-            display: false
-          },
-          tooltip: {
-            mode: 'index',
-            intersect: false,
-            backgroundColor: 'rgba(0, 0, 0, 0.8)',
-            titleColor: 'white',
-            bodyColor: 'white',
-            borderColor: 'rgba(255, 255, 255, 0.1)',
-            borderWidth: 1
-          }
-        },
-        interaction: {
-          mode: 'nearest',
-          axis: 'x',
-          intersect: false
-        }
-      }
-    });
+  .rb-dashboard-controls {
+    justify-content: space-between;
   }
   
-  async initRevenueChart() {
-    const ctx = document.getElementById('revenueChart').getContext('2d');
-    
-    this.charts.revenue = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels: [],
-        datasets: [{
-          label: 'Revenue',
-          data: [],
-          backgroundColor: 'rgba(16, 185, 129, 0.8)',
-          borderColor: 'rgb(16, 185, 129)',
-          borderWidth: 1
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: {
-          y: {
-            beginAtZero: true,
-            ticks: {
-              callback: function(value) {
-                return '$' + value.toLocaleString();
-              }
-            }
-          }
-        },
-        plugins: {
-          legend: {
-            display: false
-          },
-          tooltip: {
-            callbacks: {
-              label: function(context) {
-                return 'Revenue: $' + context.parsed.y.toLocaleString();
-              }
-            }
-          }
-        }
-      }
-    });
+  .rb-location-select {
+    min-width: 150px;
   }
   
-  bindEvents() {
-    // Period selection
-    document.querySelectorAll('[data-period]').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        this.changePeriod(e.target.dataset.period);
-      });
-    });
-    
-    // Chart type toggle
-    document.querySelectorAll('[data-chart-type]').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        this.changeChartType(e.target.dataset.chartType);
-      });
-    });
-    
-    // Export functionality
-    document.getElementById('export-chart')?.addEventListener('click', () => {
-      this.exportChart();
-    });
+  .rb-user-name {
+    display: none;
   }
   
-  async changePeriod(period) {
-    this.currentPeriod = period;
-    
-    // Update active button
-    document.querySelectorAll('[data-period]').forEach(btn => {
-      btn.classList.toggle('rb-active', btn.dataset.period === period);
-    });
-    
-    await this.loadChartData();
+  .rb-dashboard-stats {
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: var(--rb-space-4);
   }
   
-  async loadInitialData() {
-    await this.loadChartData();
+  .rb-stat-card {
+    padding: var(--rb-space-4);
   }
   
-  async loadChartData() {
-    this.showChartLoading(true);
-    
-    try {
-      const response = await fetch(this.ajaxUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams({
-          action: 'rb_get_dashboard_chart_data',
-          nonce: this.nonce,
-          period: this.currentPeriod,
-          location_id: rbDashboard.current_location
-        })
-      });
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        this.updateCharts(data.data);
-      } else {
-        this.showChartError(data.message);
-      }
-    } catch (error) {
-      this.showChartError('Failed to load chart data');
-    } finally {
-      this.showChartLoading(false);
-    }
+  .rb-stat-number {
+    font-size: var(--rb-text-3xl);
   }
   
-  updateCharts(data) {
-    // Update booking trends chart
-    if (this.charts.bookingTrends && data.bookingTrends) {
-      this.charts.bookingTrends.data.labels = data.bookingTrends.labels;
-      this.charts.bookingTrends.data.datasets[0].data = data.bookingTrends.total;
-      this.charts.bookingTrends.data.datasets[1].data = data.bookingTrends.confirmed;
-      this.charts.bookingTrends.data.datasets[2].data = data.bookingTrends.pending;
-      this.charts.bookingTrends.update('active');
-    }
-    
-    // Update revenue chart
-    if (this.charts.revenue && data.revenue) {
-      this.charts.revenue.data.labels = data.revenue.labels;
-      this.charts.revenue.data.datasets[0].data = data.revenue.amounts;
-      this.charts.revenue.update('active');
-    }
+  .rb-dashboard-content {
+    grid-template-columns: 1fr;
+    gap: var(--rb-space-4);
   }
   
-  showChartLoading(show) {
-    const loading = document.getElementById('chart-loading');
-    if (loading) {
-      loading.style.display = show ? 'flex' : 'none';
-    }
+  .rb-chart-header {
+    flex-direction: column;
+    gap: var(--rb-space-3);
+    align-items: stretch;
   }
   
-  showChartError(message) {
-    // Implement error display
-    console.error('Chart error:', message);
+  .rb-chart-controls {
+    justify-content: space-between;
   }
   
-  exportChart() {
-    // Implement chart export functionality
-    const link = document.createElement('a');
-    link.download = `booking-trends-${this.currentPeriod}.png`;
-    link.href = this.charts.bookingTrends.toBase64Image();
-    link.click();
+  .rb-chart-body {
+    height: 250px;
+  }
+  
+  .rb-actions-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .rb-action-item {
+    padding: var(--rb-space-3);
+  }
+  
+  .rb-action-icon {
+    width: 40px;
+    height: 40px;
+    margin-right: var(--rb-space-3);
+  }
+}
+
+@media (max-width: 640px) {
+  .rb-dashboard-stats {
+    grid-template-columns: 1fr;
+  }
+  
+  .rb-stat-header {
+    flex-direction: column;
+    gap: var(--rb-space-2);
+    align-items: flex-start;
+  }
+  
+  .rb-chart-period {
+    flex-direction: column;
+    gap: var(--rb-space-1);
+  }
+  
+  .rb-chart-legend {
+    flex-direction: column;
+    gap: var(--rb-space-2);
+    align-items: flex-start;
+  }
+  
+  .rb-schedule-summary {
+    flex-direction: column;
+    gap: var(--rb-space-3);
   }
 }
 ```
 
-## 🎯 Quick Actions Widget
+## 🧪 Testing Requirements
 
-### HTML Structure
-```html
-<div class="rb-quick-actions">
-  <div class="rb-widget-header">
-    <h3 class="rb-widget-title">Quick Actions</h3>
-    <button class="rb-btn rb-btn-sm rb-btn-outline" id="customize-actions">
-      <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
-        <path d="M12 15.5A3.5 3.5 0 0 1 8.5 12A3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5m7.43-2.53c.04-.32.07-.64.07-.97c0-.33-.03-.66-.07-1l2.11-1.63c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.31-.61-.22l-2.49 1c-.52-.39-1.06-.73-1.69-.98l-.37-2.65A.506.506 0 0 0 14 2h-4c-.25 0-.46.18-.5.42l-.37 2.65c-.63.25-1.17.59-1.69.98l-2.49-1c-.22-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64L4.57 11c-.04.34-.07.67-.07 1c0 .33.03.65.07.97l-2.11 1.66c-.19.15-.25.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1.01c.52.4 1.06.74 1.69.99l.37 2.65c.04.24.25.42.5.42h4c.25 0 .46-.18.5-.42l.37-2.65c.63-.26 1.17-.59 1.69-.99l2.49 1.01c.22.08.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.66Z"/>
-      </svg>
-      Customize
-    </button>
-  </div>
-  
-  <div class="rb-actions-grid" id="quick-actions-grid">
-    <div class="rb-action-item" data-action="confirm-booking">
-      <div class="rb-action-icon">
-        <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
-        </svg>
-      </div>
-      <div class="rb-action-content">
-        <div class="rb-action-title">Confirm Booking</div>
-        <div class="rb-action-description">Quick confirm pending reservations</div>
-        <div class="rb-action-badge">3 pending</div>
-      </div>
-    </div>
-    
-    <div class="rb-action-item" data-action="add-walkin">
-      <div class="rb-action-icon">
-        <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M12 5.9c1.16 0 2.1.94 2.1 2.1s-.94 2.1-2.1 2.1S9.9 9.16 9.9 8s.94-2.1 2.1-2.1m0 9c2.97 0 6.1 1.46 6.1 2.1v1.1H5.9V17c0-.64 3.13-2.1 6.1-2.1M12 4C9.79 4 8 5.79 8 8s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm0 9c-2.67 0-8 1.34-8 4v3h16v-3c0-2.66-5.33-4-8-4z"/>
-        </svg>
-      </div>
-      <div class="rb-action-content">
-        <div class="rb-action-title">Add Walk-in</div>
-        <div class="rb-action-description">Register walk-in customers</div>
-      </div>
-    </div>
-    
-    <div class="rb-action-item" data-action="view-calendar">
-      <div class="rb-action-icon">
-        <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/>
-        </svg>
-      </div>
-      <div class="rb-action-content">
-        <div class="rb-action-title">View Calendar</div>
-        <div class="rb-action-description">Open booking calendar view</div>
-      </div>
-    </div>
-    
-    <div class="rb-action-item" data-action="manage-tables">
-      <div class="rb-action-icon">
-        <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M20 6v2h-2v6h-1.5v-6h-5v6H10V8H8V6h12zM6 10v2H4v6H2.5v-6H1v-2h5z"/>
-        </svg>
-      </div>
-      <div class="rb-action-content">
-        <div class="rb-action-title">Manage Tables</div>
-        <div class="rb-action-description">Edit table arrangements</div>
-      </div>
-    </div>
-    
-    <div class="rb-action-item" data-action="view-reports">
-      <div class="rb-action-icon">
-        <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/>
-        </svg>
-      </div>
-      <div class="rb-action-content">
-        <div class="rb-action-title">View Reports</div>
-        <div class="rb-action-description">Analytics and insights</div>
-      </div>
-    </div>
-    
-    <div class="rb-action-item" data-action="settings">
-              <div class="rb-action-icon">
-        <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M12 15.5A3.5 3.5 0 0 1 8.5 12A3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5m7.43-2.53c.04-.32.07-.64.07-.97 0-.33-.03-.66-.07-1l2.11-1.63c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.31-.61-.22l-2.49 1c-.52-.39-1.06-.73-1.69-.98l-.37-2.65C14.46 2.18 14.25 2 14 2h-4c-.25 0-.46.18-.5.42l-.37 2.65c-.63.25-1.17.59-1.69.98l-2.49-1c-.22-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64L4.57 11c-.04.34-.07.67-.07 1 0 .33.03.65.07.97l-2.11 1.66c-.19.15-.25.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1.01c.52.4 1.06.74 1.69.99l.37 2.65c.04.24.25.42.5.42h4c.25 0 .46-.18.5-.42l.37-2.65c.63-.26 1.17-.59 1.69-.99l2.49 1.01c.22.08.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.66Z"/>
-        </svg>
+### Functional Testing
+1. **Dashboard Loading**
+   - [ ] Dashboard loads without errors
+   - [ ] All stats display correctly
+   - [ ] Charts render properly
+   - [ ] Location switching works
+
+2. **Real-time Updates**
+   - [ ] Auto-refresh updates stats
+   - [ ] Manual refresh works
+   - [ ] Data sync across components
+
+3. **Interactive Elements**
+   - [ ] Chart period switching
+   - [ ] Quick action buttons
+   - [ ] Schedule item clicks
+   - [ ] Theme toggle
+
+4. **AJAX Functionality**
+   - [ ] Stats loading via AJAX
+   - [ ] Chart data fetching
+   - [ ] Error handling
+   - [ ] Loading states
+
+### Performance Testing
+- [ ] Dashboard loads in <3s
+- [ ] Chart animations smooth (60fps)
+- [ ] Memory usage reasonable
+- [ ] No memory leaks
+
+### Accessibility Testing
+- [ ] Keyboard navigation works
+- [ ] Screen reader friendly
+- [ ] Color contrast compliance
+- [ ] Focus indicators visible
+
+## 🎯 Success Criteria
+
+### Visual Requirements
+- [ ] Matches Figma design patterns
+- [ ] Consistent with Phase 1 design system
+- [ ] Professional dashboard appearance
+- [ ] Smooth animations and transitions
+
+### Functional Requirements
+- [ ] Real-time data display
+- [ ] Interactive charts working
+- [ ] Quick actions functional
+- [ ] Location switching works
+- [ ] Mobile responsive design
+
+### Performance Requirements
+- [ ] Fast initial load
+- [ ] Smooth chart interactions
+- [ ] Efficient data updates
+- [ ] No layout shifts
+
+### Integration Requirements
+- [ ] Works with existing analytics
+- [ ] Maintains session management
+- [ ] Compatible with multi-location setup
+- [ ] Preserves all business logic
+
+## 📁 Expected File Outputs
+
+```
+assets/css/portal-dashboard.css           # Complete dashboard styles
+assets/js/dashboard-charts.js             # Chart functionality
+assets/js/portal-dashboard.js             # Dashboard interactions
+public/class-modern-dashboard.php         # WordPress integration
+public/partials/portal-dashboard.php      # Main dashboard template
+public/partials/dashboard-stats-section.php    # Stats cards template
+public/partials/dashboard-content-section.php  # Main content template
+```
+
+## 🔗 Integration Notes
+
+- Must work with existing `RB_Analytics` class
+- Preserve all analytics calculation logic
+- Maintain compatibility with existing location system
+- Support existing notification system
+- Work with current multi-language setup
+
+Focus on creating a beautiful, data-rich dashboard that provides restaurant managers with real-time insights and quick access to key functions!
