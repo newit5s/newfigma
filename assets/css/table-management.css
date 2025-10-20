@@ -1,0 +1,545 @@
+/*
+ * Table & Customer Management Styles (Phase 6)
+ * -----------------------------------------------------------------------------
+ * Provides the styling for the visual table floor plan editor, table list view,
+ * analytics sidebar, and the companion customer profile management experience.
+ */
+
+.rb-table-management,
+.rb-customer-management {
+  background: var(--rb-bg-secondary);
+  min-height: 100vh;
+  padding: var(--rb-space-6);
+  color: var(--rb-text-primary);
+}
+
+.rb-table-header,
+.rb-customer-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--rb-space-6);
+  padding: var(--rb-space-6);
+  border-radius: var(--rb-radius-lg);
+  border: 1px solid var(--rb-border);
+  background: var(--rb-bg-primary);
+  box-shadow: var(--rb-shadow-xs);
+  margin-bottom: var(--rb-space-6);
+}
+
+.rb-table-header .rb-header-title,
+.rb-customer-header-bar .rb-header-title {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rb-space-1);
+}
+
+.rb-location-info {
+  display: flex;
+  align-items: center;
+  gap: var(--rb-space-3);
+  color: var(--rb-text-secondary);
+  font-size: var(--rb-text-sm);
+}
+
+.rb-table-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--rb-space-2);
+  padding: var(--rb-space-1);
+  border-radius: var(--rb-radius);
+  border: 1px solid var(--rb-border);
+  background: var(--rb-bg-primary);
+}
+
+.rb-table-tabs .rb-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--rb-space-2);
+  padding: var(--rb-space-2) var(--rb-space-4);
+  border-radius: var(--rb-radius-sm);
+  border: none;
+  background: transparent;
+  color: var(--rb-text-secondary);
+  font-weight: var(--rb-font-medium);
+  cursor: pointer;
+  transition: all var(--rb-transition-fast);
+}
+
+.rb-tab-btn svg {
+  pointer-events: none;
+}
+
+.rb-tab-btn:hover {
+  color: var(--rb-text-primary);
+  background: var(--rb-gray-100);
+}
+
+.rb-tab-btn.rb-active {
+  background: var(--rb-primary-500);
+  color: #fff;
+  box-shadow: var(--rb-shadow-sm);
+}
+
+.rb-table-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: var(--rb-space-6);
+  align-items: start;
+}
+
+.rb-floor-plan-card,
+.rb-table-properties,
+.rb-table-list-card,
+.rb-table-analytics-card,
+.rb-customer-panel,
+.rb-customer-detail-card {
+  background: var(--rb-bg-primary);
+  border-radius: var(--rb-radius-lg);
+  border: 1px solid var(--rb-border);
+  box-shadow: var(--rb-shadow-xs);
+}
+
+.rb-floor-plan-card {
+  padding: var(--rb-space-6);
+}
+
+.rb-floor-plan-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--rb-space-4);
+}
+
+.rb-floor-plan-toolbar .rb-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--rb-space-3);
+}
+
+.rb-floor-plan-canvas {
+  position: relative;
+  min-height: 520px;
+  border-radius: var(--rb-radius-lg);
+  border: 1px dashed var(--rb-border-strong);
+  background: var(--rb-surface-muted);
+  overflow: hidden;
+}
+
+.rb-floor-plan-grid {
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(
+      to right,
+      var(--rb-border) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      to bottom,
+      var(--rb-border) 1px,
+      transparent 1px
+    );
+  background-size: 40px 40px;
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.rb-floor-table {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--rb-space-1);
+  border-radius: var(--rb-radius-md);
+  border: 2px solid transparent;
+  background: var(--rb-bg-primary);
+  box-shadow: var(--rb-shadow-sm);
+  min-width: 72px;
+  min-height: 72px;
+  padding: var(--rb-space-3);
+  cursor: grab;
+  transition: transform var(--rb-transition-fast), box-shadow var(--rb-transition-fast);
+}
+
+.rb-floor-table:active {
+  cursor: grabbing;
+  box-shadow: var(--rb-shadow-lg);
+}
+
+.rb-floor-table[data-shape="round"] {
+  border-radius: 999px;
+}
+
+.rb-floor-table[data-status="available"] {
+  border-color: var(--rb-success-500);
+}
+
+.rb-floor-table[data-status="occupied"] {
+  border-color: var(--rb-error-500);
+}
+
+.rb-floor-table[data-status="reserved"] {
+  border-color: var(--rb-warning-500);
+}
+
+.rb-floor-table[data-status="cleaning"] {
+  border-color: var(--rb-info-500);
+}
+
+.rb-floor-table.rb-selected {
+  transform: scale(1.05);
+  border-color: var(--rb-primary-500);
+}
+
+.rb-table-label {
+  font-weight: var(--rb-font-semibold);
+  font-size: var(--rb-text-base);
+}
+
+.rb-table-capacity {
+  font-size: var(--rb-text-sm);
+  color: var(--rb-text-secondary);
+}
+
+.rb-table-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--rb-space-1);
+  padding: 2px var(--rb-space-2);
+  border-radius: var(--rb-radius-pill);
+  font-size: var(--rb-text-xs);
+  font-weight: var(--rb-font-medium);
+}
+
+.rb-status-available {
+  background: rgba(34, 197, 94, 0.12);
+  color: var(--rb-success-600);
+}
+
+.rb-status-occupied {
+  background: rgba(244, 63, 94, 0.12);
+  color: var(--rb-error-600);
+}
+
+.rb-status-reserved {
+  background: rgba(250, 204, 21, 0.16);
+  color: var(--rb-warning-700);
+}
+
+.rb-status-cleaning {
+  background: rgba(59, 130, 246, 0.14);
+  color: var(--rb-info-600);
+}
+
+.rb-table-properties {
+  padding: var(--rb-space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--rb-space-4);
+}
+
+.rb-table-properties header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--rb-space-3);
+}
+
+.rb-property-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--rb-space-4);
+}
+
+.rb-property-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rb-space-1);
+}
+
+.rb-property-label {
+  font-size: var(--rb-text-xs);
+  font-weight: var(--rb-font-medium);
+  color: var(--rb-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.rb-property-value {
+  font-size: var(--rb-text-base);
+  font-weight: var(--rb-font-semibold);
+}
+
+.rb-table-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--rb-space-3);
+}
+
+.rb-table-list-card,
+.rb-table-analytics-card {
+  padding: var(--rb-space-6);
+  display: none;
+}
+
+.rb-tab-panel.rb-active {
+  display: block;
+}
+
+.rb-table-list {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.rb-table-list th,
+.rb-table-list td {
+  text-align: left;
+  padding: var(--rb-space-3);
+  border-bottom: 1px solid var(--rb-border);
+}
+
+.rb-table-list tbody tr:hover {
+  background: var(--rb-gray-100);
+}
+
+.rb-analytics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--rb-space-4);
+}
+
+.rb-analytics-card {
+  border-radius: var(--rb-radius-lg);
+  border: 1px solid var(--rb-border);
+  padding: var(--rb-space-5);
+  background: var(--rb-surface-muted);
+}
+
+.rb-analytics-value {
+  font-size: var(--rb-text-2xl);
+  font-weight: var(--rb-font-bold);
+  margin-top: var(--rb-space-2);
+}
+
+.rb-customer-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 320px) minmax(0, 1fr);
+  gap: var(--rb-space-6);
+  align-items: start;
+}
+
+.rb-customer-panel {
+  padding: var(--rb-space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--rb-space-4);
+}
+
+.rb-customer-filter-tabs {
+  display: flex;
+  gap: var(--rb-space-2);
+}
+
+.rb-customer-filter-tabs .rb-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--rb-space-1);
+  padding: var(--rb-space-2) var(--rb-space-4);
+  border-radius: var(--rb-radius-pill);
+  border: 1px solid var(--rb-border);
+  background: var(--rb-bg-secondary);
+  color: var(--rb-text-secondary);
+  cursor: pointer;
+  transition: all var(--rb-transition-fast);
+}
+
+.rb-customer-filter-tabs .rb-pill.rb-active {
+  background: var(--rb-primary-500);
+  color: #fff;
+  border-color: transparent;
+  box-shadow: var(--rb-shadow-sm);
+}
+
+.rb-customer-search {
+  position: relative;
+}
+
+.rb-customer-search input {
+  width: 100%;
+  padding-left: var(--rb-space-9);
+}
+
+.rb-customer-search svg {
+  position: absolute;
+  top: 50%;
+  left: var(--rb-space-3);
+  transform: translateY(-50%);
+  color: var(--rb-text-secondary);
+}
+
+.rb-customer-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rb-space-3);
+  max-height: 540px;
+  overflow-y: auto;
+}
+
+.rb-customer-item {
+  display: flex;
+  gap: var(--rb-space-3);
+  padding: var(--rb-space-3);
+  border-radius: var(--rb-radius-md);
+  border: 1px solid transparent;
+  background: var(--rb-bg-primary);
+  cursor: pointer;
+  transition: border-color var(--rb-transition-fast), box-shadow var(--rb-transition-fast);
+}
+
+.rb-customer-item:hover {
+  border-color: var(--rb-border);
+  box-shadow: var(--rb-shadow-xs);
+}
+
+.rb-customer-item.rb-active {
+  border-color: var(--rb-primary-500);
+  box-shadow: var(--rb-shadow-sm);
+}
+
+.rb-customer-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  background: var(--rb-primary-100);
+  color: var(--rb-primary-700);
+  font-weight: var(--rb-font-semibold);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rb-customer-meta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rb-space-1);
+}
+
+.rb-customer-name {
+  font-weight: var(--rb-font-semibold);
+}
+
+.rb-customer-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--rb-space-2);
+}
+
+.rb-customer-tags .rb-badge {
+  font-size: var(--rb-text-xs);
+}
+
+.rb-customer-detail-card {
+  padding: var(--rb-space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--rb-space-6);
+}
+
+.rb-customer-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--rb-space-4);
+}
+
+.rb-customer-detail-info {
+  display: flex;
+  gap: var(--rb-space-4);
+  align-items: center;
+}
+
+.rb-customer-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--rb-space-4);
+}
+
+.rb-summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rb-space-1);
+}
+
+.rb-summary-label {
+  color: var(--rb-text-secondary);
+  font-size: var(--rb-text-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.rb-summary-value {
+  font-size: var(--rb-text-lg);
+  font-weight: var(--rb-font-semibold);
+}
+
+.rb-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rb-space-3);
+}
+
+.rb-history-item {
+  border-radius: var(--rb-radius-md);
+  border: 1px solid var(--rb-border);
+  padding: var(--rb-space-3);
+  background: var(--rb-surface-muted);
+}
+
+.rb-empty-state {
+  padding: var(--rb-space-6);
+  border-radius: var(--rb-radius-lg);
+  border: 1px dashed var(--rb-border);
+  text-align: center;
+  color: var(--rb-text-secondary);
+  background: var(--rb-bg-primary);
+}
+
+@media (max-width: 1280px) {
+  .rb-table-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .rb-table-properties {
+    order: -1;
+  }
+}
+
+@media (max-width: 1024px) {
+  .rb-customer-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .rb-table-header,
+  .rb-customer-header-bar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .rb-floor-plan-toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--rb-space-3);
+  }
+
+  .rb-table-tabs {
+    width: 100%;
+  }
+
+  .rb-table-tabs .rb-tab-btn {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+}
