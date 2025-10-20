@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Restaurant Booking Design System – Style Guide</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../assets/css/design-system.css" />
+    <link rel="stylesheet" href="../assets/css/components.css" />
+    <style>
+      body {
+        background: var(--rb-bg-secondary);
+      }
+
+      header {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background-color: var(--rb-bg-primary);
+        border-bottom: 1px solid var(--rb-border-color);
+        padding: var(--rb-space-4) var(--rb-space-6);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      main {
+        padding: var(--rb-space-8) 0;
+      }
+
+      section {
+        margin-bottom: var(--rb-space-12);
+      }
+
+      .section-header {
+        margin-bottom: var(--rb-space-6);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .token-grid {
+        display: grid;
+        gap: var(--rb-space-4);
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      }
+
+      .color-swatch {
+        border-radius: var(--rb-radius-lg);
+        border: 1px solid var(--rb-border-color);
+        padding: var(--rb-space-4);
+        box-shadow: var(--rb-shadow-xs);
+        background: var(--rb-bg-primary);
+      }
+
+      .color-block {
+        height: 64px;
+        border-radius: var(--rb-radius-md);
+        margin-bottom: var(--rb-space-3);
+      }
+
+      .token-label {
+        font-size: var(--rb-text-sm);
+        font-weight: var(--rb-font-medium);
+        color: var(--rb-text-secondary);
+      }
+
+      .token-value {
+        font-size: var(--rb-text-xs);
+        color: var(--rb-text-muted);
+      }
+
+      .component-preview {
+        display: grid;
+        gap: var(--rb-space-4);
+        background-color: var(--rb-bg-primary);
+        border: 1px solid var(--rb-border-color);
+        padding: var(--rb-space-6);
+        border-radius: var(--rb-radius-xl);
+        box-shadow: var(--rb-shadow-sm);
+      }
+
+      .flex-gap {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--rb-space-3);
+      }
+
+      .card-grid {
+        display: grid;
+        gap: var(--rb-space-4);
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      }
+
+      .sidebar-demo {
+        display: grid;
+        gap: var(--rb-space-4);
+      }
+
+      .table-wrapper {
+        overflow-x: auto;
+      }
+
+      .footer-note {
+        text-align: center;
+        color: var(--rb-text-muted);
+        font-size: var(--rb-text-sm);
+        padding-bottom: var(--rb-space-8);
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div>
+        <h1>Restaurant Booking Design System</h1>
+        <p class="rb-text-muted">
+          Foundation components and tokens for customer booking & management portal.
+        </p>
+      </div>
+      <button class="rb-btn rb-btn-secondary rb-theme-toggle" id="themeToggle">
+        <svg class="rb-theme-icon rb-sun-icon" width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <path
+            d="M12 18a6 6 0 100-12 6 6 0 000 12zm0-16v2m0 16v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M2 12h2m16 0h2m-3.66-6.36l-1.42 1.42M6.34 17.66L4.93 19.07"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
+        <svg class="rb-theme-icon rb-moon-icon" width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <path
+            d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
+        <span>Toggle Theme</span>
+      </button>
+    </header>
+
+    <main class="rb-container">
+      <section>
+        <div class="section-header">
+          <h2>Color Palette</h2>
+          <p class="rb-text-muted">Primary, grayscale and semantic tokens.</p>
+        </div>
+        <div class="token-grid">
+          <div class="color-swatch">
+            <div class="color-block" style="background: var(--rb-primary-500);"></div>
+            <div class="token-label">Primary 500</div>
+            <div class="token-value">--rb-primary-500</div>
+          </div>
+          <div class="color-swatch">
+            <div class="color-block" style="background: var(--rb-primary-100);"></div>
+            <div class="token-label">Primary 100</div>
+            <div class="token-value">--rb-primary-100</div>
+          </div>
+          <div class="color-swatch">
+            <div class="color-block" style="background: var(--rb-gray-900);"></div>
+            <div class="token-label">Gray 900</div>
+            <div class="token-value">--rb-gray-900</div>
+          </div>
+          <div class="color-swatch">
+            <div class="color-block" style="background: var(--rb-gray-100);"></div>
+            <div class="token-label">Gray 100</div>
+            <div class="token-value">--rb-gray-100</div>
+          </div>
+          <div class="color-swatch">
+            <div class="color-block" style="background: var(--rb-success);"></div>
+            <div class="token-label">Success</div>
+            <div class="token-value">--rb-success</div>
+          </div>
+          <div class="color-swatch">
+            <div class="color-block" style="background: var(--rb-warning);"></div>
+            <div class="token-label">Warning</div>
+            <div class="token-value">--rb-warning</div>
+          </div>
+          <div class="color-swatch">
+            <div class="color-block" style="background: var(--rb-error);"></div>
+            <div class="token-label">Error</div>
+            <div class="token-value">--rb-error</div>
+          </div>
+          <div class="color-swatch">
+            <div class="color-block" style="background: var(--rb-info);"></div>
+            <div class="token-label">Info</div>
+            <div class="token-value">--rb-info</div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-header">
+          <h2>Typography</h2>
+          <p class="rb-text-muted">Inter font scale for headings and body content.</p>
+        </div>
+        <div class="component-preview">
+          <h1>Heading 1 – Reservation Overview</h1>
+          <h2>Heading 2 – Upcoming Bookings</h2>
+          <h3>Heading 3 – Manager Notes</h3>
+          <h4>Heading 4 – Customer Details</h4>
+          <p>
+            Body text uses <strong>var(--rb-text-base)</strong> size. The system embraces generous white space
+            and clear hierarchy to improve readability for staff and customers.
+          </p>
+          <p class="rb-text-muted">
+            Muted text is ideal for descriptions and supporting details within the booking flow.
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-header">
+          <h2>Buttons</h2>
+          <p class="rb-text-muted">Primary, secondary, outline and icon buttons.</p>
+        </div>
+        <div class="component-preview flex-gap">
+          <button class="rb-btn rb-btn-primary">Reserve Table</button>
+          <button class="rb-btn rb-btn-primary rb-btn-lg">Large Primary</button>
+          <button class="rb-btn rb-btn-primary" disabled>Disabled</button>
+          <button class="rb-btn rb-btn-secondary">Secondary Button</button>
+          <button class="rb-btn rb-btn-outline">Outline Button</button>
+          <button class="rb-btn rb-btn-icon" aria-label="Notifications">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V4a2 2 0 10-4 0v1.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </button>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-header">
+          <h2>Form Elements</h2>
+          <p class="rb-text-muted">Inputs, selects, textareas with validation messaging.</p>
+        </div>
+        <div class="component-preview">
+          <div class="rb-form-group">
+            <label class="rb-label" for="email">Email Address</label>
+            <input class="rb-input" id="email" type="email" placeholder="Enter email" />
+            <span class="rb-error-message">Please provide a valid email.</span>
+          </div>
+          <div class="rb-form-group">
+            <label class="rb-label" for="location">Location</label>
+            <select class="rb-select" id="location">
+              <option selected>Choose location</option>
+              <option>Downtown Branch</option>
+              <option>Riverside Terrace</option>
+            </select>
+          </div>
+          <div class="rb-form-group">
+            <label class="rb-label" for="requests">Special Requests</label>
+            <textarea class="rb-textarea" id="requests" rows="3" placeholder="Allergies, celebrations..."></textarea>
+          </div>
+          <div class="rb-check-group">
+            <label><input class="rb-checkbox" type="checkbox" checked /> VIP Guest</label>
+            <label><input class="rb-radio" type="radio" name="contact" checked /> Email</label>
+            <label><input class="rb-radio" type="radio" name="contact" /> SMS</label>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-header">
+          <h2>Cards & Stats</h2>
+          <p class="rb-text-muted">Containers for dashboard metrics and content blocks.</p>
+        </div>
+        <div class="card-grid">
+          <article class="rb-card">
+            <div class="rb-card-header">
+              <h3 class="rb-card-title">Upcoming Reservation</h3>
+            </div>
+            <div class="rb-card-body">
+              <p>
+                Sarah Parker • Table for 4 • Tonight 7:30 PM
+              </p>
+              <button class="rb-btn rb-btn-secondary">View details</button>
+            </div>
+          </article>
+          <div class="rb-stat-card">
+            <div class="rb-stat-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M5 12l3 3 5-7 6 9"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </div>
+            <div class="rb-stat-content">
+              <div class="rb-stat-number">128</div>
+              <div class="rb-stat-label">Monthly Reservations</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-header">
+          <h2>Modal</h2>
+          <p class="rb-text-muted">Layered dialog for booking confirmations.</p>
+        </div>
+        <div class="component-preview">
+          <button class="rb-btn rb-btn-primary" id="openModal">Open Sample Modal</button>
+          <div class="rb-modal-overlay" id="sampleModal" role="dialog" aria-modal="true" aria-hidden="true">
+            <div class="rb-modal">
+              <div class="rb-modal-header rb-flex-between">
+                <h3 class="rb-modal-title">Confirm Reservation</h3>
+                <button class="rb-modal-close" type="button" aria-label="Close" data-close-modal>&times;</button>
+              </div>
+              <div class="rb-modal-body">
+                <p>Please confirm this reservation for <strong>Sarah Parker</strong> on <strong>July 24, 7:30 PM</strong>.</p>
+              </div>
+              <div class="rb-modal-footer">
+                <button class="rb-btn rb-btn-secondary" type="button" data-close-modal>Cancel</button>
+                <button class="rb-btn rb-btn-primary" type="button">Confirm</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-header">
+          <h2>Sidebar Navigation</h2>
+          <p class="rb-text-muted">Foundation for manager portal layout.</p>
+        </div>
+        <div class="component-preview sidebar-demo">
+          <nav class="rb-sidebar" aria-label="Manager navigation">
+            <div class="rb-sidebar-header">
+              <div class="rb-logo">Restaurant</div>
+            </div>
+            <ul class="rb-nav-menu">
+              <li class="rb-nav-item">
+                <a class="rb-nav-link rb-active" href="#">
+                  <svg class="rb-nav-icon" viewBox="0 0 24 24" fill="none">
+                    <path
+                      d="M3 12l9-9 9 9"
+                      stroke="currentColor"
+                      stroke-width="1.5"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                    <path
+                      d="M9 21V12h6v9"
+                      stroke="currentColor"
+                      stroke-width="1.5"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                  Dashboard
+                </a>
+              </li>
+              <li class="rb-nav-item">
+                <a class="rb-nav-link" href="#">
+                  <svg class="rb-nav-icon" viewBox="0 0 24 24" fill="none">
+                    <path
+                      d="M4 6h16M4 12h16M4 18h7"
+                      stroke="currentColor"
+                      stroke-width="1.5"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                  Bookings
+                  <span class="rb-badge">5</span>
+                </a>
+              </li>
+              <li class="rb-nav-item">
+                <a class="rb-nav-link" href="#">
+                  <svg class="rb-nav-icon" viewBox="0 0 24 24" fill="none">
+                    <path
+                      d="M20 7a4 4 0 00-8 0v1H6a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2v-8a2 2 0 00-2-2h-6V7"
+                      stroke="currentColor"
+                      stroke-width="1.5"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                  Customers
+                </a>
+              </li>
+            </ul>
+          </nav>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-header">
+          <h2>Data Table</h2>
+          <p class="rb-text-muted">Responsive table for reservation records.</p>
+        </div>
+        <div class="component-preview table-wrapper">
+          <table class="rb-table">
+            <thead>
+              <tr>
+                <th>Guest</th>
+                <th>Party Size</th>
+                <th>Date</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Maria Gomez</td>
+                <td>4</td>
+                <td>July 24, 7:00 PM</td>
+                <td><span class="rb-badge">Confirmed</span></td>
+              </tr>
+              <tr>
+                <td>Ethan Choi</td>
+                <td>2</td>
+                <td>July 24, 8:15 PM</td>
+                <td><span class="rb-badge">Pending</span></td>
+              </tr>
+              <tr>
+                <td>Julia Waters</td>
+                <td>6</td>
+                <td>July 25, 6:45 PM</td>
+                <td><span class="rb-badge">Waitlist</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-header">
+          <h2>Alerts</h2>
+          <p class="rb-text-muted">Status banners for real-time updates.</p>
+        </div>
+        <div class="component-preview">
+          <div class="rb-alert rb-alert-success">
+            <strong>Success:</strong>
+            Reservation confirmed and guest notified via email.
+          </div>
+          <div class="rb-alert rb-alert-warning">
+            <strong>Warning:</strong>
+            Guest requested dietary accommodations. Please review before seating.
+          </div>
+          <div class="rb-alert rb-alert-error">
+            <strong>Error:</strong>
+            Payment authorization failed. Contact guest to update details.
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer-note">
+      Phase 1 foundation ready for integration into WordPress plugin components.
+    </footer>
+
+    <script src="../assets/js/theme-manager.js"></script>
+    <script>
+      // Modal Demo Logic
+      const modal = document.getElementById('sampleModal');
+      const openModalBtn = document.getElementById('openModal');
+      const closeButtons = modal.querySelectorAll('[data-close-modal]');
+
+      function openModal() {
+        modal.classList.add('is-visible');
+        modal.setAttribute('aria-hidden', 'false');
+      }
+
+      function closeModal() {
+        modal.classList.remove('is-visible');
+        modal.setAttribute('aria-hidden', 'true');
+      }
+
+      openModalBtn.addEventListener('click', openModal);
+      closeButtons.forEach((button) => button.addEventListener('click', closeModal));
+      modal.addEventListener('click', (event) => {
+        if (event.target === modal) {
+          closeModal();
+        }
+      });
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && modal.classList.contains('is-visible')) {
+          closeModal();
+        }
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,550 @@
+/*
+ * Modern Restaurant Booking Manager - Base Components
+ * Contains foundational UI components using variables from design-system.css
+ */
+
+/* Buttons --------------------------------------------------------- */
+.rb-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--rb-space-2);
+  font-family: var(--rb-font-sans);
+  font-weight: var(--rb-font-medium);
+  font-size: var(--rb-text-sm);
+  line-height: 1;
+  padding: var(--rb-space-3) var(--rb-space-5);
+  border-radius: var(--rb-radius-md);
+  border: 1px solid transparent;
+  color: var(--rb-text-inverse);
+  background-color: var(--rb-primary-600);
+  cursor: pointer;
+  transition: background-color var(--rb-transition-fast),
+    box-shadow var(--rb-transition-fast),
+    transform var(--rb-transition-fast),
+    color var(--rb-transition-fast),
+    border-color var(--rb-transition-fast);
+}
+
+.rb-btn:hover,
+.rb-btn:focus-visible {
+  background-color: var(--rb-primary-700);
+  box-shadow: var(--rb-shadow-md);
+  transform: translateY(-1px);
+}
+
+.rb-btn:focus-visible {
+  outline: 3px solid rgba(59, 130, 246, 0.35);
+  outline-offset: 2px;
+}
+
+.rb-btn:disabled,
+.rb-btn[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.6;
+  box-shadow: none;
+  transform: none;
+}
+
+.rb-btn-primary { /* default styles already primary */ }
+
+.rb-btn-secondary {
+  background-color: transparent;
+  color: var(--rb-text-primary);
+  border-color: var(--rb-border-strong);
+}
+
+.rb-btn-secondary:hover,
+.rb-btn-secondary:focus-visible {
+  background-color: rgba(59, 130, 246, 0.08);
+  color: var(--rb-primary-700);
+}
+
+.rb-btn-outline {
+  background-color: transparent;
+  border-color: rgba(59, 130, 246, 0.35);
+  color: var(--rb-primary-600);
+}
+
+.rb-btn-outline:hover,
+.rb-btn-outline:focus-visible {
+  background-color: rgba(59, 130, 246, 0.12);
+}
+
+.rb-btn-lg {
+  padding: var(--rb-space-4) var(--rb-space-6);
+  font-size: var(--rb-text-base);
+}
+
+.rb-btn-sm {
+  padding: var(--rb-space-2) var(--rb-space-4);
+  font-size: var(--rb-text-xs);
+}
+
+.rb-btn-icon {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: var(--rb-radius-lg);
+}
+
+/* Badges --------------------------------------------------------- */
+.rb-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--rb-space-2);
+  min-width: 20px;
+  height: 20px;
+  border-radius: var(--rb-radius-full);
+  background-color: var(--rb-primary-100);
+  color: var(--rb-primary-700);
+  font-size: var(--rb-text-xs);
+  font-weight: var(--rb-font-medium);
+}
+
+/* Form Controls -------------------------------------------------- */
+.rb-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rb-space-2);
+  margin-bottom: var(--rb-space-5);
+}
+
+.rb-label {
+  font-size: var(--rb-text-sm);
+  font-weight: var(--rb-font-medium);
+  color: var(--rb-text-secondary);
+}
+
+.rb-input,
+.rb-select,
+.rb-textarea {
+  width: 100%;
+  padding: var(--rb-space-3) var(--rb-space-4);
+  border-radius: var(--rb-radius-md);
+  border: 1px solid var(--rb-border-color);
+  background-color: var(--rb-bg-elevated);
+  color: var(--rb-text-primary);
+  font-size: var(--rb-text-base);
+  transition: border-color var(--rb-transition-fast),
+    box-shadow var(--rb-transition-fast),
+    background-color var(--rb-transition-fast);
+}
+
+.rb-input::placeholder,
+.rb-textarea::placeholder {
+  color: var(--rb-text-muted);
+}
+
+.rb-input:focus,
+.rb-select:focus,
+.rb-textarea:focus {
+  outline: none;
+  border-color: var(--rb-primary-500);
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.12);
+}
+
+.rb-input:disabled,
+.rb-select:disabled,
+.rb-textarea:disabled {
+  background-color: var(--rb-bg-muted);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.rb-error-message {
+  font-size: var(--rb-text-xs);
+  color: var(--rb-error);
+}
+
+/* Checkboxes & Radios ------------------------------------------- */
+.rb-check-group {
+  display: flex;
+  align-items: center;
+  gap: var(--rb-space-3);
+}
+
+.rb-checkbox,
+.rb-radio {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--rb-radius-sm);
+  border: 2px solid var(--rb-border-strong);
+  display: inline-grid;
+  place-content: center;
+  transition: border-color var(--rb-transition-fast),
+    background-color var(--rb-transition-fast);
+}
+
+.rb-checkbox::after {
+  content: '';
+  width: 10px;
+  height: 10px;
+  transform: scale(0);
+  transition: transform var(--rb-transition-fast);
+  background-color: var(--rb-primary-600);
+  border-radius: 2px;
+}
+
+.rb-checkbox:checked {
+  border-color: transparent;
+  background-color: var(--rb-primary-600);
+}
+
+.rb-checkbox:checked::after {
+  transform: scale(1);
+}
+
+.rb-radio {
+  border-radius: 50%;
+}
+
+.rb-radio::after {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--rb-primary-600);
+  transform: scale(0);
+  transition: transform var(--rb-transition-fast);
+}
+
+.rb-radio:checked {
+  border-color: var(--rb-primary-600);
+}
+
+.rb-radio:checked::after {
+  transform: scale(1);
+}
+
+/* Cards ---------------------------------------------------------- */
+.rb-card {
+  background-color: var(--rb-bg-elevated);
+  border-radius: var(--rb-radius-lg);
+  border: 1px solid var(--rb-border-color);
+  box-shadow: var(--rb-shadow-sm);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.rb-card-header {
+  padding: var(--rb-space-5);
+  border-bottom: 1px solid var(--rb-border-color);
+}
+
+.rb-card-title {
+  margin: 0;
+  font-size: var(--rb-text-xl);
+  font-weight: var(--rb-font-semibold);
+}
+
+.rb-card-body {
+  padding: var(--rb-space-5);
+  color: var(--rb-text-secondary);
+}
+
+.rb-stat-card {
+  display: flex;
+  align-items: center;
+  gap: var(--rb-space-4);
+  padding: var(--rb-space-5);
+  border-radius: var(--rb-radius-lg);
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.12), rgba(59, 130, 246, 0.05));
+  border: 1px solid rgba(59, 130, 246, 0.18);
+}
+
+.rb-stat-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--rb-radius-lg);
+  background-color: rgba(37, 99, 235, 0.12);
+  display: grid;
+  place-items: center;
+  color: var(--rb-primary-600);
+}
+
+.rb-stat-number {
+  font-size: var(--rb-text-3xl);
+  font-weight: var(--rb-font-semibold);
+}
+
+.rb-stat-label {
+  font-size: var(--rb-text-sm);
+  color: var(--rb-text-muted);
+}
+
+/* Modal ---------------------------------------------------------- */
+.rb-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(15, 23, 42, 0.35);
+  backdrop-filter: blur(4px);
+  display: grid;
+  place-items: center;
+  padding: var(--rb-space-6);
+  z-index: 1000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--rb-transition-base);
+}
+
+.rb-modal-overlay.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.rb-modal {
+  width: min(100%, 560px);
+  background-color: var(--rb-bg-elevated);
+  border-radius: var(--rb-radius-xl);
+  box-shadow: var(--rb-shadow-lg);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transform: translateY(10px);
+  transition: transform var(--rb-transition-base);
+}
+
+.rb-modal-overlay.is-visible .rb-modal {
+  transform: translateY(0);
+}
+
+.rb-modal-header,
+.rb-modal-footer {
+  padding: var(--rb-space-5);
+  border-bottom: 1px solid var(--rb-border-color);
+}
+
+.rb-modal-footer {
+  border-top: 1px solid var(--rb-border-color);
+  border-bottom: none;
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--rb-space-3);
+}
+
+.rb-modal-body {
+  padding: var(--rb-space-5);
+  color: var(--rb-text-secondary);
+}
+
+.rb-modal-title {
+  margin: 0;
+  font-size: var(--rb-text-2xl);
+  font-weight: var(--rb-font-semibold);
+}
+
+.rb-modal-close {
+  appearance: none;
+  background: none;
+  border: none;
+  color: var(--rb-text-muted);
+  cursor: pointer;
+  font-size: var(--rb-text-xl);
+  line-height: 1;
+  transition: color var(--rb-transition-fast);
+}
+
+.rb-modal-close:hover,
+.rb-modal-close:focus-visible {
+  color: var(--rb-primary-600);
+}
+
+/* Navigation ----------------------------------------------------- */
+.rb-sidebar {
+  width: var(--rb-sidebar-width);
+  min-height: 100vh;
+  background-color: var(--rb-bg-secondary);
+  border-right: 1px solid var(--rb-border-color);
+  display: flex;
+  flex-direction: column;
+  padding: var(--rb-space-6) var(--rb-space-4);
+  gap: var(--rb-space-6);
+}
+
+.rb-sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.rb-logo {
+  font-size: var(--rb-text-xl);
+  font-weight: var(--rb-font-semibold);
+  color: var(--rb-primary-600);
+}
+
+.rb-nav-menu {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--rb-space-2);
+}
+
+.rb-nav-item {}
+
+.rb-nav-link {
+  display: flex;
+  align-items: center;
+  gap: var(--rb-space-3);
+  padding: var(--rb-space-3) var(--rb-space-4);
+  border-radius: var(--rb-radius-md);
+  color: var(--rb-text-secondary);
+  font-weight: var(--rb-font-medium);
+  transition: background-color var(--rb-transition-fast),
+    color var(--rb-transition-fast);
+}
+
+.rb-nav-link:hover,
+.rb-nav-link:focus-visible {
+  background-color: rgba(59, 130, 246, 0.08);
+  color: var(--rb-primary-700);
+}
+
+.rb-nav-link.rb-active {
+  background-color: var(--rb-primary-600);
+  color: var(--rb-text-inverse);
+  box-shadow: var(--rb-shadow-sm);
+}
+
+.rb-nav-icon {
+  width: 18px;
+  height: 18px;
+}
+
+/* Tables & Lists ------------------------------------------------- */
+.rb-table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: var(--rb-bg-elevated);
+  border-radius: var(--rb-radius-lg);
+  overflow: hidden;
+  box-shadow: var(--rb-shadow-sm);
+}
+
+.rb-table thead {
+  background-color: var(--rb-bg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: var(--rb-text-xs);
+  color: var(--rb-text-muted);
+}
+
+.rb-table th,
+.rb-table td {
+  padding: var(--rb-space-4);
+  border-bottom: 1px solid var(--rb-border-color);
+  text-align: left;
+}
+
+.rb-table tbody tr:hover {
+  background-color: rgba(59, 130, 246, 0.06);
+}
+
+/* Alerts --------------------------------------------------------- */
+.rb-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--rb-space-3);
+  padding: var(--rb-space-4);
+  border-radius: var(--rb-radius-lg);
+  border: 1px solid transparent;
+}
+
+.rb-alert-success {
+  background-color: var(--rb-success-light);
+  border-color: rgba(16, 185, 129, 0.3);
+  color: var(--rb-success);
+}
+
+.rb-alert-warning {
+  background-color: var(--rb-warning-light);
+  border-color: rgba(245, 158, 11, 0.35);
+  color: var(--rb-warning);
+}
+
+.rb-alert-error {
+  background-color: var(--rb-error-light);
+  border-color: rgba(239, 68, 68, 0.35);
+  color: var(--rb-error);
+}
+
+/* Tables & Components adjustments for dark mode ------------------ */
+[data-theme="dark"] .rb-sidebar {
+  background-color: #0f172a;
+}
+
+[data-theme="dark"] .rb-nav-link:hover,
+[data-theme="dark"] .rb-nav-link:focus-visible {
+  background-color: rgba(96, 165, 250, 0.16);
+}
+
+[data-theme="dark"] .rb-nav-link.rb-active {
+  background-color: #3b82f6;
+  color: var(--rb-text-inverse);
+}
+
+[data-theme="dark"] .rb-table thead {
+  background-color: rgba(148, 163, 184, 0.06);
+}
+
+[data-theme="dark"] .rb-modal-overlay {
+  background-color: rgba(15, 23, 42, 0.6);
+}
+
+[data-theme="dark"] .rb-stat-card {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.24), rgba(37, 99, 235, 0.12));
+  border-color: rgba(59, 130, 246, 0.35);
+}
+
+[data-theme="dark"] .rb-btn-secondary {
+  color: var(--rb-text-secondary);
+  border-color: rgba(148, 163, 184, 0.24);
+}
+
+[data-theme="dark"] .rb-btn-secondary:hover,
+[data-theme="dark"] .rb-btn-secondary:focus-visible {
+  color: var(--rb-text-inverse);
+  background-color: rgba(96, 165, 250, 0.2);
+}
+
+[data-theme="dark"] .rb-input,
+[data-theme="dark"] .rb-select,
+[data-theme="dark"] .rb-textarea {
+  background-color: rgba(15, 23, 42, 0.65);
+  border-color: rgba(148, 163, 184, 0.2);
+}
+
+[data-theme="dark"] .rb-input:focus,
+[data-theme="dark"] .rb-select:focus,
+[data-theme="dark"] .rb-textarea:focus {
+  border-color: rgba(96, 165, 250, 0.6);
+  box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.2);
+}
+
+/* Theme Toggle ---------------------------------------------------- */
+.rb-theme-toggle {
+  gap: var(--rb-space-3);
+  min-width: 0;
+}
+
+.rb-theme-icon {
+  transition: opacity var(--rb-transition-fast), transform var(--rb-transition-fast);
+}
+
+.rb-theme-toggle .rb-moon-icon,
+.rb-theme-toggle .rb-sun-icon {
+  opacity: 0.4;
+}
+
+[data-theme="dark"] .rb-theme-toggle .rb-moon-icon {
+  opacity: 1;
+}
+
+[data-theme="light"] .rb-theme-toggle .rb-sun-icon {
+  opacity: 1;
+}

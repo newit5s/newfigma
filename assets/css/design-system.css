@@ -1,0 +1,290 @@
+/*
+ * Modern Restaurant Booking Manager - Design System
+ * Phase 1 deliverable: CSS variables, typography, spacing, elevation, and layout tokens
+ * Inspired by Figma design (Table Booking Restaurant Application)
+ */
+
+/*
+====================================================================
+Base Tokens
+====================================================================
+*/
+:root {
+  /* Color Palette ------------------------------------------------ */
+  /* Primary */
+  --rb-primary-50: #eff6ff;
+  --rb-primary-100: #dbeafe;
+  --rb-primary-200: #bfdbfe;
+  --rb-primary-300: #93c5fd;
+  --rb-primary-400: #60a5fa;
+  --rb-primary-500: #3b82f6;
+  --rb-primary-600: #2563eb;
+  --rb-primary-700: #1d4ed8;
+  --rb-primary-800: #1e40af;
+  --rb-primary-900: #1e3a8a;
+
+  /* Gray Scale */
+  --rb-gray-50: #f9fafb;
+  --rb-gray-100: #f3f4f6;
+  --rb-gray-200: #e5e7eb;
+  --rb-gray-300: #d1d5db;
+  --rb-gray-400: #9ca3af;
+  --rb-gray-500: #6b7280;
+  --rb-gray-600: #4b5563;
+  --rb-gray-700: #374151;
+  --rb-gray-800: #1f2937;
+  --rb-gray-900: #111827;
+
+  /* Accent & Semantic */
+  --rb-success: #10b981;
+  --rb-success-light: #d1fae5;
+  --rb-warning: #f59e0b;
+  --rb-warning-light: #fef3c7;
+  --rb-error: #ef4444;
+  --rb-error-light: #fee2e2;
+  --rb-info: #3b82f6;
+  --rb-info-light: #dbeafe;
+
+  /* Background */
+  --rb-bg-primary: #ffffff;
+  --rb-bg-secondary: #f9fafb;
+  --rb-bg-muted: #f3f4f6;
+  --rb-bg-elevated: #ffffff;
+
+  /* Text */
+  --rb-text-primary: #111827;
+  --rb-text-secondary: #4b5563;
+  --rb-text-muted: #6b7280;
+  --rb-text-inverse: #f9fafb;
+
+  /* Border */
+  --rb-border-color: #e5e7eb;
+  --rb-border-strong: #d1d5db;
+
+  /* Typography --------------------------------------------------- */
+  --rb-font-sans: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+  --rb-font-heading: var(--rb-font-sans);
+
+  --rb-text-xs: 0.75rem;   /* 12px */
+  --rb-text-sm: 0.875rem;  /* 14px */
+  --rb-text-base: 1rem;    /* 16px */
+  --rb-text-lg: 1.125rem;  /* 18px */
+  --rb-text-xl: 1.25rem;   /* 20px */
+  --rb-text-2xl: 1.5rem;   /* 24px */
+  --rb-text-3xl: 1.875rem; /* 30px */
+  --rb-text-4xl: 2.25rem;  /* 36px */
+
+  --rb-font-normal: 400;
+  --rb-font-medium: 500;
+  --rb-font-semibold: 600;
+  --rb-font-bold: 700;
+
+  /* Spacing ------------------------------------------------------ */
+  --rb-space-0: 0;
+  --rb-space-1: 0.25rem;  /* 4px */
+  --rb-space-2: 0.5rem;   /* 8px */
+  --rb-space-3: 0.75rem;  /* 12px */
+  --rb-space-4: 1rem;     /* 16px */
+  --rb-space-5: 1.25rem;  /* 20px */
+  --rb-space-6: 1.5rem;   /* 24px */
+  --rb-space-8: 2rem;     /* 32px */
+  --rb-space-10: 2.5rem;  /* 40px */
+  --rb-space-12: 3rem;    /* 48px */
+  --rb-space-16: 4rem;    /* 64px */
+
+  /* Sizing ------------------------------------------------------- */
+  --rb-radius-xs: 0.25rem; /* 4px */
+  --rb-radius-sm: 0.375rem; /* 6px */
+  --rb-radius-md: 0.5rem;  /* 8px */
+  --rb-radius-lg: 0.75rem; /* 12px */
+  --rb-radius-xl: 1rem;    /* 16px */
+  --rb-radius-full: 999px;
+
+  /* Shadows ------------------------------------------------------ */
+  --rb-shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.08);
+  --rb-shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.12), 0 1px 2px rgba(15, 23, 42, 0.06);
+  --rb-shadow-md: 0 10px 30px rgba(15, 23, 42, 0.08);
+  --rb-shadow-lg: 0 20px 45px rgba(15, 23, 42, 0.12);
+
+  /* Transitions -------------------------------------------------- */
+  --rb-transition-fast: 150ms ease-in-out;
+  --rb-transition-base: 250ms ease-in-out;
+  --rb-transition-slow: 350ms ease-in-out;
+
+  /* Layout ------------------------------------------------------- */
+  --rb-container-width: 1200px;
+  --rb-sidebar-width: 280px;
+
+  /* Breakpoints -------------------------------------------------- */
+  --rb-screen-sm: 640px;
+  --rb-screen-md: 768px;
+  --rb-screen-lg: 1024px;
+  --rb-screen-xl: 1280px;
+}
+
+/*
+====================================================================
+Dark Theme Tokens
+====================================================================
+*/
+[data-theme="dark"] {
+  --rb-bg-primary: #1f2937;
+  --rb-bg-secondary: #111827;
+  --rb-bg-muted: #0f172a;
+  --rb-bg-elevated: #1f2937;
+
+  --rb-text-primary: #f9fafb;
+  --rb-text-secondary: #e5e7eb;
+  --rb-text-muted: #cbd5f5;
+  --rb-text-inverse: #111827;
+
+  --rb-border-color: #1f2937;
+  --rb-border-strong: #374151;
+
+  --rb-shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.3);
+  --rb-shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.35), 0 1px 2px rgba(15, 23, 42, 0.25);
+  --rb-shadow-md: 0 10px 30px rgba(15, 23, 42, 0.35);
+  --rb-shadow-lg: 0 20px 45px rgba(15, 23, 42, 0.45);
+}
+
+/*
+====================================================================
+Global Resets & Utilities
+====================================================================
+*/
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  margin: 0;
+  font-family: var(--rb-font-sans);
+  font-size: var(--rb-text-base);
+  font-weight: var(--rb-font-normal);
+  line-height: 1.5;
+  color: var(--rb-text-primary);
+  background-color: var(--rb-bg-primary);
+  transition: background-color var(--rb-transition-base), color var(--rb-transition-base);
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+a:hover,
+a:focus {
+  color: var(--rb-primary-600);
+}
+
+p {
+  margin-top: 0;
+  margin-bottom: var(--rb-space-4);
+  color: var(--rb-text-secondary);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  margin-top: 0;
+  color: var(--rb-text-primary);
+  font-family: var(--rb-font-heading);
+}
+
+h1 { font-size: var(--rb-text-4xl); font-weight: var(--rb-font-bold); }
+h2 { font-size: var(--rb-text-3xl); font-weight: var(--rb-font-semibold); }
+h3 { font-size: var(--rb-text-2xl); font-weight: var(--rb-font-semibold); }
+h4 { font-size: var(--rb-text-xl); font-weight: var(--rb-font-medium); }
+h5 { font-size: var(--rb-text-lg); font-weight: var(--rb-font-medium); }
+h6 { font-size: var(--rb-text-base); font-weight: var(--rb-font-medium); }
+
+/* Layout Utilities ---------------------------------------------- */
+.rb-container {
+  width: min(100%, var(--rb-container-width));
+  margin: 0 auto;
+  padding: var(--rb-space-4);
+}
+
+@media (min-width: 640px) {
+  .rb-container {
+    padding: var(--rb-space-6);
+  }
+}
+
+@media (min-width: 1024px) {
+  .rb-container {
+    padding: var(--rb-space-8);
+  }
+}
+
+.rb-grid {
+  display: grid;
+  gap: var(--rb-space-6);
+}
+
+.rb-grid-2 {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.rb-flex {
+  display: flex;
+  gap: var(--rb-space-3);
+}
+
+.rb-flex-between {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Text Utilities ------------------------------------------------ */
+.rb-text-muted { color: var(--rb-text-muted); }
+.rb-text-secondary { color: var(--rb-text-secondary); }
+.rb-text-bold { font-weight: var(--rb-font-semibold); }
+
+/* Surface Utilities --------------------------------------------- */
+.rb-surface {
+  background-color: var(--rb-bg-elevated);
+  border: 1px solid var(--rb-border-color);
+  border-radius: var(--rb-radius-lg);
+  box-shadow: var(--rb-shadow-sm);
+  transition: box-shadow var(--rb-transition-base), transform var(--rb-transition-base);
+}
+
+.rb-surface:hover {
+  box-shadow: var(--rb-shadow-lg);
+  transform: translateY(-2px);
+}
+
+/* Scrollbar Styling (WebKit) ------------------------------------ */
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--rb-bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--rb-gray-300);
+  border-radius: var(--rb-radius-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--rb-gray-400);
+}
