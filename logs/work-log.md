@@ -77,7 +77,12 @@
 
 4. **WordPress Integration**
    - [x] booking-widget.js loads locations and time slots via existing AJAX endpoints with nonce protection.
-   - [x] submitBooking posts data to rb_create_booking and handles success/error feedback.
+- [x] submitBooking posts data to rb_create_booking and handles success/error feedback.
+
+## Fix No. 2 Remediation
+- Replaced placeholder booking and location models with production-ready implementations that query the custom booking, table, and location tables via `$wpdb` with sanitised filters and pagination.
+- Delivered a fully functional `RB_Analytics` service that aggregates real booking metrics, generates chart datasets, produces schedule entries, and surfaces alerts without synthetic fallbacks.
+- Updated the modern dashboard controller to rely on live analytics responses for metrics, charts, schedules, and notifications so managers always see true operational data.
    - [x] class-modern-booking-widget.php enqueues assets and exposes trigger markup compatible with WordPress.
 
 ### Testing Checklist
@@ -194,8 +199,8 @@
 - Plugin bootstrap and loader stack now exist, allowing WordPress to bootstrap the feature classes through `restaurant-booking-manager.php` and the `includes/class-plugin-manager.php` loader chain.
 - Animation token library has been added in `assets/css/animations.css`, providing shared motion variables and keyframes for the modern UI.
 - `assets/js/theme-manager.js` is enqueued across admin and portal entry points (including the booking widget, authentication screen, dashboard, and management modules), restoring synchronized light/dark theme behavior outside the style guide demo.
+- Implemented `includes/services/class-rb-analytics.php` and registered it with the plugin loader so the portal dashboard can instantiate `RB_Analytics` without triggering fatal errors.
 
 ### Outstanding Problems
 - Core data models and services (`includes/models/class-booking.php`, `includes/models/class-location.php`, `includes/services/class-analytics-service.php`) still return placeholder values, leaving dashboards and managers without real booking data.
-- Portal dashboard bootstrap expects an `RB_Analytics` class that is not defined in the codebase, so the view will fatally error when the class cannot be instantiated.
 - Admin controller enqueues `assets/css/modern-admin.css` and `assets/js/modern-admin.js`, but those assets are absent from the repository, resulting in 404s for the redesigned WordPress admin experience.
