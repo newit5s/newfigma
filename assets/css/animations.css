@@ -1,0 +1,350 @@
+/**
+ * Modern Restaurant Booking - Animation System
+ */
+
+:root {
+  --rb-transition-fast: 150ms ease-in-out;
+  --rb-transition-base: 250ms ease-in-out;
+  --rb-transition-slow: 350ms ease-in-out;
+  --rb-ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --rb-ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --rb-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --rb-ease-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes zoomIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes slideOutUp {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-30px);
+  }
+}
+
+@keyframes slideOutDown {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+}
+
+@keyframes bounce {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-5px);
+  }
+  75% {
+    transform: translateX(5px);
+  }
+}
+
+@keyframes swing {
+  20% {
+    transform: rotate(15deg);
+  }
+  40% {
+    transform: rotate(-10deg);
+  }
+  60% {
+    transform: rotate(5deg);
+  }
+  80% {
+    transform: rotate(-5deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+@keyframes heartBeat {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  14% {
+    transform: scale(1.3);
+  }
+  28% {
+    transform: scale(1);
+  }
+  42% {
+    transform: scale(1.3);
+  }
+  70% {
+    transform: scale(1);
+  }
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes spinReverse {
+  0% {
+    transform: rotate(360deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -1200px 0;
+  }
+  100% {
+    background-position: 1200px 0;
+  }
+}
+
+@keyframes skeleton-loading {
+  0%,
+  100% {
+    background-position: 1200px 0;
+  }
+  50% {
+    background-position: -1200px 0;
+  }
+}
+
+@keyframes ripple {
+  0% {
+    transform: scale(0);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(4);
+    opacity: 0;
+  }
+}
+
+@keyframes scaleIn {
+  0% {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes scaleOut {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+}
+
+@keyframes flip {
+  0% {
+    transform: perspective(400px) rotateY(0);
+  }
+  100% {
+    transform: perspective(400px) rotateY(360deg);
+  }
+}
+
+.rb-animate-slide-up {
+  animation: slideInUp var(--rb-transition-base);
+}
+
+.rb-animate-slide-down {
+  animation: slideInDown var(--rb-transition-base);
+}
+
+.rb-animate-slide-left {
+  animation: slideInLeft var(--rb-transition-base);
+}
+
+.rb-animate-slide-right {
+  animation: slideInRight var(--rb-transition-base);
+}
+
+.rb-animate-fade-in {
+  animation: fadeIn var(--rb-transition-base);
+}
+
+.rb-animate-fade-out {
+  animation: fadeOut var(--rb-transition-base);
+}
+
+.rb-animate-zoom-in {
+  animation: zoomIn var(--rb-transition-base);
+}
+
+.rb-animate-bounce {
+  animation: bounce 0.6s var(--rb-ease-bounce) infinite;
+}
+
+.rb-animate-pulse {
+  animation: pulse 2s var(--rb-ease-in-out) infinite;
+}
+
+.rb-animate-shake {
+  animation: shake 0.5s ease-in-out;
+}
+
+.rb-animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+.rb-animate-spin-reverse {
+  animation: spinReverse 1s linear infinite;
+}
+
+.rb-animate-skeleton {
+  background: linear-gradient(90deg, var(--rb-bg-secondary), var(--rb-border), var(--rb-bg-secondary));
+  background-size: 1200px 100%;
+  animation: skeleton-loading 2s infinite;
+}
+
+.rb-animate-ripple {
+  animation: ripple 0.6s ease-out;
+}
+
+.rb-transition-fast {
+  transition: all var(--rb-transition-fast);
+}
+
+.rb-transition-base {
+  transition: all var(--rb-transition-base);
+}
+
+.rb-transition-slow {
+  transition: all var(--rb-transition-slow);
+}
+
+.rb-delay-100 { animation-delay: 100ms; }
+.rb-delay-200 { animation-delay: 200ms; }
+.rb-delay-300 { animation-delay: 300ms; }
+.rb-delay-500 { animation-delay: 500ms; }
+.rb-delay-700 { animation-delay: 700ms; }
+.rb-delay-1000 { animation-delay: 1000ms; }
+
+.rb-animation-fill-both { animation-fill-mode: both; }
+.rb-animation-fill-forward { animation-fill-mode: forwards; }
+.rb-animation-fill-backwards { animation-fill-mode: backwards; }
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

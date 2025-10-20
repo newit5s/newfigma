@@ -113,16 +113,31 @@ if ( ! class_exists( 'RB_Modern_Table_Manager' ) ) {
             );
 
             wp_enqueue_style(
+                'rb-animations',
+                $base_url . 'assets/css/animations.css',
+                array( 'rb-design-system' ),
+                $version
+            );
+
+            wp_enqueue_style(
                 'rb-table-management',
                 $base_url . 'assets/css/table-management.css',
-                array( 'rb-design-system', 'rb-components' ),
+                array( 'rb-design-system', 'rb-components', 'rb-animations' ),
                 $version
+            );
+
+            wp_enqueue_script(
+                'rb-theme-manager',
+                $base_url . 'assets/js/theme-manager.js',
+                array(),
+                $version,
+                true
             );
 
             wp_enqueue_script(
                 'rb-table-management',
                 $base_url . 'assets/js/table-management.js',
-                array(),
+                array( 'rb-theme-manager' ),
                 $version,
                 true
             );
@@ -130,7 +145,7 @@ if ( ! class_exists( 'RB_Modern_Table_Manager' ) ) {
             wp_enqueue_script(
                 'rb-customer-management',
                 $base_url . 'assets/js/customer-management.js',
-                array(),
+                array( 'rb-theme-manager' ),
                 $version,
                 true
             );
