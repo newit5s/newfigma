@@ -1,0 +1,381 @@
+/*
+ * Modern Restaurant Booking Manager - Portal Authentication Styles
+ * Phase 3 deliverable: Login interface inspired by the modern Figma design system.
+ */
+
+@keyframes rbFadeInUp {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 24px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes rbCardPulse {
+  0% {
+    box-shadow: 0 24px 60px rgba(15, 23, 42, 0.12);
+  }
+  50% {
+    box-shadow: 0 32px 90px rgba(15, 23, 42, 0.18);
+  }
+  100% {
+    box-shadow: 0 24px 60px rgba(15, 23, 42, 0.12);
+  }
+}
+
+@keyframes rbShake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20%,
+  60% {
+    transform: translateX(-6px);
+  }
+  40%,
+  80% {
+    transform: translateX(6px);
+  }
+}
+
+.rb-portal-login-wrapper {
+  min-height: 100vh;
+  background: linear-gradient(180deg, rgba(59, 130, 246, 0.12) 0%, rgba(59, 130, 246, 0.04) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--rb-space-12) var(--rb-space-6);
+}
+
+.rb-portal-login-container {
+  position: relative;
+  width: min(960px, 100%);
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: var(--rb-space-8);
+  align-items: stretch;
+}
+
+.rb-portal-login-card {
+  grid-column: span 7;
+  background-color: var(--rb-bg-primary);
+  border-radius: var(--rb-radius-xl);
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.12);
+  padding: var(--rb-space-12) var(--rb-space-12) var(--rb-space-10);
+  display: flex;
+  flex-direction: column;
+  gap: var(--rb-space-6);
+  animation: rbFadeInUp 500ms var(--rb-transition-base) forwards;
+}
+
+.rb-portal-login-card:focus-within {
+  box-shadow: 0 28px 70px rgba(37, 99, 235, 0.25);
+}
+
+.rb-portal-logo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rb-space-3);
+  text-align: left;
+}
+
+.rb-logo-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--rb-radius-lg);
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, var(--rb-primary-500), var(--rb-primary-700));
+  color: var(--rb-text-inverse);
+  font-size: var(--rb-text-2xl);
+  box-shadow: var(--rb-shadow-md);
+}
+
+.rb-logo-text {
+  font-family: var(--rb-font-heading);
+  font-size: var(--rb-text-3xl);
+  font-weight: var(--rb-font-semibold);
+  color: var(--rb-text-primary);
+  letter-spacing: -0.02em;
+}
+
+.rb-logo-subtitle {
+  font-size: var(--rb-text-base);
+  color: var(--rb-text-secondary);
+}
+
+.rb-portal-login-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rb-space-5);
+}
+
+.rb-form-checkbox {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--rb-space-3);
+  margin-bottom: 0;
+}
+
+.rb-checkbox-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--rb-space-3);
+  font-size: var(--rb-text-sm);
+  color: var(--rb-text-secondary);
+  cursor: pointer;
+}
+
+.rb-checkbox-label .rb-checkbox {
+  position: relative;
+}
+
+.rb-checkbox-custom {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.rb-input-group {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  background-color: var(--rb-bg-elevated);
+  border: 1px solid var(--rb-border-color);
+  border-radius: var(--rb-radius-md);
+  overflow: hidden;
+  transition: border-color var(--rb-transition-fast), box-shadow var(--rb-transition-fast);
+}
+
+.rb-input-group:focus-within {
+  border-color: var(--rb-primary-500);
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.12);
+}
+
+.rb-input-group .rb-input {
+  border: none;
+  border-radius: 0;
+  padding-right: var(--rb-space-4);
+}
+
+.rb-input-addon {
+  width: 48px;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  border-left: 1px solid var(--rb-border-color);
+  background-color: transparent;
+  color: var(--rb-text-muted);
+  cursor: pointer;
+  transition: color var(--rb-transition-fast), background-color var(--rb-transition-fast);
+}
+
+.rb-input-addon:hover,
+.rb-input-addon:focus-visible {
+  background-color: rgba(59, 130, 246, 0.08);
+  color: var(--rb-primary-600);
+  outline: none;
+}
+
+.rb-password-toggle {
+  border: none;
+  background: none;
+  padding: 0;
+}
+
+.rb-eye-icon {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+}
+
+.rb-btn-block {
+  width: 100%;
+}
+
+.rb-btn-loading {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rb-btn[aria-busy="true"] .rb-btn-text {
+  opacity: 0;
+}
+
+.rb-btn[aria-busy="true"] .rb-btn-loading {
+  display: inline-flex;
+}
+
+.rb-loading-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(249, 250, 251, 0.4);
+  border-top-color: var(--rb-text-inverse);
+  border-radius: 50%;
+  animation: spin 600ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.rb-portal-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: var(--rb-space-4);
+}
+
+.rb-link {
+  font-size: var(--rb-text-sm);
+  color: var(--rb-primary-600);
+  font-weight: var(--rb-font-medium);
+  text-decoration: none;
+  transition: color var(--rb-transition-fast);
+}
+
+.rb-link:hover,
+.rb-link:focus-visible {
+  color: var(--rb-primary-700);
+  text-decoration: underline;
+}
+
+.rb-portal-bg {
+  grid-column: span 5;
+  position: relative;
+  border-radius: var(--rb-radius-xl);
+  background: radial-gradient(circle at 20% 20%, rgba(59, 130, 246, 0.35), transparent 60%),
+    radial-gradient(circle at 80% 80%, rgba(14, 116, 144, 0.25), transparent 65%),
+    linear-gradient(135deg, rgba(59, 130, 246, 0.85), rgba(37, 99, 235, 0.65));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  animation: rbCardPulse 10s ease-in-out infinite;
+}
+
+.rb-bg-pattern {
+  width: 80%;
+  height: 80%;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.08);
+  filter: blur(0.5px);
+}
+
+.rb-alert {
+  display: none;
+}
+
+.rb-alert[aria-hidden="false"],
+.rb-alert.rb-alert-visible {
+  display: block;
+}
+
+.rb-login-shake {
+  animation: rbShake 420ms cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+
+[data-theme="dark"] .rb-portal-login-wrapper {
+  background: radial-gradient(circle at 20% 20%, rgba(37, 99, 235, 0.32), rgba(17, 24, 39, 0.95));
+}
+
+[data-theme="dark"] .rb-portal-login-card {
+  background-color: rgba(17, 24, 39, 0.86);
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.45);
+}
+
+[data-theme="dark"] .rb-input-group {
+  background-color: rgba(17, 24, 39, 0.88);
+  border-color: rgba(148, 163, 184, 0.25);
+}
+
+[data-theme="dark"] .rb-input-addon {
+  border-color: rgba(148, 163, 184, 0.25);
+}
+
+[data-theme="dark"] .rb-bg-pattern {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+@media (max-width: 1024px) {
+  .rb-portal-login-container {
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+  }
+
+  .rb-portal-login-card,
+  .rb-portal-bg {
+    grid-column: span 1;
+  }
+
+  .rb-portal-bg {
+    min-height: 320px;
+    order: -1;
+  }
+}
+
+@media (max-width: 768px) {
+  .rb-portal-login-wrapper {
+    padding: var(--rb-space-10) var(--rb-space-4);
+  }
+
+  .rb-portal-login-card {
+    padding: var(--rb-space-8);
+    gap: var(--rb-space-5);
+  }
+
+  .rb-logo-text {
+    font-size: var(--rb-text-2xl);
+  }
+
+  .rb-logo-subtitle {
+    font-size: var(--rb-text-sm);
+  }
+}
+
+@media (max-width: 640px) {
+  .rb-portal-login-wrapper {
+    padding: var(--rb-space-8) var(--rb-space-3);
+  }
+
+  .rb-portal-login-card {
+    padding: var(--rb-space-6);
+    border-radius: var(--rb-radius-lg);
+  }
+
+  .rb-form-checkbox {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .rb-portal-actions {
+    flex-direction: column;
+    gap: var(--rb-space-3);
+    align-items: flex-start;
+  }
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .rb-btn,
+  .rb-input,
+  .rb-input-addon {
+    min-height: 48px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+  }
+}
