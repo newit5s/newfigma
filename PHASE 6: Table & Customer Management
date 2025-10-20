@@ -1,0 +1,3298 @@
+PHASE 6: Table & Customer Management
+🎯 Objective
+Create a comprehensive table and customer management system with visual floor plan editor, customer profiles, and VIP/Blacklist management based on Figma design: https://www.figma.com/community/file/1308435721888237413
+📋 Dependencies
+
+Phase 1: Design system CSS variables and base components
+Phase 3: Portal authentication system
+Existing Backend: RB_Table::get_tables(), RB_Customer class, table CRUD operations
+
+📦 Deliverables
+
+table-management.css - Table floor plan and customer management styles
+table-management.js - Interactive floor plan editor and customer interactions
+customer-management.js - Customer profile system and history tracking
+table-management.php - Table management interface template
+customer-profiles.php - Customer management interface template
+class-modern-table-manager.php - WordPress integration and data handling
+
+🎨 Interface Layout Specifications
+Table Management Layout
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ Table Management - Downtown Branch                    [Save Layout] [Reset]  │ ← Header
+├─────────────────────────────────────────────────────────────────────────────┤
+│ [Floor Plan] [Customer List] [Analytics]                                     │ ← View Tabs
+├─────────────────────────────────────────────────────────────────────────────┤
+│ ┌─────────────────────────────────┐ ┌─────────────────────────────────────┐ │
+│ │           Floor Plan            │ │         Table Properties            │ │
+│ │                                 │ │                                     │ │
+│ │     ┌─────┐     ┌─────┐        │ │  ┌─────────────────────────────────┐ │ │
+│ │     │ T1  │     │ T2  │        │ │  │ Table 1                        │ │ │
+│ │     │ 4p  │     │ 2p  │        │ │  │ ────────────────────────────── │ │ │
+│ │     │🟢   │     │🔴   │        │ │  │ Capacity: 4 people             │ │ │
+│ │     └─────┘     └─────┘        │ │  │ Status: Available              │ │ │
+│ │                                 │ │  │ Position: (120, 80)            │ │ │
+│ │  ┌─────────────┐    ┌─────┐    │ │  │ Shape: Rectangle               │ │ │
+│ │  │     T3      │    │ T4  │    │ │  │                                │ │ │
+│ │  │     8p      │    │ 6p  │    │ │  │ [Edit] [Delete] [Duplicate]    │ │ │
+│ │  │     🟡      │    │ 🟢  │    │ │  └─────────────────────────────────┘ │ │
+│ │  └─────────────┘    └─────┘    │ │                                     │ │
+│ │                                 │ │  [+ Add New Table]                  │ │
+│ └─────────────────────────────────┘ └─────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Customer Management Layout
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ Customer Management                        [🔍 Search] [+ Add Customer]      │ ← Header
+├─────────────────────────────────────────────────────────────────────────────┤
+│ [All] [VIP] [Regular] [Blacklist]                        [Export] [Import]   │ ← Filters
+├─────────────────────────────────────────────────────────────────────────────┤
+│ ┌─────────────────────────────────┐ ┌─────────────────────────────────────┐ │
+│ │        Customer List            │ │      Customer Profile              │ │
+│ │                                 │ │                                     │ │
+│ │ ┌─────────────────────────────┐ │ │  ┌─────────────────────────────────┐ │ │
+│ │ │ 👤 John Doe        [VIP]    │ │ │  │ 👤 John Doe                    │ │ │
+│ │ │ john@email.com              │ │ │  │ john@email.com                 │ │ │
+│ │ │ +1 234 567 8900             │ │ │  │ +1 234 567 8900                │ │ │
+│ │ │ 24 visits • $2,400 spent    │ │ │  │                                │ │ │
+│ │ └─────────────────────────────┘ │ │  │ Status: VIP Customer           │ │ │
+│ │ ┌─────────────────────────────┐ │ │  │ Total Visits: 24               │ │ │
+│ │ │ 👤 Sarah Wilson   [Regular] │ │ │  │ Total Spent: $2,400            │ │ │
+│ │ │ sarah@email.com             │ │ │  │ Avg Party Size: 3.2            │ │ │
+│ │ │ +1 234 567 8901             │ │ │  │ Last Visit: March 10, 2024     │ │ │
+│ │ │ 8 visits • $640 spent       │ │ │  │                                │ │ │
+│ │ └─────────────────────────────┘ │ │  │ 📊 Booking History             │ │ │
+│ │                                 │ │  │ 📝 Notes & Preferences         │ │ │
+│ └─────────────────────────────────┘ └─────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────────────────┘
+🏗️ Table Management Component
+HTML Structure
+html<div class="rb-table-management">
+  <!-- Header Section -->
+  <div class="rb-table-header">
+    <div class="rb-header-title">
+      <h1 class="rb-page-title">Table Management</h1>
+      <div class="rb-location-info">
+        <span class="rb-location-name">Downtown Branch</span>
+        <span class="rb-table-count">12 tables • 64 seats</span>
+      </div>
+    </div>
+    
+    <div class="rb-header-actions">
+      <button class="rb-btn rb-btn-outline" id="reset-layout">
+        <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+        </svg>
+        Reset Layout
+      </button>
+      <button class="rb-btn rb-btn-primary" id="save-layout">
+        <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/>
+        </svg>
+        Save Layout
+      </button>
+    </div>
+  </div>
+  
+  <!-- Tab Navigation -->
+  <div class="rb-table-tabs">
+    <button class="rb-tab-btn rb-active" data-tab="floor-plan">
+      <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
+        <path d="M20 6v2h-2v6h-1.5v-6h-5v6H10V8H8V6h12zM6 10v2H4v6H2.5v-6H1v-2h5z"/>
+      </svg>
+      Floor Plan
+    </button>
+    <button class="rb-tab-btn" data-tab="table-list">
+      <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
+        <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/>
+      </svg>
+      Table List
+    </button>
+    <button class="rb-tab-btn" data-tab="analytics">
+      <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
+        <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/>
+      </svg>
+      Analytics
+    </button>
+  </div>
+  
+  <!-- Main Content -->
+  <div class="rb-table-content">
+    <div class="rb-content-main">
+      <!-- Floor Plan Tab -->
+      <div class="rb-tab-content rb-active" id="floor-plan-tab">
+        <div class="rb-floor-plan-container">
+          <div class="rb-floor-plan" id="floor-plan">
+            <div class="rb-floor-plan-canvas" id="floor-plan-canvas">
+              <!-- Dynamic table elements -->
+            </div>
+            
+            <!-- Grid overlay -->
+            <div class="rb-floor-grid" id="floor-grid" style="display: none;"></div>
+            
+            <!-- Selection rectangle -->
+            <div class="rb-selection-rectangle" id="selection-rectangle" style="display: none;"></div>
+          </div>
+          
+          <!-- Floor Plan Controls -->
+          <div class="rb-floor-controls">
+            <div class="rb-control-group">
+              <label class="rb-control-label">Zoom:</label>
+              <div class="rb-zoom-controls">
+                <button class="rb-btn rb-btn-sm rb-btn-icon" id="zoom-out">-</button>
+                <span class="rb-zoom-level" id="zoom-level">100%</span>
+                <button class="rb-btn rb-btn-sm rb-btn-icon" id="zoom-in">+</button>
+              </div>
+            </div>
+            
+            <div class="rb-control-group">
+              <label class="rb-control-label">Grid:</label>
+              <label class="rb-toggle">
+                <input type="checkbox" id="show-grid">
+                <span class="rb-toggle-slider"></span>
+              </label>
+            </div>
+            
+            <div class="rb-control-group">
+              <label class="rb-control-label">Snap to Grid:</label>
+              <label class="rb-toggle">
+                <input type="checkbox" id="snap-to-grid" checked>
+                <span class="rb-toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Table List Tab -->
+      <div class="rb-tab-content" id="table-list-tab">
+        <div class="rb-table-list-container">
+          <div class="rb-table-list-header">
+            <div class="rb-search-input">
+              <svg class="rb-search-icon" width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+              </svg>
+              <input type="text" class="rb-input" placeholder="Search tables..." id="table-search">
+            </div>
+            
+            <button class="rb-btn rb-btn-primary" id="add-new-table">
+              <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+              </svg>
+              Add Table
+            </button>
+          </div>
+          
+          <div class="rb-table-list" id="table-list">
+            <!-- Dynamic table list items -->
+          </div>
+        </div>
+      </div>
+      
+      <!-- Analytics Tab -->
+      <div class="rb-tab-content" id="analytics-tab">
+        <div class="rb-analytics-container">
+          <div class="rb-analytics-stats">
+            <div class="rb-stat-card">
+              <div class="rb-stat-icon">
+                <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M20 6v2h-2v6h-1.5v-6h-5v6H10V8H8V6h12z"/>
+                </svg>
+              </div>
+              <div class="rb-stat-content">
+                <div class="rb-stat-number">85%</div>
+                <div class="rb-stat-label">Average Occupancy</div>
+              </div>
+            </div>
+            
+            <div class="rb-stat-card">
+              <div class="rb-stat-icon">
+                <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                </svg>
+              </div>
+              <div class="rb-stat-content">
+                <div class="rb-stat-number">4.2</div>
+                <div class="rb-stat-label">Avg Turn Rate</div>
+              </div>
+            </div>
+            
+            <div class="rb-stat-card">
+              <div class="rb-stat-icon">
+                <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/>
+                </svg>
+              </div>
+              <div class="rb-stat-content">
+                <div class="rb-stat-number">$125</div>
+                <div class="rb-stat-label">Avg Revenue/Table</div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="rb-table-performance">
+            <h3>Table Performance</h3>
+            <div class="rb-performance-chart">
+              <canvas id="table-performance-chart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Sidebar -->
+    <div class="rb-content-sidebar">
+      <!-- Table Properties Panel -->
+      <div class="rb-table-properties" id="table-properties">
+        <div class="rb-panel-header">
+          <h3 class="rb-panel-title">Table Properties</h3>
+          <button class="rb-btn rb-btn-sm rb-btn-icon" id="close-properties">
+            <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+            </svg>
+          </button>
+        </div>
+        
+        <div class="rb-panel-content">
+          <div class="rb-form-group">
+            <label class="rb-label">Table Name</label>
+            <input type="text" class="rb-input" id="table-name" placeholder="Table 1">
+          </div>
+          
+          <div class="rb-form-group">
+            <label class="rb-label">Capacity</label>
+            <select class="rb-select" id="table-capacity">
+              <option value="2">2 people</option>
+              <option value="4">4 people</option>
+              <option value="6">6 people</option>
+              <option value="8">8 people</option>
+              <option value="10">10 people</option>
+            </select>
+          </div>
+          
+          <div class="rb-form-group">
+            <label class="rb-label">Table Type</label>
+            <select class="rb-select" id="table-type">
+              <option value="standard">Standard</option>
+              <option value="booth">Booth</option>
+              <option value="bar">Bar</option>
+              <option value="outdoor">Outdoor</option>
+              <option value="private">Private Room</option>
+            </select>
+          </div>
+          
+          <div class="rb-form-group">
+            <label class="rb-label">Position</label>
+            <div class="rb-position-inputs">
+              <input type="number" class="rb-input rb-input-sm" id="table-x" placeholder="X">
+              <input type="number" class="rb-input rb-input-sm" id="table-y" placeholder="Y">
+            </div>
+          </div>
+          
+          <div class="rb-form-group">
+            <label class="rb-label">Size</label>
+            <div class="rb-size-inputs">
+              <input type="number" class="rb-input rb-input-sm" id="table-width" placeholder="Width">
+              <input type="number" class="rb-input rb-input-sm" id="table-height" placeholder="Height">
+            </div>
+          </div>
+          
+          <div class="rb-form-group">
+            <label class="rb-label">Status</label>
+            <select class="rb-select" id="table-status">
+              <option value="available">Available</option>
+              <option value="occupied">Occupied</option>
+              <option value="reserved">Reserved</option>
+              <option value="maintenance">Maintenance</option>
+            </select>
+          </div>
+          
+          <div class="rb-form-actions">
+            <button class="rb-btn rb-btn-error" id="delete-table">Delete Table</button>
+            <button class="rb-btn rb-btn-outline" id="duplicate-table">Duplicate</button>
+            <button class="rb-btn rb-btn-primary" id="update-table">Update</button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Table Templates -->
+      <div class="rb-table-templates">
+        <div class="rb-panel-header">
+          <h3 class="rb-panel-title">Table Templates</h3>
+        </div>
+        
+        <div class="rb-panel-content">
+          <div class="rb-template-grid">
+            <div class="rb-template-item" data-template="2-square">
+              <div class="rb-template-preview">
+                <div class="rb-template-table rb-square"></div>
+              </div>
+              <div class="rb-template-label">2-Seat Square</div>
+            </div>
+            
+            <div class="rb-template-item" data-template="4-square">
+              <div class="rb-template-preview">
+                <div class="rb-template-table rb-square rb-large"></div>
+              </div>
+              <div class="rb-template-label">4-Seat Square</div>
+            </div>
+            
+            <div class="rb-template-item" data-template="6-rectangle">
+              <div class="rb-template-preview">
+                <div class="rb-template-table rb-rectangle"></div>
+              </div>
+              <div class="rb-template-label">6-Seat Rectangle</div>
+            </div>
+            
+            <div class="rb-template-item" data-template="8-round">
+              <div class="rb-template-preview">
+                <div class="rb-template-table rb-round"></div>
+              </div>
+              <div class="rb-template-label">8-Seat Round</div>
+            </div>
+            
+            <div class="rb-template-item" data-template="booth">
+              <div class="rb-template-preview">
+                <div class="rb-template-table rb-booth"></div>
+              </div>
+              <div class="rb-template-label">Booth</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+👥 Customer Management Component
+HTML Structure
+html<div class="rb-customer-management">
+  <!-- Header Section -->
+  <div class="rb-customer-header">
+    <div class="rb-header-title">
+      <h1 class="rb-page-title">Customer Management</h1>
+      <div class="rb-customer-stats">
+        <span class="rb-stat-item">
+          <strong>1,247</strong> Total Customers
+        </span>
+        <span class="rb-stat-item">
+          <strong>89</strong> VIP Customers
+        </span>
+        <span class="rb-stat-item">
+          <strong>12</strong> Blacklisted
+        </span>
+      </div>
+    </div>
+    
+    <div class="rb-header-actions">
+      <div class="rb-search-input">
+        <svg class="rb-search-icon" width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+        </svg>
+        <input type="text" class="rb-input" placeholder="Search customers..." id="customer-search">
+      </div>
+      
+      <button class="rb-btn rb-btn-outline" id="import-customers">
+        <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/>
+          <polyline points="14,2 14,8 20,8"/>
+          <line x1="16" y1="13" x2="8" y2="13"/>
+          <line x1="16" y1="17" x2="8" y2="17"/>
+          <polyline points="10,9 9,9 8,9"/>
+        </svg>
+        Import
+      </button>
+      
+      <button class="rb-btn rb-btn-outline" id="export-customers">
+        <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/>
+          <polyline points="14,2 14,8 20,8"/>
+          <line x1="16" y1="13" x2="8" y2="13"/>
+          <line x1="16" y1="17" x2="8" y2="17"/>
+          <polyline points="10,9 9,9 8,9"/>
+        </svg>
+        Export
+      </button>
+      
+      <button class="rb-btn rb-btn-primary" id="add-new-customer">
+        <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+        </svg>
+        Add Customer
+      </button>
+    </div>
+  </div>
+  
+  <!-- Filter Tabs -->
+  <div class="rb-customer-filters">
+    <button class="rb-filter-btn rb-active" data-filter="all">
+      All Customers
+      <span class="rb-filter-count">1,247</span>
+    </button>
+    <button class="rb-filter-btn" data-filter="vip">
+      VIP
+      <span class="rb-filter-count">89</span>
+    </button>
+    <button class="rb-filter-btn" data-filter="regular">
+      Regular
+      <span class="rb-filter-count">1,146</span>
+    </button>
+    <button class="rb-filter-btn" data-filter="blacklist">
+      Blacklist
+      <span class="rb-filter-count">12</span>
+    </button>
+  </div>
+  
+  <!-- Main Content -->
+  <div class="rb-customer-content">
+    <div class="rb-customer-list-container">
+      <div class="rb-customer-list" id="customer-list">
+        <!-- Dynamic customer list items -->
+      </div>
+      
+      <!-- Pagination -->
+      <div class="rb-customer-pagination">
+        <div class="rb-pagination-info">
+          <span>Showing <strong>1-25</strong> of <strong>1,247</strong> customers</span>
+        </div>
+        
+        <div class="rb-pagination-controls">
+          <button class="rb-btn rb-btn-sm rb-btn-outline" disabled>Previous</button>
+          <div class="rb-pagination-pages">
+            <button class="rb-pagination-page rb-active">1</button>
+            <button class="rb-pagination-page">2</button>
+            <button class="rb-pagination-page">3</button>
+            <span class="rb-pagination-ellipsis">...</span>
+            <button class="rb-pagination-page">50</button>
+          </div>
+          <button class="rb-btn rb-btn-sm rb-btn-outline">Next</button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Customer Profile Sidebar -->
+    <div class="rb-customer-profile-container">
+      <div class="rb-customer-profile" id="customer-profile">
+        <div class="rb-profile-header">
+          <div class="rb-profile-avatar">
+            <img src="#" alt="Customer Avatar" id="customer-avatar">
+            <div class="rb-avatar-fallback" id="customer-initials">JD</div>
+          </div>
+          
+          <div class="rb-profile-info">
+            <h3 class="rb-profile-name" id="customer-name">John Doe</h3>
+            <div class="rb-profile-status">
+              <span class="rb-customer-badge rb-badge-vip" id="customer-status">VIP</span>
+            </div>
+            <div class="rb-profile-contact">
+              <span class="rb-contact-item" id="customer-email">john@example.com</span>
+              <span class="rb-contact-item" id="customer-phone">+1 234 567 8900</span>
+            </div>
+          </div>
+          
+          <div class="rb-profile-actions">
+            <button class="rb-btn rb-btn-sm rb-btn-outline" id="edit-customer">
+              <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+              </svg>
+              Edit
+            </button>
+            <button class="rb-btn rb-btn-sm rb-btn-outline" id="customer-actions">
+              <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        
+        <!-- Customer Stats -->
+        <div class="rb-customer-stats-grid">
+          <div class="rb-customer-stat">
+            <div class="rb-stat-number" id="total-visits">24</div>
+            <div class="rb-stat-label">Total Visits</div>
+          </div>
+          <div class="rb-customer-stat">
+            <div class="rb-stat-number" id="total-spent">$2,400</div>
+            <div class="rb-stat-label">Total Spent</div>
+          </div>
+          <div class="rb-customer-stat">
+            <div class="rb-stat-number" id="avg-party-size">3.2</div>
+            <div class="rb-stat-label">Avg Party Size</div>
+          </div>
+          <div class="rb-customer-stat">
+            <div class="rb-stat-number" id="last-visit">10 days</div>
+            <div class="rb-stat-label">Last Visit</div>
+          </div>
+        </div>
+        
+        <!-- Customer Tabs -->
+        <div class="rb-profile-tabs">
+          <button class="rb-tab-btn rb-active" data-tab="history">
+            <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M13,3A9,9 0 0,0 4,12H1L4.96,16.03L9,12H6A7,7 0 0,1 13,5A7,7 0 0,1 20,12A7,7 0 0,1 13,19C11.07,19 9.32,18.21 8.06,16.94L6.64,18.36C8.27,20 10.5,21 13,21A9,9 0 0,0 22,12A9,9 0 0,0 13,3Z"/>
+            </svg>
+            History
+          </button>
+          <button class="rb-tab-btn" data-tab="preferences">
+            <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 15.5A3.5 3.5 0 0 1 8.5 12A3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5m7.43-2.53c.04-.32.07-.64.07-.97 0-.33-.03-.66-.07-1l2.11-1.63c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.31-.61-.22l-2.49 1c-.52-.39-1.06-.73-1.69-.98l-.37-2.65C14.46 2.18 14.25 2 14 2h-4c-.25 0-.46.18-.5.42l-.37 2.65c-.63.25-1.17.59-1.69.98l-2.49-1c-.22-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64L4.57 11c-.04.34-.07.67-.07 1 0 .33.03.65.07.97l-2.11 1.66c-.19.15-.25.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1.01c.52.4 1.06.74 1.69.99l.37 2.65c.04.24.25.42.5.42h4c.25 0 .46-.18.5-.42l.37-2.65c.63-.26 1.17-.59 1.69-.99l2.49 1.01c.22.08.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.66Z"/>
+            </svg>
+            Preferences
+          </button>
+          <button class="rb-tab-btn" data-tab="notes">
+            <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/>
+              <polyline points="14,2 14,8 20,8"/>
+              <line x1="16" y1="13" x2="8" y2="13"/>
+              <line x1="16" y1="17" x2="8" y2="17"/>
+              <polyline points="10,9 9,9 8,9"/>
+            </svg>
+            Notes
+          </button>
+        </div>
+        
+        <!-- Tab Content -->
+        <div class="rb-profile-tab-content">
+          <!-- History Tab -->
+          <div class="rb-tab-content rb-active" id="history-tab">
+            <div class="rb-booking-history" id="booking-history">
+              <!-- Dynamic booking history -->
+            </div>
+          </div>
+          
+          <!-- Preferences Tab -->
+          <div class="rb-tab-content" id="preferences-tab">
+            <div class="rb-customer-preferences">
+              <div class="rb-preference-item">
+                <label class="rb-preference-label">Preferred Table Type:</label>
+                <span class="rb-preference-value">Booth</span>
+              </div>
+              <div class="rb-preference-item">
+                <label class="rb-preference-label">Dietary Restrictions:</label>
+                <span class="rb-preference-value">Vegetarian</span>
+              </div>
+              <div class="rb-preference-item">
+                <label class="rb-preference-label">Special Occasions:</label>
+                <span class="rb-preference-value">Anniversary (March 15)</span>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Notes Tab -->
+          <div class="rb-tab-content" id="notes-tab">
+            <div class="rb-customer-notes">
+              <div class="rb-notes-list" id="customer-notes">
+                <!-- Dynamic notes -->
+              </div>
+              
+              <div class="rb-add-note">
+                <textarea class="rb-textarea" placeholder="Add a note..." id="new-note"></textarea>
+                <button class="rb-btn rb-btn-sm rb-btn-primary" id="save-note">Save Note</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+🎨 CSS Styling
+Table Management Styles
+css.rb-table-management {
+  background: var(--rb-bg-secondary);
+  min-height: 100vh;
+  padding: var(--rb-space-6);
+}
+
+.rb-table-header {
+  background: var(--rb-bg-primary);
+  border: 1px solid var(--rb-border);
+  border-radius: var(--rb-radius-lg);
+  padding: var(--rb-space-6);
+  margin-bottom: var(--rb-space-6);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.rb-header-title {
+  flex: 1;
+}
+
+.rb-page-title {
+  font-size: var(--rb-text-2xl);
+  font-weight: var(--rb-font-bold);
+  color: var(--rb-text-primary);
+  margin: 0 0 var(--rb-space-1) 0;
+}
+
+.rb-location-info {
+  display: flex;
+  gap: var(--rb-space-4);
+  color: var(--rb-text-secondary);
+  font-size: var(--rb-text-base);
+}
+
+.rb-table-tabs {
+  display: flex;
+  background: var(--rb-bg-primary);
+  border: 1px solid var(--rb-border);
+  border-radius: var(--rb-radius-lg);
+  padding: var(--rb-space-2);
+  margin-bottom: var(--rb-space-6);
+  gap: var(--rb-space-2);
+}
+
+.rb-tab-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--rb-space-2);
+  background: transparent;
+  border: none;
+  padding: var(--rb-space-3) var(--rb-space-4);
+  border-radius: var(--rb-radius);
+  color: var(--rb-text-secondary);
+  cursor: pointer;
+  transition: all var(--rb-transition-fast);
+  font-weight: var(--rb-font-medium);
+}
+
+.rb-tab-btn.rb-active {
+  background: var(--rb-primary-500);
+  color: white;
+}
+
+.rb-tab-btn:hover:not(.rb-active) {
+  background: var(--rb-gray-100);
+  color: var(--rb-text-primary);
+}
+
+.rb-table-content {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: var(--rb-space-6);
+}
+
+.rb-tab-content {
+  display: none;
+}
+
+.rb-tab-content.rb-active {
+  display: block;
+}
+Floor Plan Styles
+css.rb-floor-plan-container {
+  background: var(--rb-bg-primary);
+  border: 1px solid var(--rb-border);
+  border-radius: var(--rb-radius-lg);
+  overflow: hidden;
+}
+
+.rb-floor-plan {
+  position: relative;
+  height: 600px;
+  background: #fafafa;
+  background-image: 
+    linear-gradient(rgba(0,0,0,.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,0,0,.1) 1px, transparent 1px);
+  background-size: 20px 20px;
+  overflow: hidden;
+}
+
+.rb-floor-plan-canvas {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-origin: 0 0;
+  transition: transform var(--rb-transition-base);
+}
+
+.rb-table-element {
+  position: absolute;
+  background: var(--rb-bg-primary);
+  border: 2px solid var(--rb-border);
+  border-radius: var(--rb-radius);
+  cursor: move;
+  user-select: none;
+  transition: all var(--rb-transition-fast);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 60px;
+  min-height: 60px;
+}
+
+.rb-table-element:hover {
+  border-color: var(--rb-primary-300);
+  transform: scale(1.02);
+  z-index: 10;
+}
+
+.rb-table-element.rb-selected {
+  border-color: var(--rb-primary-500);
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2);
+  z-index: 20;
+}
+
+.rb-table-element.rb-dragging {
+  opacity: 0.8;
+  z-index: 30;
+  transform: rotate(2deg);
+}
+
+.rb-table-number {
+  font-weight: var(--rb-font-bold);
+  color: var(--rb-text-primary);
+  font-size: var(--rb-text-base);
+}
+
+.rb-table-capacity {
+  font-size: var(--rb-text-xs);
+  color: var(--rb-text-secondary);
+  margin-top: var(--rb-space-1);
+}
+
+.rb-table-status {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--rb-bg-primary);
+}
+
+.rb-table-status.rb-available {
+  background: var(--rb-success);
+}
+
+.rb-table-status.rb-occupied {
+  background: var(--rb-error);
+}
+
+.rb-table-status.rb-reserved {
+  background: var(--rb-warning);
+}
+
+.rb-table-status.rb-maintenance {
+  background: var(--rb-gray-500);
+}
+
+/* Table Shapes */
+.rb-table-element.rb-square {
+  border-radius: var(--rb-radius);
+}
+
+.rb-table-element.rb-round {
+  border-radius: 50%;
+}
+
+.rb-table-element.rb-booth {
+  border-radius: var(--rb-radius-lg);
+  background: linear-gradient(135deg, var(--rb-bg-primary) 0%, var(--rb-gray-50) 100%);
+}
+
+.rb-floor-controls {
+  background: var(--rb-bg-secondary);
+  border-top: 1px solid var(--rb-border);
+  padding: var(--rb-space-4);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.rb-control-group {
+  display: flex;
+  align-items: center;
+  gap: var(--rb-space-2);
+}
+
+.rb-control-label {
+  font-size: var(--rb-text-sm);
+  color: var(--rb-text-secondary);
+  font-weight: var(--rb-font-medium);
+}
+
+.rb-zoom-controls {
+  display: flex;
+  align-items: center;
+  background: var(--rb-bg-primary);
+  border: 1px solid var(--rb-border);
+  border-radius: var(--rb-radius);
+}
+
+.rb-zoom-controls button {
+  background: transparent;
+  border: none;
+  padding: var(--rb-space-2);
+  color: var(--rb-text-secondary);
+  cursor: pointer;
+  transition: color var(--rb-transition-fast);
+}
+
+.rb-zoom-controls button:hover {
+  color: var(--rb-text-primary);
+}
+
+.rb-zoom-level {
+  padding: 0 var(--rb-space-3);
+  font-size: var(--rb-text-sm);
+  font-weight: var(--rb-font-medium);
+  color: var(--rb-text-primary);
+  min-width: 50px;
+  text-align: center;
+}
+
+/* Toggle Switch */
+.rb-toggle {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+}
+
+.rb-toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.rb-toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--rb-gray-300);
+  transition: var(--rb-transition-base);
+  border-radius: 24px;
+}
+
+.rb-toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background: white;
+  transition: var(--rb-transition-base);
+  border-radius: 50%;
+}
+
+.rb-toggle input:checked + .rb-toggle-slider {
+  background: var(--rb-primary-500);
+}
+
+.rb-toggle input:checked + .rb-toggle-slider:before {
+  transform: translateX(20px);
+}
+Table Properties Panel
+css.rb-content-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rb-space-6);
+}
+
+.rb-table-properties {
+  background: var(--rb-bg-primary);
+  border: 1px solid var(--rb-border);
+  border-radius: var(--rb-radius-lg);
+  overflow: hidden;
+}
+
+.rb-panel-header {
+  background: var(--rb-bg-secondary);
+  border-bottom: 1px solid var(--rb-border);
+  padding: var(--rb-space-4);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.rb-panel-title {
+  font-size: var(--rb-text-lg);
+  font-weight: var(--rb-font-semibold);
+  color: var(--rb-text-primary);
+  margin: 0;
+}
+
+.rb-panel-content {
+  padding: var(--rb-space-6);
+}
+
+.rb-position-inputs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--rb-space-2);
+}
+
+.rb-size-inputs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--rb-space-2);
+}
+
+.rb-form-actions {
+  display: flex;
+  gap: var(--rb-space-2);
+  margin-top: var(--rb-space-6);
+  padding-top: var(--rb-space-4);
+  border-top: 1px solid var(--rb-border);
+}
+
+.rb-form-actions .rb-btn {
+  flex: 1;
+}
+
+/* Table Templates */
+.rb-table-templates {
+  background: var(--rb-bg-primary);
+  border: 1px solid var(--rb-border);
+  border-radius: var(--rb-radius-lg);
+  overflow: hidden;
+}
+
+.rb-template-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--rb-space-3);
+}
+
+.rb-template-item {
+  background: var(--rb-bg-secondary);
+  border: 1px solid var(--rb-border);
+  border-radius: var(--rb-radius);
+  padding: var(--rb-space-3);
+  cursor: pointer;
+  transition: all var(--rb-transition-fast);
+  text-align: center;
+}
+
+.rb-template-item:hover {
+  border-color: var(--rb-primary-300);
+  background: var(--rb-primary-50);
+}
+
+.rb-template-preview {
+  width: 40px;
+  height: 40px;
+  margin: 0 auto var(--rb-space-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rb-template-table {
+  background: var(--rb-primary-200);
+  border: 2px solid var(--rb-primary-500);
+}
+
+.rb-template-table.rb-square {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--rb-radius-sm);
+}
+
+.rb-template-table.rb-square.rb-large {
+  width: 32px;
+  height: 32px;
+}
+
+.rb-template-table.rb-rectangle {
+  width: 32px;
+  height: 20px;
+  border-radius: var(--rb-radius-sm);
+}
+
+.rb-template-table.rb-round {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+}
+
+.rb-template-table.rb-booth {
+  width: 28px;
+  height: 20px;
+  border-radius: var(--rb-radius);
+  background: linear-gradient(135deg, var(--rb-primary-200) 0%, var(--rb-primary-300) 100%);
+}
+
+.rb-template-label {
+  font-size: var(--rb-text-xs);
+  color: var(--rb-text-secondary);
+  font-weight: var(--rb-font-medium);
+}
+Customer Management Styles
+css.rb-customer-management {
+  background: var(--rb-bg-secondary);
+  min-height: 100vh;
+  padding: var(--rb-space-6);
+}
+
+.rb-customer-header {
+  background: var(--rb-bg-primary);
+  border: 1px solid var(--rb-border);
+  border-radius: var(--rb-radius-lg);
+  padding: var(--rb-space-6);
+  margin-bottom: var(--rb-space-6);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.rb-customer-stats {
+  display: flex;
+  gap: var(--rb-space-6);
+  margin-top: var(--rb-space-2);
+}
+
+.rb-stat-item {
+  color: var(--rb-text-secondary);
+  font-size: var(--rb-text-sm);
+}
+
+.rb-stat-item strong {
+  color: var(--rb-text-primary);
+  font-weight: var(--rb-font-semibold);
+}
+
+.rb-customer-filters {
+  display: flex;
+  background: var(--rb-bg-primary);
+  border: 1px solid var(--rb-border);
+  border-radius: var(--rb-radius-lg);
+  padding: var(--rb-space-2);
+  margin-bottom: var(--rb-space-6);
+  gap: var(--rb-space-2);
+}
+
+.rb-filter-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--rb-space-2);
+  background: transparent;
+  border: none;
+  padding: var(--rb-space-3) var(--rb-space-4);
+  border-radius: var(--rb-radius);
+  color: var(--rb-text-secondary);
+  cursor: pointer;
+  transition: all var(--rb-transition-fast);
+  font-weight: var(--rb-font-medium);
+}
+
+.rb-filter-btn.rb-active {
+  background: var(--rb-primary-500);
+  color: white;
+}
+
+.rb-filter-btn:hover:not(.rb-active) {
+  background: var(--rb-gray-100);
+  color: var(--rb-text-primary);
+}
+
+.rb-filter-count {
+  background: rgba(255, 255, 255, 0.2);
+  padding: var(--rb-space-1) var(--rb-space-2);
+  border-radius: var(--rb-radius-full);
+  font-size: var(--rb-text-xs);
+  font-weight: var(--rb-font-bold);
+}
+
+.rb-filter-btn.rb-active .rb-filter-count {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.rb-customer-content {
+  display: grid;
+  grid-template-columns: 1fr 400px;
+  gap: var(--rb-space-6);
+}
+
+/* Customer List */
+.rb-customer-list-container {
+  background: var(--rb-bg-primary);
+  border: 1px solid var(--rb-border);
+  border-radius: var(--rb-radius-lg);
+  overflow: hidden;
+}
+
+.rb-customer-list {
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.rb-customer-item {
+  display: flex;
+  align-items: center;
+  padding: var(--rb-space-4);
+  border-bottom: 1px solid var(--rb-border);
+  cursor: pointer;
+  transition: all var(--rb-transition-fast);
+}
+
+.rb-customer-item:hover {
+  background: var(--rb-gray-50);
+}
+
+.rb-customer-item.rb-selected {
+  background: var(--rb-primary-50);
+  border-color: var(--rb-primary-200);
+}
+
+.rb-customer-item:last-child {
+  border-bottom: none;
+}
+
+.rb-customer-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--rb-gray-200);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: var(--rb-font-bold);
+  color: var(--rb-gray-600);
+  margin-right: var(--rb-space-4);
+  flex-shrink: 0;
+}
+
+.rb-customer-info {
+  flex: 1;
+}
+
+.rb-customer-name {
+  font-weight: var(--rb-font-semibold);
+  color: var(--rb-text-primary);
+  margin-bottom: var(--rb-space-1);
+}
+
+.rb-customer-contact {
+  font-size: var(--rb-text-sm);
+  color: var(--rb-text-secondary);
+  margin-bottom: var(--rb-space-1);
+}
+
+.rb-customer-summary {
+  font-size: var(--rb-text-xs);
+  color: var(--rb-text-secondary);
+}
+
+.rb-customer-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--rb-space-1) var(--rb-space-2);
+  border-radius: var(--rb-radius-full);
+  font-size: var(--rb-text-xs);
+  font-weight: var(--rb-font-medium);
+  margin-left: var(--rb-space-2);
+}
+
+.rb-badge-vip {
+  background: var(--rb-warning);
+  color: white;
+}
+
+.rb-badge-regular {
+  background: var(--rb-gray-100);
+  color: var(--rb-gray-700);
+}
+
+.rb-badge-blacklist {
+  background: var(--rb-error);
+  color: white;
+}
+
+/* Customer Profile */
+.rb-customer-profile-container {
+  background: var(--rb-bg-primary);
+  border: 1px solid var(--rb-border);
+  border-radius: var(--rb-radius-lg);
+  overflow: hidden;
+}
+
+.rb-profile-header {
+  background: var(--rb-bg-secondary);
+  border-bottom: 1px solid var(--rb-border);
+  padding: var(--rb-space-6);
+  display: flex;
+  gap: var(--rb-space-4);
+}
+
+.rb-profile-avatar {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.rb-profile-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.rb-avatar-fallback {
+  width: 100%;
+  height: 100%;
+  background: var(--rb-primary-500);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--rb-text-xl);
+  font-weight: var(--rb-font-bold);
+}
+
+.rb-profile-info {
+  flex: 1;
+}
+
+.rb-profile-name {
+  font-size: var(--rb-text-xl);
+  font-weight: var(--rb-font-bold);
+  color: var(--rb-text-primary);
+  margin: 0 0 var(--rb-space-2) 0;
+}
+
+.rb-profile-status {
+  margin-bottom: var(--rb-space-3);
+}
+
+.rb-profile-contact {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rb-space-1);
+}
+
+.rb-contact-item {
+  color: var(--rb-text-secondary);
+  font-size: var(--rb-text-sm);
+}
+
+.rb-profile-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rb-space-2);
+}
+
+.rb-customer-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--rb-space-4);
+  padding: var(--rb-space-6);
+  border-bottom: 1px solid var(--rb-border);
+}
+
+.rb-customer-stat {
+  text-align: center;
+}
+
+.rb-customer-stat .rb-stat-number {
+  font-size: var(--rb-text-2xl);
+  font-weight: var(--rb-font-bold);
+  color: var(--rb-text-primary);
+  display: block;
+}
+
+.rb-customer-stat .rb-stat-label {
+  font-size: var(--rb-text-xs);
+  color: var(--rb-text-secondary);
+  margin-top: var(--rb-space-1);
+}
+
+.rb-profile-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--rb-border);
+  background: var(--rb-bg-secondary);
+}
+
+.rb-profile-tabs .rb-tab-btn {
+  flex: 1;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: var(--rb-space-4);
+  color: var(--rb-text-secondary);
+  cursor: pointer;
+  transition: all var(--rb-transition-fast);
+  font-weight: var(--rb-font-medium);
+}
+
+.rb-profile-tabs .rb-tab-btn.rb-active {
+  color: var(--rb-primary-500);
+  border-bottom-color: var(--rb-primary-500);
+  background: var(--rb-bg-primary);
+}
+
+.rb-profile-tab-content {
+  padding: var(--rb-space-6);
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+/* Booking History */
+.rb-booking-history {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rb-space-4);
+}
+
+.rb-history-item {
+  background: var(--rb-bg-secondary);
+  border: 1px solid var(--rb-border);
+  border-radius: var(--rb-radius);
+  padding: var(--rb-space-4);
+}
+
+.rb-history-date {
+  font-size: var(--rb-text-sm);
+  color: var(--rb-text-secondary);
+  margin-bottom: var(--rb-space-2);
+}
+
+.rb-history-details {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.rb-history-info {
+  flex: 1;
+}
+
+.rb-history-party {
+  font-weight: var(--rb-font-medium);
+  color: var(--rb-text-primary);
+}
+
+.rb-history-table {
+  font-size: var(--rb-text-sm);
+  color: var(--rb-text-secondary);
+}
+
+.rb-history-status {
+  padding: var(--rb-space-1) var(--rb-space-2);
+  border-radius: var(--rb-radius-full);
+  font-size: var(--rb-text-xs);
+  font-weight: var(--rb-font-medium);
+}
+💻 JavaScript Implementation
+Table Management JavaScript
+javascriptclass TableManagement {
+  constructor() {
+    this.tables = [];
+    this.selectedTable = null;
+    this.isDragging = false;
+    this.zoomLevel = 1;
+    this.snapToGrid = true;
+    this.gridSize = 20;
+    
+    this.canvas = document.getElementById('floor-plan-canvas');
+    this.properties = document.getElementById('table-properties');
+    
+    this.ajaxUrl = rbTableManagement.ajax_url;
+    this.nonce = rbTableManagement.nonce;
+    
+    this.init();
+  }
+  
+  init() {
+    this.bindEvents();
+    this.loadTables();
+    this.initDragAndDrop();
+  }
+  
+  bindEvents() {
+    // Tab switching
+    document.querySelectorAll('.rb-tab-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        this.switchTab(e.target.dataset.tab);
+      });
+    });
+    
+    // Zoom controls
+    document.getElementById('zoom-in')?.addEventListener('click', () => {
+      this.zoomIn();
+    });
+    
+    document.getElementById('zoom-out')?.addEventListener('click', () => {
+      this.zoomOut();
+    });
+    
+    // Grid toggle
+    document.getElementById('show-grid')?.addEventListener('change', (e) => {
+      this.toggleGrid(e.target.checked);
+    });
+    
+    document.getElementById('snap-to-grid')?.addEventListener('change', (e) => {
+      this.snapToGrid = e.target.checked;
+    });
+    
+    // Save layout
+    document.getElementById('save-layout')?.addEventListener('click', () => {
+      this.saveLayout();
+    });
+    
+    // Reset layout
+    document.getElementById('reset-layout')?.addEventListener('click', () => {
+      this.resetLayout();
+    });
+    
+    // Add new table
+    document.getElementById('add-new-table')?.addEventListener('click', () => {
+      this.addNewTable();
+    });
+    
+    // Table templates
+    document.querySelectorAll('.rb-template-item').forEach(item => {
+      item.addEventListener('click', (e) => {
+        const template = e.currentTarget.dataset.template;
+        this.addTableFromTemplate(template);
+      });
+    });
+    
+    // Table properties form
+    this.bindPropertyEvents();
+  }
+  
+  bindPropertyEvents() {
+    const propertyInputs = this.properties.querySelectorAll('input, select');
+    propertyInputs.forEach(input => {
+      input.addEventListener('change', () => {
+        this.updateSelectedTable();
+      });
+    });
+    
+    document.getElementById('update-table')?.addEventListener('click', () => {
+      this.saveTableProperties();
+    });
+    
+    document.getElementById('delete-table')?.addEventListener('click', () => {
+      this.deleteSelectedTable();
+    });
+    
+    document.getElementById('duplicate-table')?.addEventListener('click', () => {
+      this.duplicateSelectedTable();
+    });
+  }
+  
+  async loadTables() {
+    try {
+      const response = await fetch(this.ajaxUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          action: 'rb_get_tables',
+          nonce: this.nonce,
+          location_id: rbTableManagement.location_id
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        this.tables = data.data;
+        this.renderTables();
+      }
+    } catch (error) {
+      console.error('Failed to load tables:', error);
+    }
+  }
+  
+  renderTables() {
+    this.canvas.innerHTML = '';
+    
+    this.tables.forEach(table => {
+      this.createTableElement(table);
+    });
+  }
+  
+  createTableElement(table) {
+    const element = document.createElement('div');
+    element.className = `rb-table-element rb-${table.shape || 'square'}`;
+    element.dataset.tableId = table.id;
+    element.style.left = table.x + 'px';
+    element.style.top = table.y + 'px';
+    element.style.width = table.width + 'px';
+    element.style.height = table.height + 'px';
+    
+    element.innerHTML = `
+      <div class="rb-table-number">${table.name || 'T' + table.number}</div>
+      <div class="rb-table-capacity">${table.capacity}p</div>
+      <div class="rb-table-status rb-${table.status || 'available'}"></div>
+    `;
+    
+    // Add event listeners
+    element.addEventListener('click', (e) => {
+      this.selectTable(table.id);
+    });
+    
+    this.canvas.appendChild(element);
+    return element;
+  }
+  
+  initDragAndDrop() {
+    let dragElement = null;
+    let dragOffset = { x: 0, y: 0 };
+    
+    this.canvas.addEventListener('mousedown', (e) => {
+      const tableElement = e.target.closest('.rb-table-element');
+      if (!tableElement) return;
+      
+      dragElement = tableElement;
+      this.isDragging = true;
+      
+      const rect = tableElement.getBoundingClientRect();
+      const canvasRect = this.canvas.getBoundingClientRect();
+      
+      dragOffset.x = e.clientX - rect.left;
+      dragOffset.y = e.clientY - rect.top;
+      
+      tableElement.classList.add('rb-dragging');
+      
+      e.preventDefault();
+    });
+    
+    document.addEventListener('mousemove', (e) => {
+      if (!this.isDragging || !dragElement) return;
+      
+      const canvasRect = this.canvas.getBoundingClientRect();
+      let x = (e.clientX - canvasRect.left - dragOffset.x) / this.zoomLevel;
+      let y = (e.clientY - canvasRect.top - dragOffset.y) / this.zoomLevel;
+      
+      // Snap to grid
+      if (this.snapToGrid) {
+        x = Math.round(x / this.gridSize) * this.gridSize;
+        y = Math.round(y / this.gridSize) * this.gridSize;
+      }
+      
+      // Constrain to canvas bounds
+      x = Math.max(0, Math.min(x, this.canvas.offsetWidth - dragElement.offsetWidth));
+      y = Math.max(0, Math.min(y, this.canvas.offsetHeight - dragElement.offsetHeight));
+      
+      dragElement.style.left = x + 'px';
+      dragElement.style.top = y + 'px';
+    });
+    
+    document.addEventListener('mouseup', () => {
+      if (this.isDragging && dragElement) {
+        dragElement.classList.remove('rb-dragging');
+        
+        // Update table position
+        const tableId = dragElement.dataset.tableId;
+        const table = this.tables.find(t => t.id == tableId);
+        
+        if (table) {
+          table.x = parseInt(dragElement.style.left);
+          table.y = parseInt(dragElement.style.top);
+          this.updateTablePosition(table);
+        }
+        
+        dragElement = null;
+        this.isDragging = false;
+      }
+    });
+  }
+  
+  selectTable(tableId) {
+    // Clear previous selection
+    document.querySelectorAll('.rb-table-element').forEach(el => {
+      el.classList.remove('rb-selected');
+    });
+    
+    // Select new table
+    const element = document.querySelector(`[data-table-id="${tableId}"]`);
+    if (element) {
+      element.classList.add('rb-selected');
+      this.selectedTable = this.tables.find(t => t.id == tableId);
+      this.showTableProperties();
+    }
+  }
+  
+  showTableProperties() {
+    if (!this.selectedTable) return;
+    
+    // Populate form fields
+    document.getElementById('table-name').value = this.selectedTable.name || '';
+    document.getElementById('table-capacity').value = this.selectedTable.capacity || 4;
+    document.getElementById('table-type').value = this.selectedTable.type || 'standard';
+    document.getElementById('table-x').value = this.selectedTable.x || 0;
+    document.getElementById('table-y').value = this.selectedTable.y || 0;
+    document.getElementById('table-width').value = this.selectedTable.width || 80;
+    document.getElementById('table-height').value = this.selectedTable.height || 80;
+    document.getElementById('table-status').value = this.selectedTable.status || 'available';
+    
+    // Show properties panel
+    this.properties.style.display = 'block';
+  }
+  
+  addTableFromTemplate(template) {
+    const templates = {
+      '2-square': { width: 60, height: 60, capacity: 2, shape: 'square' },
+      '4-square': { width: 80, height: 80, capacity: 4, shape: 'square' },
+      '6-rectangle': { width: 100, height: 60, capacity: 6, shape: 'rectangle' },
+      '8-round': { width: 90, height: 90, capacity: 8, shape: 'round' },
+      'booth': { width: 120, height: 80, capacity: 4, shape: 'booth' }
+    };
+    
+    const config = templates[template];
+    if (!config) return;
+    
+    const newTable = {
+      id: 'temp_' + Date.now(),
+      name: `Table ${this.tables.length + 1}`,
+      x: 100,
+      y: 100,
+      width: config.width,
+      height: config.height,
+      capacity: config.capacity,
+      shape: config.shape,
+      type: 'standard',
+      status: 'available'
+    };
+    
+    this.tables.push(newTable);
+    this.createTableElement(newTable);
+    this.selectTable(newTable.id);
+  }
+  
+  async saveTableProperties() {
+    if (!this.selectedTable) return;
+    
+    try {
+      const response = await fetch(this.ajaxUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          action: 'rb_save_table',
+          nonce: this.nonce,
+          table_data: JSON.stringify(this.selectedTable)
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        this.showSuccess('Table saved successfully');
+        this.loadTables(); // Refresh
+      } else {
+        this.showError(data.message);
+      }
+    } catch (error) {
+      this.showError('Failed to save table');
+    }
+  }
+  
+  async saveLayout() {
+    try {
+      const response = await fetch(this.ajaxUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          action: 'rb_save_layout',
+          nonce: this.nonce,
+          location_id: rbTableManagement.location_id,
+          tables: JSON.stringify(this.tables)
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        this.showSuccess('Layout saved successfully');
+      } else {
+        this.showError(data.message);
+      }
+    } catch (error) {
+      this.showError('Failed to save layout');
+    }
+  }
+  
+  zoomIn() {
+    this.zoomLevel = Math.min(this.zoomLevel * 1.2, 3);
+    this.canvas.style.transform = `scale(${this.zoomLevel})`;
+    document.getElementById('zoom-level').textContent = Math.round(this.zoomLevel * 100) + '%';
+  }
+  
+  zoomOut() {
+    this.zoomLevel = Math.max(this.zoomLevel / 1.2, 0.5);
+    this.canvas.style.transform = `scale(${this.zoomLevel})`;
+    document.getElementById('zoom-level').textContent = Math.round(this.zoomLevel * 100) + '%';
+  }
+  
+  toggleGrid(show) {
+    const grid = document.getElementById('floor-grid');
+    if (grid) {
+      grid.style.display = show ? 'block' : 'none';
+    }
+  }
+  
+  switchTab(tabName) {
+    // Update tab buttons
+    document.querySelectorAll('.rb-tab-btn').forEach(btn => {
+      btn.classList.toggle('rb-active', btn.dataset.tab === tabName);
+    });
+    
+    // Update tab content
+    document.querySelectorAll('.rb-tab-content').forEach(content => {
+      content.classList.toggle('rb-active', content.id === `${tabName}-tab`);
+    });
+  }
+  
+  showSuccess(message) {
+    // Implement success notification
+    console.log('Success:', message);
+  }
+  
+  showError(message) {
+    // Implement error notification
+    console.error('Error:', message);
+  }
+}
+
+// Customer Management JavaScript
+class CustomerManagement {
+  constructor() {
+    this.customers = [];
+    this.selectedCustomer = null;
+    this.currentFilter = 'all';
+    this.currentPage = 1;
+    this.pageSize = 25;
+    
+    this.ajaxUrl = rbCustomerManagement.ajax_url;
+    this.nonce = rbCustomerManagement.nonce;
+    
+    this.init();
+  }
+  
+  init() {
+    this.bindEvents();
+    this.loadCustomers();
+  }
+  
+  bindEvents() {
+    // Filter buttons
+    document.querySelectorAll('.rb-filter-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        this.changeFilter(e.target.dataset.filter);
+      });
+    });
+    
+    // Search
+    const searchInput = document.getElementById('customer-search');
+    if (searchInput) {
+      let searchTimeout;
+      searchInput.addEventListener('input', (e) => {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+          this.searchCustomers(e.target.value);
+        }, 500);
+      });
+    }
+    
+    // Profile tabs
+    document.querySelectorAll('.rb-profile-tabs .rb-tab-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        this.switchProfileTab(e.target.dataset.tab);
+      });
+    });
+    
+    // Add customer
+    document.getElementById('add-new-customer')?.addEventListener('click', () => {
+      this.openAddCustomerModal();
+    });
+    
+    // Export customers
+    document.getElementById('export-customers')?.addEventListener('click', () => {
+      this.exportCustomers();
+    });
+  }
+  
+  async loadCustomers() {
+    try {
+      const response = await fetch(this.ajaxUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          action: 'rb_get_customers',
+          nonce: this.nonce,
+          filter: this.currentFilter,
+          page: this.currentPage,
+          page_size: this.pageSize
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        this.customers = data.data.customers;
+        this.renderCustomerList();
+        this.updatePagination(data.data.pagination);
+      }
+    } catch (error) {
+      console.error('Failed to load customers:', error);
+    }
+  }
+  
+  renderCustomerList() {
+    const container = document.getElementById('customer-list');
+    if (!container) return;
+    
+    container.innerHTML = '';
+    
+    this.customers.forEach(customer => {
+      const item = this.createCustomerItem(customer);
+      container.appendChild(item);
+    });
+  }
+  
+  createCustomerItem(customer) {
+    const item = document.createElement('div');
+    item.className = 'rb-customer-item';
+    item.dataset.customerId = customer.id;
+    
+    const initials = customer.name.split(' ').map(n => n[0]).join('').toUpperCase();
+    const statusClass = `rb-badge-${customer.status.toLowerCase()}`;
+    
+    item.innerHTML = `
+      <div class="rb-customer-avatar">${initials}</div>
+      <div class="rb-customer-info">
+        <div class="rb-customer-name">
+          ${customer.name}
+          <span class="rb-customer-badge ${statusClass}">${customer.status}</span>
+        </div>
+        <div class="rb-customer-contact">${customer.email}</div>
+        <div class="rb-customer-contact">${customer.phone}</div>
+        <div class="rb-customer-summary">
+          ${customer.total_visits} visits • $${customer.total_spent} spent
+        </div>
+      </div>
+    `;
+    
+    item.addEventListener('click', () => {
+      this.selectCustomer(customer.id);
+    });
+    
+    return item;
+  }
+  
+  async selectCustomer(customerId) {
+    // Update visual selection
+    document.querySelectorAll('.rb-customer-item').forEach(item => {
+      item.classList.toggle('rb-selected', item.dataset.customerId == customerId);
+    });
+    
+    // Load customer details
+    try {
+      const response = await fetch(this.ajaxUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          action: 'rb_get_customer_details',
+          nonce: this.nonce,
+          customer_id: customerId
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        this.selectedCustomer = data.data;
+        this.renderCustomerProfile();
+      }
+    } catch (error) {
+      console.error('Failed to load customer details:', error);
+    }
+  }
+  
+  renderCustomerProfile() {
+    if (!this.selectedCustomer) return;
+    
+    const customer = this.selectedCustomer;
+    
+    // Update profile header
+    document.getElementById('customer-name').textContent = customer.name;
+    document.getElementById('customer-email').textContent = customer.email;
+    document.getElementById('customer-phone').textContent = customer.phone;
+    document.getElementById('customer-status').textContent = customer.status;
+    document.getElementById('customer-status').className = `rb-customer-badge rb-badge-${customer.status.toLowerCase()}`;
+    
+    // Update initials
+    const initials = customer.name.split(' ').map(n => n[0]).join('').toUpperCase();
+    document.getElementById('customer-initials').textContent = initials;
+    
+    // Update stats
+    document.getElementById('total-visits').textContent = customer.total_visits;
+    document.getElementById('total-spent').textContent = '$' + customer.total_spent;
+    document.getElementById('avg-party-size').textContent = customer.avg_party_size;
+    document.getElementById('last-visit').textContent = customer.last_visit_relative;
+    
+    // Load booking history
+    this.loadCustomerHistory();
+  }
+  
+  async loadCustomerHistory() {
+    if (!this.selectedCustomer) return;
+    
+    try {
+      const response = await fetch(this.ajaxUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          action: 'rb_get_customer_history',
+          nonce: this.nonce,
+          customer_id: this.selectedCustomer.id
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        this.renderBookingHistory(data.data);
+      }
+    } catch (error) {
+      console.error('Failed to load customer history:', error);
+    }
+  }
+  
+  renderBookingHistory(history) {
+    const container = document.getElementById('booking-history');
+    if (!container) return;
+    
+    container.innerHTML = '';
+    
+    history.forEach(booking => {
+      const item = document.createElement('div');
+      item.className = 'rb-history-item';
+      
+      item.innerHTML = `
+        <div class="rb-history-date">${booking.formatted_date}</div>
+        <div class="rb-history-details">
+          <div class="rb-history-info">
+            <div class="rb-history-party">${booking.party_size} people</div>
+            <div class="rb-history-table">Table ${booking.table_number}</div>
+          </div>
+          <div class="rb-history-status rb-status-${booking.status.toLowerCase()}">
+            ${booking.status}
+          </div>
+        </div>
+      `;
+      
+      container.appendChild(item);
+    });
+  }
+  
+  changeFilter(filter) {
+    this.currentFilter = filter;
+    this.currentPage = 1;
+    
+    // Update active filter button
+    document.querySelectorAll('.rb-filter-btn').forEach(btn => {
+      btn.classList.toggle('rb-active', btn.dataset.filter === filter);
+    });
+    
+    this.loadCustomers();
+  }
+  
+  switchProfileTab(tabName) {
+    // Update tab buttons
+    document.querySelectorAll('.rb-profile-tabs .rb-tab-btn').forEach(btn => {
+      btn.classList.toggle('rb-active', btn.dataset.tab === tabName);
+    });
+    
+    // Update tab content
+    document.querySelectorAll('.rb-profile-tab-content .rb-tab-content').forEach(content => {
+      content.classList.toggle('rb-active', content.id === `${tabName}-tab`);
+    });
+  }
+  
+  async exportCustomers() {
+    try {
+      const response = await fetch(this.ajaxUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          action: 'rb_export_customers',
+          nonce: this.nonce,
+          filter: this.currentFilter
+        })
+      });
+      
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `customers-${this.currentFilter}-${new Date().toISOString().split('T')[0]}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+      }
+    } catch (error) {
+      console.error('Failed to export customers:', error);
+    }
+  }
+  
+  openAddCustomerModal() {
+    // Implementation for Phase 5+ 
+    console.log('Opening add customer modal');
+  }
+  
+  updatePagination(pagination) {
+    // Implementation similar to booking management pagination
+    console.log('Updating pagination:', pagination);
+  }
+}
+
+// Initialize components when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+  if (document.querySelector('.rb-table-management')) {
+    new TableManagement();
+  }
+  
+  if (document.querySelector('.rb-customer-management')) {
+    new CustomerManagement();
+  }
+});
+🔧 WordPress Integration
+Modern Table Manager Class
+php<?php
+// public/class-modern-table-manager.php
+
+class RB_Modern_Table_Manager {
+    
+    private $current_user;
+    
+    public function __construct() {
+        add_action('init', array($this, 'init'));
+        add_action('wp_enqueue_scripts', array($this, 'enqueue_table_assets'));
+        
+        // AJAX endpoints
+        add_action('wp_ajax_rb_get_tables', array($this, 'get_tables'));
+        add_action('wp_ajax_rb_save_table', array($this, 'save_table'));
+        add_action('wp_ajax_rb_save_layout', array($this, 'save_layout'));
+        add_action('wp_ajax_rb_delete_table', array($this, 'delete_table'));
+        add_action('wp_ajax_rb_get_customers', array($this, 'get_customers'));
+        add_action('wp_ajax_rb_get_customer_details', array($this, 'get_customer_details'));
+        add_action('wp_ajax_rb_get_customer_history', array($this, 'get_customer_history'));
+        add_action('wp_ajax_rb_export_customers', array($this, 'export_customers'));
+    }
+    
+    public function init() {
+        // Check if user is accessing table management
+        if (isset($_GET['rb_portal']) && $_GET['rb_portal'] === 'tables') {
+            $this->render_table_management();
+            exit;
+        }
+        
+        // Check if user is accessing customer management
+        if (isset($_GET['rb_portal']) && $_GET['rb_portal'] === 'customers') {
+            $this->render_customer_management();
+            exit;
+        }
+    }
+    
+    public function enqueue_table_assets() {
+        if (!$this->is_management_page()) {
+            return;
+        }
+        
+        // Table management styles
+        wp_enqueue_style('rb-table-management',
+            plugin_dir_url(__FILE__) . '../assets/css/table-management.css',
+            array('rb-design-system'), // Dependency on Phase 1
+            '1.0.0'
+        );
+        
+        // Table management scripts
+        wp_enqueue_script('rb-table-management',
+            plugin_dir_url(__FILE__) . '../assets/js/table-management.js',
+            array('jquery'),
+            '1.0.0',
+            true
+        );
+        
+        // Customer management scripts
+        wp_enqueue_script('rb-customer-management',
+            plugin_dir_url(__FILE__) . '../assets/js/customer-management.js',
+            array('jquery'),
+            '1.0.0',
+            true
+        );
+        
+        // Localize script data
+        wp_localize_script('rb-table-management', 'rbTableManagement', array(
+            'ajax_url' => admin_url('admin-ajax.php'),
+            'nonce' => wp_create_nonce('rb_table_management_nonce'),
+            'location_id' => $this->get_current_location(),
+            'strings' => array(
+                'loading' => __('Loading...', 'restaurant-booking'),
+                'error' => __('Error loading data', 'restaurant-booking'),
+                'save_success' => __('Saved successfully', 'restaurant-booking'),
+                'delete_confirm' => __('Are you sure you want to delete this table?', 'restaurant-booking')
+            )
+        ));
+        
+        wp_localize_script('rb-customer-management', 'rbCustomerManagement', array(
+            'ajax_url' => admin_url('admin-ajax.php'),
+            'nonce' => wp_create_nonce('rb_customer_management_nonce'),
+            'strings' => array(
+                'loading' => __('Loading customers...', 'restaurant-booking'),
+                'no_customers' => __('No customers found', 'restaurant-booking'),
+                'export_success' => __('Customers exported successfully', 'restaurant-booking')
+            )
+        ));
+    }
+    
+    public function get_tables() {
+        check_ajax_referer('rb_table_management_nonce', 'nonce');
+        
+        $location_id = sanitize_text_field($_POST['location_id']);
+        
+        try {
+            $tables = RB_Table::get_tables_by_location($location_id);
+            
+            $formatted_tables = array_map(array($this, 'format_table_data'), $tables);
+            
+            wp_send_json_success($formatted_tables);RetryVContinueOrchestrated continuation of WordPress integration implementation phases.The user is asking me to continue with the Phase 6 implementation. I was in the middle of the WordPress integration section, specifically the Modern Table Manager Class. I need to continue from where I left off in the get_tables() method and complete the rest of the PHP implementation, including other AJAX methods, template files, and any remaining sections.
+Let me continue from where I left off:
+php        } catch (Exception $e) {
+            wp_send_json_error(array(
+                'message' => __('Failed to load tables', 'restaurant-booking')
+            ));
+        }
+    }
+I need to continue with:
+
+Complete the get_tables() method
+Implement save_table() method
+Implement save_layout() method
+Implement delete_table() method
+Implement customer management methods
+Add helper methods
+Template files
+Testing requirements
+Success criteria
+File outputs
+Integration notes
+
+Let me continue systematically.php        } catch (Exception $e) {
+            wp_send_json_error(array(
+                'message' => __('Failed to load tables', 'restaurant-booking')
+            ));
+        }
+    }
+    
+    public function save_table() {
+        check_ajax_referer('rb_table_management_nonce', 'nonce');
+        
+        $table_data = json_decode(stripslashes($_POST['table_data']), true);
+        
+        try {
+            // Validate table data
+            $validated_data = $this->validate_table_data($table_data);
+            
+            if (strpos($validated_data['id'], 'temp_') === 0) {
+                // New table
+                $table_id = RB_Table::create_table($validated_data);
+            } else {
+                // Update existing table
+                $table_id = RB_Table::update_table($validated_data['id'], $validated_data);
+            }
+            
+            if ($table_id) {
+                // Log the action
+                RB_Logger::log('table_saved', array(
+                    'table_id' => $table_id,
+                    'location_id' => $validated_data['location_id'],
+                    'user_id' => $this->current_user['id']
+                ));
+                
+                wp_send_json_success(array(
+                    'message' => __('Table saved successfully', 'restaurant-booking'),
+                    'table_id' => $table_id
+                ));
+            } else {
+                throw new Exception(__('Failed to save table', 'restaurant-booking'));
+            }
+            
+        } catch (Exception $e) {
+            wp_send_json_error(array(
+                'message' => $e->getMessage()
+            ));
+        }
+    }
+    
+    public function save_layout() {
+        check_ajax_referer('rb_table_management_nonce', 'nonce');
+        
+        $location_id = intval($_POST['location_id']);
+        $tables = json_decode(stripslashes($_POST['tables']), true);
+        
+        try {
+            $updated_count = 0;
+            $errors = array();
+            
+            foreach ($tables as $table_data) {
+                if (strpos($table_data['id'], 'temp_') === 0) {
+                    continue; // Skip temporary tables
+                }
+                
+                $result = RB_Table::update_position($table_data['id'], array(
+                    'x' => $table_data['x'],
+                    'y' => $table_data['y'],
+                    'width' => $table_data['width'],
+                    'height' => $table_data['height']
+                ));
+                
+                if ($result) {
+                    $updated_count++;
+                } else {
+                    $errors[] = sprintf(__('Failed to update table %s', 'restaurant-booking'), $table_data['name']);
+                }
+            }
+            
+            // Save layout metadata
+            update_option("rb_layout_version_{$location_id}", time());
+            
+            // Log the action
+            RB_Logger::log('layout_saved', array(
+                'location_id' => $location_id,
+                'tables_updated' => $updated_count,
+                'user_id' => $this->current_user['id']
+            ));
+            
+            if ($updated_count > 0) {
+                wp_send_json_success(array(
+                    'message' => sprintf(
+                        _n('%d table updated successfully', '%d tables updated successfully', $updated_count, 'restaurant-booking'),
+                        $updated_count
+                    ),
+                    'updated_count' => $updated_count,
+                    'errors' => $errors
+                ));
+            } else {
+                wp_send_json_error(array(
+                    'message' => __('No tables were updated', 'restaurant-booking'),
+                    'errors' => $errors
+                ));
+            }
+            
+        } catch (Exception $e) {
+            wp_send_json_error(array(
+                'message' => $e->getMessage()
+            ));
+        }
+    }
+    
+    public function delete_table() {
+        check_ajax_referer('rb_table_management_nonce', 'nonce');
+        
+        $table_id = intval($_POST['table_id']);
+        
+        try {
+            // Check if table has active bookings
+            $active_bookings = RB_Booking::get_future_bookings_by_table($table_id);
+            
+            if (!empty($active_bookings)) {
+                throw new Exception(__('Cannot delete table with active bookings', 'restaurant-booking'));
+            }
+            
+            // Get table data for logging
+            $table = RB_Table::get_table($table_id);
+            
+            $result = RB_Table::delete_table($table_id);
+            
+            if ($result) {
+                // Log the action
+                RB_Logger::log('table_deleted', array(
+                    'table_id' => $table_id,
+                    'table_name' => $table->name,
+                    'location_id' => $table->location_id,
+                    'user_id' => $this->current_user['id']
+                ));
+                
+                wp_send_json_success(array(
+                    'message' => __('Table deleted successfully', 'restaurant-booking')
+                ));
+            } else {
+                throw new Exception(__('Failed to delete table', 'restaurant-booking'));
+            }
+            
+        } catch (Exception $e) {
+            wp_send_json_error(array(
+                'message' => $e->getMessage()
+            ));
+        }
+    }
+    
+    public function get_customers() {
+        check_ajax_referer('rb_customer_management_nonce', 'nonce');
+        
+        $filter = sanitize_text_field($_POST['filter']);
+        $page = intval($_POST['page']);
+        $page_size = intval($_POST['page_size']);
+        $search = sanitize_text_field($_POST['search'] ?? '');
+        
+        try {
+            $customers_data = RB_Customer::get_customers_with_filters($filter, $page, $page_size, $search);
+            
+            $formatted_customers = array_map(array($this, 'format_customer_data'), $customers_data['customers']);
+            
+            $response_data = array(
+                'customers' => $formatted_customers,
+                'pagination' => array(
+                    'current_page' => $page,
+                    'total_pages' => $customers_data['total_pages'],
+                    'total_items' => $customers_data['total_items'],
+                    'start' => ($page - 1) * $page_size + 1,
+                    'end' => min($page * $page_size, $customers_data['total_items'])
+                )
+            );
+            
+            wp_send_json_success($response_data);
+            
+        } catch (Exception $e) {
+            wp_send_json_error(array(
+                'message' => __('Failed to load customers', 'restaurant-booking')
+            ));
+        }
+    }
+    
+    public function get_customer_details() {
+        check_ajax_referer('rb_customer_management_nonce', 'nonce');
+        
+        $customer_id = intval($_POST['customer_id']);
+        
+        try {
+            $customer = RB_Customer::get_customer_with_stats($customer_id);
+            
+            if (!$customer) {
+                throw new Exception(__('Customer not found', 'restaurant-booking'));
+            }
+            
+            $customer_data = $this->format_customer_details($customer);
+            
+            wp_send_json_success($customer_data);
+            
+        } catch (Exception $e) {
+            wp_send_json_error(array(
+                'message' => $e->getMessage()
+            ));
+        }
+    }
+    
+    public function get_customer_history() {
+        check_ajax_referer('rb_customer_management_nonce', 'nonce');
+        
+        $customer_id = intval($_POST['customer_id']);
+        
+        try {
+            $history = RB_Booking::get_customer_booking_history($customer_id);
+            
+            $formatted_history = array_map(array($this, 'format_booking_history'), $history);
+            
+            wp_send_json_success($formatted_history);
+            
+        } catch (Exception $e) {
+            wp_send_json_error(array(
+                'message' => __('Failed to load customer history', 'restaurant-booking')
+            ));
+        }
+    }
+    
+    public function export_customers() {
+        check_ajax_referer('rb_customer_management_nonce', 'nonce');
+        
+        $filter = sanitize_text_field($_POST['filter']);
+        
+        try {
+            $customers = RB_Customer::get_customers_for_export($filter);
+            
+            // Generate CSV content
+            $csv_content = $this->generate_customers_csv($customers);
+            
+            // Set headers for file download
+            header('Content-Type: text/csv');
+            header('Content-Disposition: attachment; filename="customers-' . $filter . '-' . date('Y-m-d') . '.csv"');
+            header('Content-Length: ' . strlen($csv_content));
+            
+            echo $csv_content;
+            exit;
+            
+        } catch (Exception $e) {
+            wp_send_json_error(array(
+                'message' => __('Failed to export customers', 'restaurant-booking')
+            ));
+        }
+    }
+    
+    private function validate_table_data($data) {
+        $validated = array();
+        
+        $validated['id'] = isset($data['id']) ? sanitize_text_field($data['id']) : '';
+        $validated['name'] = isset($data['name']) ? sanitize_text_field($data['name']) : '';
+        $validated['capacity'] = isset($data['capacity']) ? intval($data['capacity']) : 4;
+        $validated['type'] = isset($data['type']) ? sanitize_text_field($data['type']) : 'standard';
+        $validated['x'] = isset($data['x']) ? intval($data['x']) : 0;
+        $validated['y'] = isset($data['y']) ? intval($data['y']) : 0;
+        $validated['width'] = isset($data['width']) ? intval($data['width']) : 80;
+        $validated['height'] = isset($data['height']) ? intval($data['height']) : 80;
+        $validated['shape'] = isset($data['shape']) ? sanitize_text_field($data['shape']) : 'square';
+        $validated['status'] = isset($data['status']) ? sanitize_text_field($data['status']) : 'available';
+        $validated['location_id'] = $this->get_current_location();
+        
+        // Validation rules
+        if (empty($validated['name'])) {
+            throw new Exception(__('Table name is required', 'restaurant-booking'));
+        }
+        
+        if ($validated['capacity'] < 1 || $validated['capacity'] > 20) {
+            throw new Exception(__('Table capacity must be between 1 and 20', 'restaurant-booking'));
+        }
+        
+        if ($validated['width'] < 40 || $validated['width'] > 200) {
+            throw new Exception(__('Table width must be between 40 and 200 pixels', 'restaurant-booking'));
+        }
+        
+        if ($validated['height'] < 40 || $validated['height'] > 200) {
+            throw new Exception(__('Table height must be between 40 and 200 pixels', 'restaurant-booking'));
+        }
+        
+        return $validated;
+    }
+    
+    private function format_table_data($table) {
+        return array(
+            'id' => $table->id,
+            'name' => $table->name,
+            'number' => $table->number,
+            'capacity' => $table->capacity,
+            'type' => $table->type,
+            'x' => $table->x_position,
+            'y' => $table->y_position,
+            'width' => $table->width,
+            'height' => $table->height,
+            'shape' => $table->shape,
+            'status' => $this->get_table_current_status($table->id),
+            'location_id' => $table->location_id
+        );
+    }
+    
+    private function format_customer_data($customer) {
+        return array(
+            'id' => $customer->id,
+            'name' => $customer->name,
+            'email' => $customer->email,
+            'phone' => $customer->phone,
+            'status' => $customer->status,
+            'total_visits' => $customer->total_visits,
+            'total_spent' => number_format($customer->total_spent, 0),
+            'avg_party_size' => round($customer->avg_party_size, 1),
+            'last_visit' => $customer->last_visit_date,
+            'created_at' => $customer->created_at
+        );
+    }
+    
+    private function format_customer_details($customer) {
+        return array(
+            'id' => $customer->id,
+            'name' => $customer->name,
+            'email' => $customer->email,
+            'phone' => $customer->phone,
+            'status' => ucfirst($customer->status),
+            'total_visits' => $customer->total_visits,
+            'total_spent' => number_format($customer->total_spent, 0),
+            'avg_party_size' => round($customer->avg_party_size, 1),
+            'last_visit_relative' => $this->time_ago($customer->last_visit_date),
+            'preferences' => $this->get_customer_preferences($customer->id),
+            'notes' => $this->get_customer_notes($customer->id)
+        );
+    }
+    
+    private function format_booking_history($booking) {
+        return array(
+            'id' => $booking->id,
+            'booking_date' => $booking->booking_date,
+            'booking_time' => $booking->booking_time,
+            'formatted_date' => wp_date('M j, Y g:i A', strtotime($booking->booking_date . ' ' . $booking->booking_time)),
+            'party_size' => $booking->party_size,
+            'table_number' => $booking->table_number,
+            'status' => ucfirst($booking->status),
+            'total_amount' => $booking->total_amount
+        );
+    }
+    
+    private function generate_customers_csv($customers) {
+        $csv_data = array();
+        
+        // CSV Headers
+        $csv_data[] = array(
+            'Customer ID',
+            'Name',
+            'Email',
+            'Phone',
+            'Status',
+            'Total Visits',
+            'Total Spent',
+            'Average Party Size',
+            'Last Visit',
+            'Created Date'
+        );
+        
+        // CSV Data
+        foreach ($customers as $customer) {
+            $csv_data[] = array(
+                $customer->id,
+                $customer->name,
+                $customer->email,
+                $customer->phone,
+                $customer->status,
+                $customer->total_visits,
+                $customer->total_spent,
+                $customer->avg_party_size,
+                $customer->last_visit_date,
+                $customer->created_at
+            );
+        }
+        
+        // Generate CSV string
+        $output = fopen('php://temp', 'r+');
+        
+        foreach ($csv_data as $row) {
+            fputcsv($output, $row);
+        }
+        
+        rewind($output);
+        $csv_content = stream_get_contents($output);
+        fclose($output);
+        
+        return $csv_content;
+    }
+    
+    private function get_table_current_status($table_id) {
+        // Check current booking status
+        $current_booking = RB_Booking::get_current_table_booking($table_id);
+        
+        if ($current_booking) {
+            return 'occupied';
+        }
+        
+        // Check upcoming reservations
+        $upcoming_booking = RB_Booking::get_next_table_booking($table_id);
+        
+        if ($upcoming_booking && $this->is_within_hours($upcoming_booking->booking_datetime, 2)) {
+            return 'reserved';
+        }
+        
+        return 'available';
+    }
+    
+    private function get_customer_preferences($customer_id) {
+        // Get customer preferences from booking history
+        global $wpdb;
+        
+        $preferences = $wpdb->get_row($wpdb->prepare("
+            SELECT 
+                preferred_table_type,
+                dietary_restrictions,
+                special_occasions,
+                notes
+            FROM {$wpdb->prefix}rb_customer_preferences 
+            WHERE customer_id = %d
+        ", $customer_id));
+        
+        return $preferences ? (array)$preferences : array();
+    }
+    
+    private function get_customer_notes($customer_id) {
+        global $wpdb;
+        
+        $notes = $wpdb->get_results($wpdb->prepare("
+            SELECT note, created_at, created_by
+            FROM {$wpdb->prefix}rb_customer_notes 
+            WHERE customer_id = %d
+            ORDER BY created_at DESC
+            LIMIT 10
+        ", $customer_id));
+        
+        return array_map(function($note) {
+            return array(
+                'text' => $note->note,
+                'date' => wp_date('M j, Y g:i A', strtotime($note->created_at)),
+                'author' => $note->created_by
+            );
+        }, $notes);
+    }
+    
+    private function time_ago($datetime) {
+        $time = time() - strtotime($datetime);
+        
+        if ($time < 60) return 'just now';
+        if ($time < 3600) return floor($time/60) . ' min ago';
+        if ($time < 86400) return floor($time/3600) . ' hrs ago';
+        if ($time < 2592000) return floor($time/86400) . ' days ago';
+        if ($time < 31536000) return floor($time/2592000) . ' months ago';
+        
+        return floor($time/31536000) . ' years ago';
+    }
+    
+    private function is_within_hours($datetime, $hours) {
+        $target_time = strtotime($datetime);
+        $current_time = time();
+        $diff_hours = ($target_time - $current_time) / 3600;
+        
+        return $diff_hours > 0 && $diff_hours <= $hours;
+    }
+    
+    public function render_table_management() {
+        // Check authentication
+        $session_manager = new RB_Portal_Session_Manager();
+        if (!$session_manager->is_logged_in()) {
+            wp_redirect(home_url('/portal'));
+            exit;
+        }
+        
+        $this->current_user = $session_manager->get_current_user();
+        
+        // Enqueue assets
+        $this->enqueue_table_assets();
+        
+        // Set page title
+        add_filter('pre_get_document_title', function() {
+            return 'Table Management - Restaurant Manager';
+        });
+        
+        // Load template
+        include plugin_dir_path(__FILE__) . 'partials/table-management.php';
+    }
+    
+    public function render_customer_management() {
+        // Check authentication
+        $session_manager = new RB_Portal_Session_Manager();
+        if (!$session_manager->is_logged_in()) {
+            wp_redirect(home_url('/portal'));
+            exit;
+        }
+        
+        $this->current_user = $session_manager->get_current_user();
+        
+        // Enqueue assets
+        $this->enqueue_table_assets();
+        
+        // Set page title
+        add_filter('pre_get_document_title', function() {
+            return 'Customer Management - Restaurant Manager';
+        });
+        
+        // Load template
+        include plugin_dir_path(__FILE__) . 'partials/customer-management.php';
+    }
+    
+    private function get_current_location() {
+        // Get user's preferred location or default
+        if ($this->current_user && isset($this->current_user['location_id'])) {
+            return $this->current_user['location_id'];
+        }
+        
+        // Return first available location
+        $locations = RB_Location::get_all_locations();
+        return !empty($locations) ? $locations[0]->id : 1;
+    }
+    
+    private function is_management_page() {
+        return (isset($_GET['rb_portal']) && in_array($_GET['rb_portal'], ['tables', 'customers']));
+    }
+}
+
+// Initialize the table manager
+new RB_Modern_Table_Manager();
+🎨 Enhanced RB_Table Class Methods
+php<?php
+// Add these methods to the existing RB_Table class
+
+class RB_Table {
+    
+    // Enhanced method for getting tables with position data
+    public static function get_tables_by_location($location_id) {
+        global $wpdb;
+        
+        $table_name = $wpdb->prefix . 'rb_tables';
+        
+        $query = $wpdb->prepare("
+            SELECT 
+                t.*,
+                COALESCE(tp.x_position, 100) as x_position,
+                COALESCE(tp.y_position, 100) as y_position,
+                COALESCE(tp.width, 80) as width,
+                COALESCE(tp.height, 80) as height,
+                COALESCE(tp.shape, 'square') as shape
+            FROM {$table_name} t
+            LEFT JOIN {$wpdb->prefix}rb_table_positions tp ON t.id = tp.table_id
+            WHERE t.location_id = %d AND t.status = 'active'
+            ORDER BY t.number ASC
+        ", $location_id);
+        
+        return $wpdb->get_results($query);
+    }
+    
+    // Create new table with position
+    public static function create_table($table_data) {
+        global $wpdb;
+        
+        $wpdb->query('START TRANSACTION');
+        
+        try {
+            // Insert table record
+            $result = $wpdb->insert(
+                $wpdb->prefix . 'rb_tables',
+                array(
+                    'location_id' => $table_data['location_id'],
+                    'name' => $table_data['name'],
+                    'number' => self::get_next_table_number($table_data['location_id']),
+                    'capacity' => $table_data['capacity'],
+                    'type' => $table_data['type'],
+                    'status' => 'active',
+                    'created_at' => current_time('mysql')
+                ),
+                array('%d', '%s', '%d', '%d', '%s', '%s', '%s')
+            );
+            
+            if (!$result) {
+                throw new Exception('Failed to create table');
+            }
+            
+            $table_id = $wpdb->insert_id;
+            
+            // Insert position data
+            $position_result = $wpdb->insert(
+                $wpdb->prefix . 'rb_table_positions',
+                array(
+                    'table_id' => $table_id,
+                    'x_position' => $table_data['x'],
+                    'y_position' => $table_data['y'],
+                    'width' => $table_data['width'],
+                    'height' => $table_data['height'],
+                    'shape' => $table_data['shape'],
+                    'updated_at' => current_time('mysql')
+                ),
+                array('%d', '%d', '%d', '%d', '%d', '%s', '%s')
+            );
+            
+            if (!$position_result) {
+                throw new Exception('Failed to save table position');
+            }
+            
+            $wpdb->query('COMMIT');
+            
+            return $table_id;
+            
+        } catch (Exception $e) {
+            $wpdb->query('ROLLBACK');
+            return false;
+        }
+    }
+    
+    // Update table position
+    public static function update_position($table_id, $position_data) {
+        global $wpdb;
+        
+        // Check if position record exists
+        $exists = $wpdb->get_var($wpdb->prepare("
+            SELECT COUNT(*) FROM {$wpdb->prefix}rb_table_positions 
+            WHERE table_id = %d
+        ", $table_id));
+        
+        if ($exists) {
+            // Update existing position
+            return $wpdb->update(
+                $wpdb->prefix . 'rb_table_positions',
+                array(
+                    'x_position' => $position_data['x'],
+                    'y_position' => $position_data['y'],
+                    'width' => $position_data['width'],
+                    'height' => $position_data['height'],
+                    'updated_at' => current_time('mysql')
+                ),
+                array('table_id' => $table_id),
+                array('%d', '%d', '%d', '%d', '%s'),
+                array('%d')
+            );
+        } else {
+            // Insert new position record
+            return $wpdb->insert(
+                $wpdb->prefix . 'rb_table_positions',
+                array(
+                    'table_id' => $table_id,
+                    'x_position' => $position_data['x'],
+                    'y_position' => $position_data['y'],
+                    'width' => $position_data['width'],
+                    'height' => $position_data['height'],
+                    'shape' => 'square',
+                    'updated_at' => current_time('mysql')
+                ),
+                array('%d', '%d', '%d', '%d', '%d', '%s', '%s')
+            );
+        }
+    }
+    
+    // Get next available table number
+    private static function get_next_table_number($location_id) {
+        global $wpdb;
+        
+        $max_number = $wpdb->get_var($wpdb->prepare("
+            SELECT MAX(number) FROM {$wpdb->prefix}rb_tables 
+            WHERE location_id = %d
+        ", $location_id));
+        
+        return ($max_number ? $max_number : 0) + 1;
+    }
+    
+    // Delete table (soft delete)
+    public static function delete_table($table_id) {
+        global $wpdb;
+        
+        return $wpdb->update(
+            $wpdb->prefix . 'rb_tables',
+            array('status' => 'deleted', 'updated_at' => current_time('mysql')),
+            array('id' => $table_id),
+            array('%s', '%s'),
+            array('%d')
+        );
+    }
+}
+
+// Enhanced RB_Customer class
+class RB_Customer {
+    
+    // Get customers with filtering and pagination
+    public static function get_customers_with_filters($filter, $page = 1, $page_size = 25, $search = '') {
+        global $wpdb;
+        
+        $customers_table = $wpdb->prefix . 'rb_customers';
+        $bookings_table = $wpdb->prefix . 'rb_bookings';
+        
+        // Build WHERE clause
+        $where_conditions = array('c.status != "deleted"');
+        $where_values = array();
+        
+        // Filter by status
+        if (!empty($filter) && $filter !== 'all') {
+            $where_conditions[] = 'c.status = %s';
+            $where_values[] = $filter;
+        }
+        
+        // Search filter
+        if (!empty($search)) {
+            $search_term = '%' . $wpdb->esc_like($search) . '%';
+            $where_conditions[] = '(c.name LIKE %s OR c.email LIKE %s OR c.phone LIKE %s)';
+            $where_values[] = $search_term;
+            $where_values[] = $search_term;
+            $where_values[] = $search_term;
+        }
+        
+        $where_clause = implode(' AND ', $where_conditions);
+        
+        // Calculate offset
+        $offset = ($page - 1) * $page_size;
+        
+        // Count total items
+        $count_query = $wpdb->prepare("
+            SELECT COUNT(DISTINCT c.id) 
+            FROM {$customers_table} c
+            WHERE {$where_clause}
+        ", $where_values);
+        
+        $total_items = $wpdb->get_var($count_query);
+        $total_pages = ceil($total_items / $page_size);
+        
+        // Get customers with stats
+        $query_values = array_merge($where_values, array($page_size, $offset));
+        
+        $customers_query = $wpdb->prepare("
+            SELECT 
+                c.*,
+                COUNT(b.id) as total_visits,
+                COALESCE(SUM(b.total_amount), 0) as total_spent,
+                COALESCE(AVG(b.party_size), 0) as avg_party_size,
+                MAX(b.booking_date) as last_visit_date
+            FROM {$customers_table} c
+            LEFT JOIN {$bookings_table} b ON c.id = b.customer_id 
+                AND b.status IN ('confirmed', 'completed')
+            WHERE {$where_clause}
+            GROUP BY c.id
+            ORDER BY c.created_at DESC
+            LIMIT %d OFFSET %d
+        ", $query_values);
+        
+        $customers = $wpdb->get_results($customers_query);
+        
+        return array(
+            'customers' => $customers,
+            'total_items' => $total_items,
+            'total_pages' => $total_pages,
+            'current_page' => $page,
+            'page_size' => $page_size
+        );
+    }
+    
+    // Get customer with detailed stats
+    public static function get_customer_with_stats($customer_id) {
+        global $wpdb;
+        
+        $customers_table = $wpdb->prefix . 'rb_customers';
+        $bookings_table = $wpdb->prefix . 'rb_bookings';
+        
+        $customer = $wpdb->get_row($wpdb->prepare("
+            SELECT 
+                c.*,
+                COUNT(b.id) as total_visits,
+                COALESCE(SUM(b.total_amount), 0) as total_spent,
+                COALESCE(AVG(b.party_size), 0) as avg_party_size,
+                MAX(b.booking_date) as last_visit_date
+            FROM {$customers_table} c
+            LEFT JOIN {$bookings_table} b ON c.id = b.customer_id 
+                AND b.status IN ('confirmed', 'completed')
+            WHERE c.id = %d
+            GROUP BY c.id
+        ", $customer_id));
+        
+        return $customer;
+    }
+    
+    // Get customers for export
+    public static function get_customers_for_export($filter) {
+        global $wpdb;
+        
+        $customers_table = $wpdb->prefix . 'rb_customers';
+        $bookings_table = $wpdb->prefix . 'rb_bookings';
+        
+        // Build WHERE clause
+        $where_conditions = array('c.status != "deleted"');
+        $where_values = array();
+        
+        if (!empty($filter) && $filter !== 'all') {
+            $where_conditions[] = 'c.status = %s';
+            $where_values[] = $filter;
+        }
+        
+        $where_clause = implode(' AND ', $where_conditions);
+        
+        $query = $wpdb->prepare("
+            SELECT 
+                c.*,
+                COUNT(b.id) as total_visits,
+                COALESCE(SUM(b.total_amount), 0) as total_spent,
+                COALESCE(AVG(b.party_size), 0) as avg_party_size,
+                MAX(b.booking_date) as last_visit_date
+            FROM {$customers_table} c
+            LEFT JOIN {$bookings_table} b ON c.id = b.customer_id 
+                AND b.status IN ('confirmed', 'completed')
+            WHERE {$where_clause}
+            GROUP BY c.id
+            ORDER BY c.created_at DESC
+        ", $where_values);
+        
+        return $wpdb->get_results($query);
+    }
+}
+📋 Template Files
+Table Management Template
+php<!-- public/partials/table-management.php -->
+<!DOCTYPE html>
+<html <?php language_attributes(); ?>>
+<head>
+    <meta charset="<?php bloginfo('charset'); ?>">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Table Management - Restaurant Manager</title>
+    <?php wp_head(); ?>
+</head>
+<body class="rb-portal-table-management">
+    
+    <!-- Include the main table management HTML structure from above -->
+    <div class="rb-table-management">
+        <!-- All the HTML structure goes here -->
+    </div>
+    
+    <?php wp_footer(); ?>
+</body>
+</html>
+Customer Profiles Template
+php<!-- public/partials/customer-profiles.php -->
+<!DOCTYPE html>
+<html <?php language_attributes(); ?>>
+<head>
+    <meta charset="<?php bloginfo('charset'); ?>">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Customer Management - Restaurant Manager</title>
+    <?php wp_head(); ?>
+</head>
+<body class="rb-portal-customer-management">
+    
+    <!-- Include the main customer management HTML structure from above -->
+    <div class="rb-customer-management">
+        <!-- All the HTML structure goes here -->
+    </div>
+    
+    <?php wp_footer(); ?>
+</body>
+</html>
+📱 Mobile Responsiveness
+Mobile-Specific Styles
+css@media (max-width: 768px) {
+  .rb-table-management,
+  .rb-customer-management {
+    padding: var(--rb-space-4);
+  }
+  
+  .rb-table-header,
+  .rb-customer-header {
+    flex-direction: column;
+    gap: var(--rb-space-4);
+    align-items: stretch;
+  }
+  
+  .rb-header-actions {
+    flex-direction: column;
+    gap: var(--rb-space-3);
+  }
+  
+  .rb-table-content {
+    grid-template-columns: 1fr;
+    gap: var(--rb-space-4);
+  }
+  
+  .rb-content-sidebar {
+    order: -1;
+  }
+  
+  .rb-customer-content {
+    grid-template-columns: 1fr;
+    gap: var(--rb-space-4);
+  }
+  
+  .rb-customer-profile-container {
+    order: -1;
+  }
+  
+  /* Floor plan mobile optimizations */
+  .rb-floor-plan {
+    height: 400px;
+  }
+  
+  .rb-floor-controls {
+    flex-direction: column;
+    gap: var(--rb-space-3);
+  }
+  
+  .rb-control-group {
+    justify-content: space-between;
+  }
+  
+  /* Table properties panel */
+  .rb-table-properties {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1000;
+    background: var(--rb-bg-primary);
+    border-radius: 0;
+  }
+  
+  .rb-position-inputs,
+  .rb-size-inputs {
+    grid-template-columns: 1fr;
+  }
+  
+  /* Customer list mobile */
+  .rb-customer-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--rb-space-3);
+  }
+  
+  .rb-customer-avatar {
+    margin-right: 0;
+  }
+  
+  .rb-customer-stats-grid {
+    grid-template-columns: 1fr;
+    gap: var(--rb-space-3);
+  }
+  
+  .rb-profile-tabs {
+    flex-direction: column;
+  }
+  
+  .rb-filter-btn {
+    flex: 1;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 640px) {
+  .rb-table-tabs {
+    flex-direction: column;
+    gap: var(--rb-space-1);
+  }
+  
+  .rb-customer-filters {
+    flex-direction: column;
+    gap: var(--rb-space-2);
+  }
+  
+  .rb-template-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .rb-customer-pagination {
+    flex-direction: column;
+    gap: var(--rb-space-3);
+    align-items: stretch;
+  }
+  
+  .rb-pagination-controls {
+    justify-content: center;
+  }
+}
+
+/* Touch-friendly interactions */
+@media (hover: none) and (pointer: coarse) {
+  .rb-table-element {
+    min-width: 80px;
+    min-height: 80px;
+  }
+  
+  .rb-action-btn,
+  .rb-template-item {
+    min-height: 44px;
+  }
+  
+  .rb-customer-item {
+    min-height: 60px;
+  }
+  
+  .rb-tab-btn {
+    min-height: 48px;
+  }
+}
+```
+
+## 🧪 Testing Requirements
+
+### Functional Testing
+1. **Table Management**
+   - [ ] Floor plan loads with existing tables
+   - [ ] Drag and drop functionality works
+   - [ ] Table properties update correctly
+   - [ ] New table creation works
+   - [ ] Table deletion with validation
+   - [ ] Layout saving and loading
+
+2. **Customer Management**
+   - [ ] Customer list displays correctly
+   - [ ] Filtering by status works
+   - [ ] Search functionality works
+   - [ ] Customer profile loads details
+   - [ ] Booking history displays
+   - [ ] Export functionality works
+
+3. **Interactive Features**
+   - [ ] Zoom controls work properly
+   - [ ] Grid toggle functions
+   - [ ] Snap to grid works
+   - [ ] Template insertion works
+   - [ ] Tab switching smooth
+
+4. **CRUD Operations**
+   - [ ] Create new tables
+   - [ ] Update table properties
+   - [ ] Delete tables (with validation)
+   - [ ] Customer status changes
+   - [ ] Note adding/editing
+
+### Performance Testing
+- [ ] Floor plan renders smoothly with 50+ tables
+- [ ] Customer list loads quickly with 1000+ customers
+- [ ] Drag operations maintain 60fps
+- [ ] Search results appear in <500ms
+
+### Accessibility Testing
+- [ ] Keyboard navigation through interface
+- [ ] Screen reader announces table selections
+- [ ] Focus indicators visible
+- [ ] Color contrast compliant
+- [ ] Touch targets minimum 44px
+
+## 🎯 Success Criteria
+
+### Visual Requirements
+- [ ] Matches Figma design patterns
+- [ ] Consistent with Phase 1 design system
+- [ ] Professional floor plan interface
+- [ ] Smooth drag and drop interactions
+
+### Functional Requirements
+- [ ] Complete table CRUD operations
+- [ ] Visual floor plan editing
+- [ ] Customer profile management
+- [ ] Export/import functionality
+- [ ] VIP/Blacklist management
+
+### Performance Requirements
+- [ ] Fast table positioning updates
+- [ ] Smooth drag operations
+- [ ] Efficient customer search
+- [ ] Optimized for large datasets
+
+### Integration Requirements
+- [ ] Works with existing table system
+- [ ] Maintains booking relationships
+- [ ] Compatible with customer data
+- [ ] Preserves data integrity
+
+## 📁 Expected File Outputs
+```
+assets/css/table-management.css           # Complete table & customer styles
+assets/js/table-management.js             # Floor plan functionality
+assets/js/customer-management.js          # Customer profile system  
+public/class-modern-table-manager.php     # WordPress integration
+public/partials/table-management.php      # Table management template
+public/partials/customer-profiles.php     # Customer management template
+includes/class-table-enhanced.php         # Enhanced table operations
+includes/class-customer-enhanced.php      # Enhanced customer operations
+🔗 Integration Notes
+
+Must work with existing RB_Table and RB_Customer classes
+Preserve all table booking relationships
+Maintain customer data integrity
+Support existing VIP/Blacklist logic
+Work with current multi-location setup
+Compatible with booking history system
+
+Focus on creating intuitive visual management tools that enhance staff productivity while maintaining all existing business logic and data relationships!
