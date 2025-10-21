@@ -7,8 +7,15 @@
  * dashboards, and managers surface actual booking information.
  */
 
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
+
 if ( ! class_exists( 'RB_Booking' ) ) {
 
+    /**
+     * Booking data model.
+     */
     class RB_Booking {
 
         /**
