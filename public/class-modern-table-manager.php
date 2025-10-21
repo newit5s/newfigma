@@ -805,5 +805,4 @@ if ( ! class_exists( 'RB_Modern_Table_Manager' ) ) {
         }
     }
 
-    new RB_Modern_Table_Manager();
 }

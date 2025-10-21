@@ -774,5 +774,4 @@ if ( ! class_exists( 'RB_Modern_Booking_Manager' ) ) {
         }
     }
 
-    new RB_Modern_Booking_Manager();
 }
