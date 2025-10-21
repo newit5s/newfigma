@@ -470,6 +470,9 @@ function restaurant_booking_resolve_manage_capability() {
 /**
  * Ensure administrators retain access when the custom capability is missing.
  *
+ * Supports both the default `manage_bookings` capability and any custom
+ * capability provided via the `restaurant_booking_manage_capability` filter.
+ *
  * @param array  $caps    Required primitive capabilities.
  * @param string $cap     Capability being checked.
  * @param int    $user_id User identifier.
@@ -478,7 +481,18 @@ function restaurant_booking_resolve_manage_capability() {
  * @return array
  */
 function restaurant_booking_map_manage_capability( $caps, $cap, $user_id, $args ) {
-    if ( 'manage_bookings' !== $cap ) {
+    $managed_caps = array( 'manage_bookings' );
+
+    $configured_cap = restaurant_booking_get_manage_capability();
+    if (
+        ! empty( $configured_cap )
+        && 'manage_options' !== $configured_cap
+        && ! in_array( $configured_cap, $managed_caps, true )
+    ) {
+        $managed_caps[] = $configured_cap;
+    }
+
+    if ( ! in_array( $cap, $managed_caps, true ) ) {
         return $caps;
     }
 
@@ -498,6 +512,47 @@ function restaurant_booking_map_manage_capability( $caps, $cap, $user_id, $args 
     return $caps;
 }
 add_filter( 'map_meta_cap', 'restaurant_booking_map_manage_capability', 10, 4 );
+
+/**
+ * Surface a diagnostic notice when an administrator is missing the manage capability.
+ */
+function restaurant_booking_show_manage_capability_notice() {
+    if ( ! is_admin() ) {
+        return;
+    }
+
+    if ( wp_doing_ajax() ) {
+        return;
+    }
+
+    if ( ! current_user_can( 'manage_options' ) ) {
+        return;
+    }
+
+    $capability = restaurant_booking_get_manage_capability();
+
+    if ( current_user_can( $capability ) ) {
+        return;
+    }
+
+    $command = sprintf(
+        'wp restaurant-booking doctor --user=%d',
+        get_current_user_id()
+    );
+
+    echo '<div class="notice notice-warning"><p>';
+    printf(
+        /* translators: %1$s capability slug, %2$s WP-CLI command. */
+        esc_html__(
+            'Restaurant Booking Manager detected that your account is missing the "%1$s" capability required to access the booking settings. Run %2$s to inspect role assignments or re-add the capability for your role.',
+            'restaurant-booking'
+        ),
+        esc_html( $capability ),
+        '<code>' . esc_html( $command ) . '</code>'
+    );
+    echo '</p></div>';
+}
+add_action( 'admin_notices', 'restaurant_booking_show_manage_capability_notice' );
 
 /**
  * Resolve the preferred portal login URL.
@@ -756,3 +811,125 @@ function restaurant_booking_set_activation_flag() {
     set_transient( 'restaurant_booking_activated', true, 30 );
 }
 register_activation_hook( __FILE__, 'restaurant_booking_set_activation_flag' );
+
+if ( defined( 'WP_CLI' ) && WP_CLI && class_exists( 'WP_CLI_Command' ) ) {
+    if ( ! class_exists( 'Restaurant_Booking_CLI_Command' ) ) {
+        /**
+         * WP-CLI helpers for diagnosing booking capability issues.
+         */
+        class Restaurant_Booking_CLI_Command extends WP_CLI_Command {
+
+            /**
+             * Diagnose management capability assignments.
+             *
+             * ## OPTIONS
+             *
+             * [--user=<id|login|email>]
+             * : Inspect a specific user.
+             *
+             * ## EXAMPLES
+             *
+             *     wp restaurant-booking doctor
+             *     wp restaurant-booking doctor --user=admin
+             *
+             * @param array $args       Positional arguments.
+             * @param array $assoc_args Associative arguments.
+             */
+            public function doctor( $args, $assoc_args ) {
+                $capability = restaurant_booking_get_manage_capability();
+                $fallback   = 'manage_options';
+
+                WP_CLI::log( sprintf( 'Configured manage capability: %s', $capability ) );
+
+                if ( $capability !== $fallback ) {
+                    WP_CLI::log( sprintf( 'Fallback capability (when available): %s', $fallback ) );
+                } else {
+                    WP_CLI::log( 'Configured capability already matches manage_options.' );
+                }
+
+                $wp_roles = wp_roles();
+
+                if ( $wp_roles instanceof WP_Roles && ! empty( $wp_roles->role_objects ) ) {
+                    WP_CLI::log( 'Role capability assignments:' );
+
+                    foreach ( $wp_roles->role_objects as $role_slug => $role ) {
+                        if ( ! $role instanceof WP_Role ) {
+                            continue;
+                        }
+
+                        $has_configured = $role->has_cap( $capability );
+                        $has_fallback   = $capability !== $fallback && $role->has_cap( $fallback );
+
+                        if ( $has_configured ) {
+                            $status = sprintf( 'has %s', $capability );
+                        } elseif ( $has_fallback ) {
+                            $status = sprintf( 'falls back via %s', $fallback );
+                        } else {
+                            $status = sprintf( 'missing %s', $capability );
+                        }
+
+                        WP_CLI::line( sprintf( '  - %s: %s', $role_slug, $status ) );
+                    }
+                } else {
+                    WP_CLI::warning( 'No roles were detected. Ensure WordPress is fully loaded.' );
+                }
+
+                if ( isset( $assoc_args['user'] ) ) {
+                    $user = $this->locate_user_for_doctor( $assoc_args['user'] );
+
+                    if ( ! $user instanceof WP_User ) {
+                        WP_CLI::error( 'Unable to locate the requested user.' );
+                    }
+
+                    $has_user_cap       = user_can( $user, $capability );
+                    $has_user_fallback  = $capability !== $fallback && user_can( $user, $fallback );
+                    $user_identifier    = $user->user_login;
+
+                    WP_CLI::log( sprintf( 'User %s (%d):', $user_identifier, $user->ID ) );
+
+                    if ( $has_user_cap ) {
+                        WP_CLI::success( sprintf( 'User already has %s.', $capability ) );
+                    } elseif ( $has_user_fallback ) {
+                        WP_CLI::warning( sprintf( 'User lacks %1$s but inherits access through %2$s.', $capability, $fallback ) );
+                    } else {
+                        WP_CLI::warning( sprintf( 'User is missing both %1$s and %2$s.', $capability, $fallback ) );
+                    }
+                } else {
+                    WP_CLI::log( 'Provide --user=<id|login|email> to inspect a specific account.' );
+                }
+
+                WP_CLI::log( sprintf( 'Add the capability to a role with: wp cap add <role> %s', $capability ) );
+            }
+
+            /**
+             * Locate a user by id, login or email for the doctor command.
+             *
+             * @param string $identifier User identifier.
+             *
+             * @return WP_User|null
+             */
+            private function locate_user_for_doctor( $identifier ) {
+                if ( is_numeric( $identifier ) ) {
+                    $user = get_user_by( 'id', (int) $identifier );
+                    if ( $user instanceof WP_User ) {
+                        return $user;
+                    }
+                }
+
+                $user = get_user_by( 'login', $identifier );
+                if ( $user instanceof WP_User ) {
+                    return $user;
+                }
+
+                $user = get_user_by( 'email', $identifier );
+                if ( $user instanceof WP_User ) {
+                    return $user;
+                }
+
+                return null;
+            }
+        }
+    }
+
+    WP_CLI::add_command( 'restaurant-booking', 'Restaurant_Booking_CLI_Command' );
+}
