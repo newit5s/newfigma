@@ -26,6 +26,13 @@ if ( ! class_exists( 'RB_Modern_Booking_Manager' ) ) {
         protected $ajax_nonce = 'rb_booking_management_nonce';
 
         /**
+         * Flag to avoid enqueueing assets multiple times.
+         *
+         * @var bool
+         */
+        protected $assets_enqueued = false;
+
+        /**
          * Constructor.
          */
         public function __construct() {
@@ -82,6 +89,19 @@ if ( ! class_exists( 'RB_Modern_Booking_Manager' ) ) {
             if ( ! $this->is_management_request() && ! $this->is_embed_context() ) {
                 return;
             }
+
+            $this->enqueue_management_assets();
+        }
+
+        /**
+         * Enqueue assets for booking management views and shortcodes.
+         */
+        protected function enqueue_management_assets() {
+            if ( $this->assets_enqueued ) {
+                return;
+            }
+
+            $this->assets_enqueued = true;
 
             $version  = defined( 'RB_PLUGIN_VERSION' ) ? RB_PLUGIN_VERSION : '1.0.0';
             $base_url = plugin_dir_url( __FILE__ ) . '../';
@@ -178,7 +198,7 @@ if ( ! class_exists( 'RB_Modern_Booking_Manager' ) ) {
                 return $content;
             }
 
-            $this->enqueue_assets();
+            $this->enqueue_management_assets();
 
             ob_start();
 
@@ -187,6 +207,47 @@ if ( ! class_exists( 'RB_Modern_Booking_Manager' ) ) {
             if ( file_exists( $template ) ) {
                 include $template;
             }
+
+            return ob_get_clean();
+        }
+
+        /**
+         * Render the booking calendar shortcode.
+         *
+         * @param array $atts Shortcode attributes.
+         *
+         * @return string
+         */
+        public function render_calendar_shortcode( $atts ) {
+            $atts = shortcode_atts(
+                array(
+                    'location' => '',
+                ),
+                $atts,
+                'booking_calendar'
+            );
+
+            $this->current_user = $this->resolve_current_user();
+
+            if ( ! restaurant_booking_user_can_manage() ) {
+                return '<div class="rb-alert rb-alert-warning">' . esc_html__( 'You do not have permission to view the booking calendar.', 'restaurant-booking' ) . '</div>';
+            }
+
+            $location = sanitize_text_field( $atts['location'] );
+            if ( '' !== $location ) {
+                $this->current_user['location_id'] = $location;
+            }
+
+            $this->enqueue_management_assets();
+
+            ob_start();
+
+            echo '<div class="rb-booking-calendar-shortcode" data-rb-booking-calendar="1">';
+            $template = plugin_dir_path( __FILE__ ) . 'partials/booking-calendar-view.php';
+            if ( file_exists( $template ) ) {
+                include $template;
+            }
+            echo '</div>';
 
             return ob_get_clean();
         }
@@ -650,7 +711,9 @@ if ( ! class_exists( 'RB_Modern_Booking_Manager' ) ) {
          * Ensure current user can manage bookings.
          */
         protected function ensure_user_can_manage() {
-            $allowed = current_user_can( 'manage_options' );
+            $allowed = function_exists( 'restaurant_booking_user_can_manage' )
+                ? restaurant_booking_user_can_manage()
+                : current_user_can( 'manage_options' );
             $allowed = apply_filters( 'rb_booking_manager_user_can', $allowed, $this->current_user );
 
             if ( ! $allowed ) {
@@ -695,11 +758,11 @@ if ( ! class_exists( 'RB_Modern_Booking_Manager' ) ) {
          * @return bool
          */
         protected function is_management_request() {
-            if ( ! isset( $_GET['rb_portal'] ) ) {
-                return false;
-            }
+            $view = function_exists( 'restaurant_booking_get_portal_view' )
+                ? restaurant_booking_get_portal_view()
+                : ( isset( $_GET['rb_portal'] ) ? sanitize_key( wp_unslash( $_GET['rb_portal'] ) ) : '' ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 
-            return 'bookings' === sanitize_key( wp_unslash( $_GET['rb_portal'] ) );
+            return 'bookings' === $view;
         }
 
         /**
@@ -708,7 +771,66 @@ if ( ! class_exists( 'RB_Modern_Booking_Manager' ) ) {
          * @return bool
          */
         protected function is_embed_context() {
-            return did_action( 'rb_portal_render_view' ) > 0;
+            if ( did_action( 'rb_portal_render_view' ) > 0 ) {
+                return true;
+            }
+
+            if ( ! is_singular() ) {
+                return false;
+            }
+
+            global $post;
+
+            if ( ! $post instanceof WP_Post ) {
+                return false;
+            }
+
+            if ( has_shortcode( $post->post_content, 'booking_calendar' ) ) {
+                return true;
+            }
+
+            return $this->page_has_portal_view( 'bookings' );
+        }
+
+        /**
+         * Determine if the current post embeds the portal shortcode for a given view.
+         *
+         * @param string $view Requested portal view slug.
+         *
+         * @return bool
+         */
+        protected function page_has_portal_view( $view ) {
+            if ( ! is_singular() ) {
+                return false;
+            }
+
+            global $post;
+
+            if ( ! $post instanceof WP_Post ) {
+                return false;
+            }
+
+            if ( ! has_shortcode( $post->post_content, 'modern_booking_portal' ) ) {
+                return false;
+            }
+
+            $shortcode_regex = get_shortcode_regex( array( 'modern_booking_portal' ) );
+            if ( empty( $shortcode_regex ) ) {
+                return false;
+            }
+
+            preg_match_all( '/'. $shortcode_regex .'/s', $post->post_content, $matches, PREG_SET_ORDER );
+
+            foreach ( $matches as $shortcode ) {
+                $atts = shortcode_parse_atts( $shortcode[3] );
+                $requested_view = isset( $atts['view'] ) ? sanitize_key( $atts['view'] ) : 'login';
+
+                if ( $requested_view === $view ) {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         /**

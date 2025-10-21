@@ -21,10 +21,18 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
         }
 
         public function add_admin_pages() {
+            if ( function_exists( 'restaurant_booking_resolve_manage_capability' ) ) {
+                $capability = restaurant_booking_resolve_manage_capability();
+            } elseif ( function_exists( 'restaurant_booking_get_manage_capability' ) ) {
+                $capability = restaurant_booking_get_manage_capability();
+            } else {
+                $capability = 'manage_options';
+            }
+
             add_menu_page(
                 __( 'Restaurant Booking', 'restaurant-booking' ),
                 __( 'Bookings', 'restaurant-booking' ),
-                'manage_options',
+                $capability,
                 'rb-dashboard',
                 array( $this, 'render_dashboard' ),
                 'dashicons-calendar-alt',
@@ -35,7 +43,7 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
                 'rb-dashboard',
                 __( 'Dashboard', 'restaurant-booking' ),
                 __( 'Dashboard', 'restaurant-booking' ),
-                'manage_options',
+                $capability,
                 'rb-dashboard',
                 array( $this, 'render_dashboard' )
             );
@@ -44,7 +52,7 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
                 'rb-dashboard',
                 __( 'Bookings', 'restaurant-booking' ),
                 __( 'Bookings', 'restaurant-booking' ),
-                'manage_options',
+                $capability,
                 'rb-bookings',
                 array( $this, 'render_bookings' )
             );
@@ -53,7 +61,7 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
                 'rb-dashboard',
                 __( 'Locations', 'restaurant-booking' ),
                 __( 'Locations', 'restaurant-booking' ),
-                'manage_options',
+                $capability,
                 'rb-locations',
                 array( $this, 'render_locations' )
             );
@@ -62,7 +70,7 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
                 'rb-dashboard',
                 __( 'Settings', 'restaurant-booking' ),
                 __( 'Settings', 'restaurant-booking' ),
-                'manage_options',
+                $capability,
                 'rb-settings',
                 array( $this, 'render_settings' )
             );
@@ -71,7 +79,7 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
                 'rb-dashboard',
                 __( 'Reports', 'restaurant-booking' ),
                 __( 'Reports', 'restaurant-booking' ),
-                'manage_options',
+                $capability,
                 'rb-reports',
                 array( $this, 'render_reports' )
             );

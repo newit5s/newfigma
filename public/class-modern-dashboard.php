@@ -30,6 +30,20 @@ if ( ! class_exists( 'RB_Modern_Dashboard' ) ) {
         protected $current_user = array();
 
         /**
+         * Flag to prevent duplicate asset registration.
+         *
+         * @var bool
+         */
+        protected $assets_enqueued = false;
+
+        /**
+         * Default chart period for shortcode embeds.
+         *
+         * @var string
+         */
+        protected $chart_default_period = '7d';
+
+        /**
          * Register WordPress hooks.
          */
         public function __construct() {
@@ -69,9 +83,22 @@ if ( ! class_exists( 'RB_Modern_Dashboard' ) ) {
          * Enqueue dashboard-specific assets.
          */
         public function enqueue_dashboard_assets() {
-            if ( ! $this->is_dashboard_request() ) {
+            if ( ! $this->is_dashboard_request() && ! $this->is_embed_context() ) {
                 return;
             }
+
+            $this->enqueue_portal_assets();
+        }
+
+        /**
+         * Register dashboard assets for reuse across embeds.
+         */
+        protected function enqueue_portal_assets() {
+            if ( $this->assets_enqueued ) {
+                return;
+            }
+
+            $this->assets_enqueued = true;
 
             $version  = defined( 'RB_PLUGIN_VERSION' ) ? RB_PLUGIN_VERSION : '1.0.0';
             $base_url = plugin_dir_url( __FILE__ ) . '../';
@@ -162,6 +189,9 @@ if ( ! class_exists( 'RB_Modern_Dashboard' ) ) {
                     'tables_url'        => $this->build_portal_url( 'tables' ),
                     'reports_url'       => $this->build_portal_url( 'reports' ),
                     'settings_url'      => $this->build_portal_url( 'settings' ),
+                    'chartDefaults'    => array(
+                        'range' => $this->chart_default_period,
+                    ),
                     'strings'           => array(
                         'loading'     => __( 'Loading...', 'restaurant-booking' ),
                         'error'       => __( 'Unable to load data.', 'restaurant-booking' ),
@@ -235,6 +265,69 @@ if ( ! class_exists( 'RB_Modern_Dashboard' ) ) {
             if ( file_exists( $template ) ) {
                 include $template;
             }
+        }
+
+        /**
+         * Render analytics shortcode output.
+         *
+         * @param array $atts Shortcode attributes.
+         *
+         * @return string
+         */
+        public function render_analytics_shortcode( $atts ) {
+            $atts = shortcode_atts(
+                array(
+                    'location' => '',
+                    'period'   => '7d',
+                ),
+                $atts,
+                'restaurant_analytics'
+            );
+
+            $this->current_user = $this->resolve_current_user();
+
+            $has_access = function_exists( 'restaurant_booking_user_can_manage' )
+                ? restaurant_booking_user_can_manage()
+                : current_user_can( 'manage_options' );
+
+            if ( ! $has_access ) {
+                return '<div class="rb-alert rb-alert-warning">' . esc_html__( 'You do not have permission to view restaurant analytics.', 'restaurant-booking' ) . '</div>';
+            }
+
+            $location = sanitize_text_field( $atts['location'] );
+            if ( '' !== $location ) {
+                $this->current_user['location_id'] = $location;
+            }
+
+            $location_id = $this->get_current_location();
+
+            $period = sanitize_key( $atts['period'] );
+            if ( ! in_array( $period, array( '7d', '30d', '90d' ), true ) ) {
+                $period = '7d';
+            }
+            $this->chart_default_period = $period;
+
+            $this->enqueue_portal_assets();
+
+            $metric_periods = $this->get_default_metric_periods();
+            $initial_stats  = array();
+
+            foreach ( $metric_periods as $metric => $default_period ) {
+                $initial_stats[ $metric ] = $this->get_metric_payload( $location_id, $metric, $default_period );
+            }
+
+            $schedule_data = $this->get_schedule_payload( $location_id );
+            $notifications = $this->get_notifications( $location_id, wp_date( 'Y-m-d' ) );
+            $locations     = $this->get_locations();
+
+            $user_context = $this->current_user;
+            $user_name    = isset( $user_context['name'] ) ? $user_context['name'] : __( 'Manager', 'restaurant-booking' );
+
+            $current_location = $location_id;
+
+            ob_start();
+            include plugin_dir_path( __FILE__ ) . 'partials/analytics-shortcode.php';
+            return ob_get_clean();
         }
 
         /**
@@ -323,12 +416,79 @@ if ( ! class_exists( 'RB_Modern_Dashboard' ) ) {
          * @return bool
          */
         protected function is_dashboard_request() {
-            if ( empty( $_GET['rb_portal'] ) ) {
+            $view = function_exists( 'restaurant_booking_get_portal_view' )
+                ? restaurant_booking_get_portal_view()
+                : ( isset( $_GET['rb_portal'] ) ? sanitize_key( wp_unslash( $_GET['rb_portal'] ) ) : '' );
+
+            return 'dashboard' === $view;
+        }
+
+        /**
+         * Determine if the dashboard assets are needed for shortcode embeds.
+         *
+         * @return bool
+         */
+        protected function is_embed_context() {
+            if ( did_action( 'rb_portal_render_view' ) > 0 ) {
+                return true;
+            }
+
+            if ( ! is_singular() ) {
                 return false;
             }
 
-            $view = sanitize_key( wp_unslash( $_GET['rb_portal'] ) );
-            return 'dashboard' === $view;
+            global $post;
+
+            if ( ! $post instanceof WP_Post ) {
+                return false;
+            }
+
+            if ( has_shortcode( $post->post_content, 'restaurant_analytics' ) ) {
+                return true;
+            }
+
+            return $this->page_has_portal_view( 'dashboard' );
+        }
+
+        /**
+         * Check whether the portal shortcode is embedded with a specific view.
+         *
+         * @param string $view Expected view slug.
+         *
+         * @return bool
+         */
+        protected function page_has_portal_view( $view ) {
+            if ( ! is_singular() ) {
+                return false;
+            }
+
+            global $post;
+
+            if ( ! $post instanceof WP_Post ) {
+                return false;
+            }
+
+            if ( ! has_shortcode( $post->post_content, 'modern_booking_portal' ) ) {
+                return false;
+            }
+
+            $shortcode_regex = get_shortcode_regex( array( 'modern_booking_portal' ) );
+            if ( empty( $shortcode_regex ) ) {
+                return false;
+            }
+
+            preg_match_all( '/'. $shortcode_regex .'/s', $post->post_content, $matches, PREG_SET_ORDER );
+
+            foreach ( $matches as $shortcode ) {
+                $atts = shortcode_parse_atts( $shortcode[3] );
+                $requested_view = isset( $atts['view'] ) ? sanitize_key( $atts['view'] ) : 'login';
+
+                if ( $requested_view === $view ) {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         /**

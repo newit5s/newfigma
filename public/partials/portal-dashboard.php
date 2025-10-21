@@ -91,7 +91,12 @@ $mobile_guest_label = static function ( $party_size ) {
     </div>
 
     <?php
-    $current_view = isset( $_GET['rb_portal'] ) ? sanitize_key( wp_unslash( $_GET['rb_portal'] ) ) : 'dashboard';
+    $current_view = function_exists( 'restaurant_booking_get_portal_view' )
+        ? restaurant_booking_get_portal_view()
+        : ( isset( $_GET['rb_portal'] ) ? sanitize_key( wp_unslash( $_GET['rb_portal'] ) ) : '' );
+    if ( empty( $current_view ) ) {
+        $current_view = 'dashboard';
+    }
     $mobile_nav_items = array(
         'dashboard' => array(
             'title' => __( 'Dashboard', 'restaurant-booking' ),
