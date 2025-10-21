@@ -146,7 +146,11 @@ add_action( 'admin_init', 'restaurant_booking_check_conflicts' );
  * Add plugin action links
  */
 function restaurant_booking_plugin_action_links( $links ) {
-    $settings_link = '<a href="' . admin_url( 'admin.php?page=restaurant-booking' ) . '">' . __( 'Settings', 'restaurant-booking' ) . '</a>';
+    $settings_link = sprintf(
+        '<a href="%s">%s</a>',
+        esc_url( admin_url( 'admin.php?page=rb-settings' ) ),
+        esc_html__( 'Settings', 'restaurant-booking' )
+    );
     array_unshift( $links, $settings_link );
     return $links;
 }
@@ -158,9 +162,9 @@ add_filter( 'plugin_action_links_' . RESTAURANT_BOOKING_BASENAME, 'restaurant_bo
 function restaurant_booking_activation_notice() {
     if ( get_transient( 'restaurant_booking_activated' ) ) {
         echo '<div class="notice notice-success is-dismissible"><p>';
-        printf( 
+        printf(
             __( 'Restaurant Booking Manager activated successfully! <a href="%s">Configure settings</a>', 'restaurant-booking' ),
-            admin_url( 'admin.php?page=restaurant-booking' )
+            esc_url( admin_url( 'admin.php?page=rb-settings' ) )
         );
         echo '</p></div>';
         delete_transient( 'restaurant_booking_activated' );
