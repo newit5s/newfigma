@@ -11,6 +11,20 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
 
     class RB_Modern_Admin {
 
+        /**
+         * Cached plugin settings for rendering.
+         *
+         * @var array|null
+         */
+        protected $cached_settings = null;
+
+        /**
+         * Tracks whether settings registration has been performed.
+         *
+         * @var bool
+         */
+        protected $settings_registered = false;
+
         public function __construct() {
             add_action( 'admin_menu', array( $this, 'add_admin_pages' ) );
             add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ) );
@@ -18,13 +32,461 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
             add_action( 'wp_ajax_rb_admin_get_dashboard', array( $this, 'ajax_get_dashboard' ) );
             add_action( 'wp_ajax_rb_admin_get_bookings', array( $this, 'ajax_get_bookings' ) );
             add_action( 'wp_ajax_rb_admin_get_locations', array( $this, 'ajax_get_locations' ) );
+
+            $this->register_settings();
+        }
+
+        public function register_settings() {
+            if ( $this->settings_registered ) {
+                return;
+            }
+
+            $this->settings_registered = true;
+
+            $default_settings = function_exists( 'restaurant_booking_get_default_settings' )
+                ? restaurant_booking_get_default_settings()
+                : array();
+
+            $args = array(
+                'type'    => 'array',
+                'default' => $default_settings,
+            );
+
+            if ( function_exists( 'restaurant_booking_sanitize_settings' ) ) {
+                $args['sanitize_callback'] = 'restaurant_booking_sanitize_settings';
+            }
+
+            register_setting( 'restaurant_booking_settings', 'restaurant_booking_settings', $args );
+
+            add_settings_section(
+                'restaurant_booking_settings_general',
+                __( 'General settings', 'restaurant-booking' ),
+                array( $this, 'render_general_settings_intro' ),
+                'restaurant_booking_settings'
+            );
+
+            add_settings_field(
+                'restaurant_booking_settings_restaurant_name',
+                __( 'Restaurant name', 'restaurant-booking' ),
+                array( $this, 'render_text_field' ),
+                'restaurant_booking_settings',
+                'restaurant_booking_settings_general',
+                array(
+                    'label_for'   => 'restaurant_booking_settings_restaurant_name',
+                    'option_key'  => 'restaurant_name',
+                    'placeholder' => __( 'e.g. Modern Bistro', 'restaurant-booking' ),
+                    'description' => __( 'Used in confirmation emails and portal headers.', 'restaurant-booking' ),
+                )
+            );
+
+            add_settings_field(
+                'restaurant_booking_settings_default_currency',
+                __( 'Default currency', 'restaurant-booking' ),
+                array( $this, 'render_select_field' ),
+                'restaurant_booking_settings',
+                'restaurant_booking_settings_general',
+                array(
+                    'label_for'  => 'restaurant_booking_settings_default_currency',
+                    'option_key' => 'default_currency',
+                    'choices'    => array(
+                        'USD' => __( 'US Dollar (USD)', 'restaurant-booking' ),
+                        'EUR' => __( 'Euro (EUR)', 'restaurant-booking' ),
+                        'GBP' => __( 'British Pound (GBP)', 'restaurant-booking' ),
+                        'JPY' => __( 'Japanese Yen (JPY)', 'restaurant-booking' ),
+                    ),
+                )
+            );
+
+            add_settings_field(
+                'restaurant_booking_settings_max_party_size',
+                __( 'Maximum party size', 'restaurant-booking' ),
+                array( $this, 'render_number_field' ),
+                'restaurant_booking_settings',
+                'restaurant_booking_settings_general',
+                array(
+                    'label_for'   => 'restaurant_booking_settings_max_party_size',
+                    'option_key'  => 'max_party_size',
+                    'min'         => 1,
+                    'max'         => 30,
+                    'description' => __( 'Largest group that can book online.', 'restaurant-booking' ),
+                )
+            );
+
+            add_settings_field(
+                'restaurant_booking_settings_buffer_time',
+                __( 'Buffer time (minutes)', 'restaurant-booking' ),
+                array( $this, 'render_number_field' ),
+                'restaurant_booking_settings',
+                'restaurant_booking_settings_general',
+                array(
+                    'label_for'   => 'restaurant_booking_settings_buffer_time',
+                    'option_key'  => 'buffer_time',
+                    'min'         => 0,
+                    'max'         => 180,
+                    'step'        => 5,
+                    'description' => __( 'Minutes between bookings to reset tables.', 'restaurant-booking' ),
+                )
+            );
+
+            add_settings_field(
+                'restaurant_booking_settings_allow_walkins',
+                __( 'Walk-in reservations', 'restaurant-booking' ),
+                array( $this, 'render_checkbox_field' ),
+                'restaurant_booking_settings',
+                'restaurant_booking_settings_general',
+                array(
+                    'label_for'   => 'restaurant_booking_settings_allow_walkins',
+                    'option_key'  => 'allow_walkins',
+                    'label'       => __( 'Allow walk-in reservations', 'restaurant-booking' ),
+                    'description' => __( 'When enabled, the floor plan reserves seats for guests without bookings.', 'restaurant-booking' ),
+                )
+            );
+
+            add_settings_section(
+                'restaurant_booking_settings_notifications',
+                __( 'Notifications', 'restaurant-booking' ),
+                array( $this, 'render_notifications_intro' ),
+                'restaurant_booking_settings'
+            );
+
+            add_settings_field(
+                'restaurant_booking_settings_reminder_hours',
+                __( 'Reminder timing (hours)', 'restaurant-booking' ),
+                array( $this, 'render_number_field' ),
+                'restaurant_booking_settings',
+                'restaurant_booking_settings_notifications',
+                array(
+                    'label_for'   => 'restaurant_booking_settings_reminder_hours',
+                    'option_key'  => 'reminder_hours',
+                    'min'         => 1,
+                    'max'         => 168,
+                    'description' => __( 'How many hours before arrival to send reminder messages.', 'restaurant-booking' ),
+                )
+            );
+
+            add_settings_field(
+                'restaurant_booking_settings_confirmation_template',
+                __( 'Confirmation template', 'restaurant-booking' ),
+                array( $this, 'render_textarea_field' ),
+                'restaurant_booking_settings',
+                'restaurant_booking_settings_notifications',
+                array(
+                    'label_for'   => 'restaurant_booking_settings_confirmation_template',
+                    'option_key'  => 'confirmation_template',
+                    'rows'        => 6,
+                    'description' => __( 'Email body sent to guests when a booking is confirmed.', 'restaurant-booking' ),
+                )
+            );
+
+            add_settings_field(
+                'restaurant_booking_settings_send_sms',
+                __( 'SMS reminders', 'restaurant-booking' ),
+                array( $this, 'render_checkbox_field' ),
+                'restaurant_booking_settings',
+                'restaurant_booking_settings_notifications',
+                array(
+                    'label_for'   => 'restaurant_booking_settings_send_sms',
+                    'option_key'  => 'send_sms',
+                    'label'       => __( 'Send SMS reminder', 'restaurant-booking' ),
+                    'description' => __( 'Requires a connected SMS provider.', 'restaurant-booking' ),
+                )
+            );
+
+            add_settings_field(
+                'restaurant_booking_settings_send_followup',
+                __( 'Post-visit follow-up', 'restaurant-booking' ),
+                array( $this, 'render_checkbox_field' ),
+                'restaurant_booking_settings',
+                'restaurant_booking_settings_notifications',
+                array(
+                    'label_for'   => 'restaurant_booking_settings_send_followup',
+                    'option_key'  => 'send_followup',
+                    'label'       => __( 'Send post-visit follow-up email', 'restaurant-booking' ),
+                    'description' => __( 'Great for requesting reviews or feedback after the dining experience.', 'restaurant-booking' ),
+                )
+            );
+
+            add_settings_section(
+                'restaurant_booking_settings_advanced',
+                __( 'Advanced options', 'restaurant-booking' ),
+                array( $this, 'render_advanced_intro' ),
+                'restaurant_booking_settings'
+            );
+
+            add_settings_field(
+                'restaurant_booking_settings_auto_cancel_minutes',
+                __( 'Auto-cancel no-shows (minutes)', 'restaurant-booking' ),
+                array( $this, 'render_number_field' ),
+                'restaurant_booking_settings',
+                'restaurant_booking_settings_advanced',
+                array(
+                    'label_for'   => 'restaurant_booking_settings_auto_cancel_minutes',
+                    'option_key'  => 'auto_cancel_minutes',
+                    'min'         => 0,
+                    'max'         => 240,
+                    'step'        => 5,
+                    'description' => __( 'Automatically release the table after this many minutes without arrival.', 'restaurant-booking' ),
+                )
+            );
+
+            add_settings_field(
+                'restaurant_booking_settings_hold_time_minutes',
+                __( 'Hold time for walk-ins (minutes)', 'restaurant-booking' ),
+                array( $this, 'render_number_field' ),
+                'restaurant_booking_settings',
+                'restaurant_booking_settings_advanced',
+                array(
+                    'label_for'   => 'restaurant_booking_settings_hold_time_minutes',
+                    'option_key'  => 'hold_time_minutes',
+                    'min'         => 0,
+                    'max'         => 180,
+                    'step'        => 5,
+                    'description' => __( 'How long to hold a table for guests queued at the host stand.', 'restaurant-booking' ),
+                )
+            );
+
+            add_settings_field(
+                'restaurant_booking_settings_integrations',
+                __( 'External integrations', 'restaurant-booking' ),
+                array( $this, 'render_select_field' ),
+                'restaurant_booking_settings',
+                'restaurant_booking_settings_advanced',
+                array(
+                    'label_for'  => 'restaurant_booking_settings_integrations',
+                    'option_key' => 'integrations',
+                    'choices'    => array(
+                        'zapier'   => __( 'Zapier', 'restaurant-booking' ),
+                        'slack'    => __( 'Slack', 'restaurant-booking' ),
+                        'teams'    => __( 'Microsoft Teams', 'restaurant-booking' ),
+                        'webhooks' => __( 'Webhook callback', 'restaurant-booking' ),
+                    ),
+                    'multiple'    => true,
+                    'size'        => 4,
+                    'description' => __( 'Select integrations to enable for automation workflows.', 'restaurant-booking' ),
+                )
+            );
+
+            add_settings_field(
+                'restaurant_booking_settings_maintenance_mode',
+                __( 'Maintenance mode', 'restaurant-booking' ),
+                array( $this, 'render_checkbox_field' ),
+                'restaurant_booking_settings',
+                'restaurant_booking_settings_advanced',
+                array(
+                    'label_for'   => 'restaurant_booking_settings_maintenance_mode',
+                    'option_key'  => 'maintenance_mode',
+                    'label'       => __( 'Temporarily disable public bookings', 'restaurant-booking' ),
+                    'description' => __( 'Useful during renovations or private events.', 'restaurant-booking' ),
+                )
+            );
+        }
+
+        public function render_general_settings_intro() {
+            echo '<p>' . esc_html__( 'Configure the restaurant details and booking defaults shown across the manager tools.', 'restaurant-booking' ) . '</p>';
+        }
+
+        public function render_notifications_intro() {
+            echo '<p>' . esc_html__( 'Control when confirmations and reminders are delivered to guests.', 'restaurant-booking' ) . '</p>';
+        }
+
+        public function render_advanced_intro() {
+            echo '<p>' . esc_html__( 'Fine-tune automation rules and integration hooks for complex workflows.', 'restaurant-booking' ) . '</p>';
+        }
+
+        protected function get_settings_cache() {
+            if ( null === $this->cached_settings ) {
+                if ( function_exists( 'restaurant_booking_get_settings' ) ) {
+                    $this->cached_settings = restaurant_booking_get_settings();
+                } else {
+                    $this->cached_settings = array();
+                }
+            }
+
+            return $this->cached_settings;
+        }
+
+        protected function get_setting_value( $key, $default = '' ) {
+            $settings = $this->get_settings_cache();
+
+            if ( isset( $settings[ $key ] ) ) {
+                return $settings[ $key ];
+            }
+
+            return $default;
+        }
+
+        public function render_text_field( $args ) {
+            $key = isset( $args['option_key'] ) ? $args['option_key'] : '';
+            $id  = isset( $args['label_for'] ) ? $args['label_for'] : $key;
+
+            if ( empty( $key ) || empty( $id ) ) {
+                return;
+            }
+
+            $value = $this->get_setting_value( $key, isset( $args['default'] ) ? $args['default'] : '' );
+            $placeholder = isset( $args['placeholder'] ) ? $args['placeholder'] : '';
+
+            printf(
+                '<input type="text" id="%1$s" name="restaurant_booking_settings[%2$s]" value="%3$s" class="regular-text" %4$s/>',
+                esc_attr( $id ),
+                esc_attr( $key ),
+                esc_attr( $value ),
+                $placeholder ? 'placeholder="' . esc_attr( $placeholder ) . '"' : ''
+            );
+
+            if ( ! empty( $args['description'] ) ) {
+                printf( '<p class="description">%s</p>', esc_html( $args['description'] ) );
+            }
+        }
+
+        public function render_number_field( $args ) {
+            $key = isset( $args['option_key'] ) ? $args['option_key'] : '';
+            $id  = isset( $args['label_for'] ) ? $args['label_for'] : $key;
+
+            if ( empty( $key ) || empty( $id ) ) {
+                return;
+            }
+
+            $value = $this->get_setting_value( $key, isset( $args['default'] ) ? $args['default'] : 0 );
+
+            $attributes = array();
+
+            foreach ( array( 'min', 'max', 'step' ) as $attribute ) {
+                if ( isset( $args[ $attribute ] ) && '' !== $args[ $attribute ] ) {
+                    $attributes[] = sprintf( '%s="%s"', $attribute, esc_attr( $args[ $attribute ] ) );
+                }
+            }
+
+            printf(
+                '<input type="number" id="%1$s" name="restaurant_booking_settings[%2$s]" value="%3$s" class="small-text" %4$s/>',
+                esc_attr( $id ),
+                esc_attr( $key ),
+                esc_attr( $value ),
+                implode( ' ', $attributes )
+            );
+
+            if ( ! empty( $args['description'] ) ) {
+                printf( '<p class="description">%s</p>', esc_html( $args['description'] ) );
+            }
+        }
+
+        public function render_checkbox_field( $args ) {
+            $key = isset( $args['option_key'] ) ? $args['option_key'] : '';
+            $id  = isset( $args['label_for'] ) ? $args['label_for'] : $key;
+
+            if ( empty( $key ) || empty( $id ) ) {
+                return;
+            }
+
+            $value = $this->get_setting_value( $key, isset( $args['default'] ) ? $args['default'] : false );
+            $label = isset( $args['label'] ) ? $args['label'] : '';
+
+            echo '<label for="' . esc_attr( $id ) . '">';
+            printf(
+                '<input type="checkbox" id="%1$s" name="restaurant_booking_settings[%2$s]" value="1" %3$s />',
+                esc_attr( $id ),
+                esc_attr( $key ),
+                checked( ! empty( $value ), true, false )
+            );
+
+            if ( $label ) {
+                echo ' ' . esc_html( $label );
+            }
+
+            echo '</label>';
+
+            if ( ! empty( $args['description'] ) ) {
+                printf( '<p class="description">%s</p>', esc_html( $args['description'] ) );
+            }
+        }
+
+        public function render_select_field( $args ) {
+            $key = isset( $args['option_key'] ) ? $args['option_key'] : '';
+            $id  = isset( $args['label_for'] ) ? $args['label_for'] : $key;
+            $choices = isset( $args['choices'] ) && is_array( $args['choices'] ) ? $args['choices'] : array();
+
+            if ( empty( $key ) || empty( $id ) ) {
+                return;
+            }
+
+            $multiple = ! empty( $args['multiple'] );
+            $value    = $this->get_setting_value( $key, isset( $args['default'] ) ? $args['default'] : ( $multiple ? array() : '' ) );
+
+            $name = sprintf( 'restaurant_booking_settings[%s]%s', $key, $multiple ? '[]' : '' );
+
+            $attributes = $multiple ? ' multiple="multiple"' : '';
+            if ( $multiple && ! empty( $args['size'] ) ) {
+                $attributes .= ' size="' . esc_attr( (int) $args['size'] ) . '"';
+            }
+
+            printf(
+                '<select id="%1$s" name="%2$s" %3$s>',
+                esc_attr( $id ),
+                esc_attr( $name ),
+                $attributes
+            );
+
+            foreach ( $choices as $option_value => $label ) {
+                $is_selected = $multiple
+                    ? in_array( $option_value, (array) $value, true )
+                    : (string) $value === (string) $option_value;
+
+                printf(
+                    '<option value="%1$s" %2$s>%3$s</option>',
+                    esc_attr( $option_value ),
+                    selected( $is_selected, true, false ),
+                    esc_html( $label )
+                );
+            }
+
+            echo '</select>';
+
+            if ( ! empty( $args['description'] ) ) {
+                printf( '<p class="description">%s</p>', esc_html( $args['description'] ) );
+            }
+        }
+
+        public function render_textarea_field( $args ) {
+            $key = isset( $args['option_key'] ) ? $args['option_key'] : '';
+            $id  = isset( $args['label_for'] ) ? $args['label_for'] : $key;
+
+            if ( empty( $key ) || empty( $id ) ) {
+                return;
+            }
+
+            $value = $this->get_setting_value( $key, isset( $args['default'] ) ? $args['default'] : '' );
+            $rows  = isset( $args['rows'] ) ? (int) $args['rows'] : 5;
+
+            printf(
+                '<textarea id="%1$s" name="restaurant_booking_settings[%2$s]" rows="%3$d" class="large-text">%4$s</textarea>',
+                esc_attr( $id ),
+                esc_attr( $key ),
+                max( 3, $rows ),
+                esc_textarea( $value )
+            );
+
+            if ( ! empty( $args['description'] ) ) {
+                printf( '<p class="description">%s</p>', esc_html( $args['description'] ) );
+            }
         }
 
         public function add_admin_pages() {
+            if ( function_exists( 'restaurant_booking_resolve_manage_capability' ) ) {
+                $capability = restaurant_booking_resolve_manage_capability();
+            } elseif ( function_exists( 'restaurant_booking_get_manage_capability' ) ) {
+                $capability = restaurant_booking_get_manage_capability();
+            } else {
+                $capability = 'manage_options';
+            }
+
+            $settings_slug = function_exists( 'restaurant_booking_get_settings_page_slug' )
+                ? restaurant_booking_get_settings_page_slug()
+                : 'restaurant-booking-settings';
+
             add_menu_page(
                 __( 'Restaurant Booking', 'restaurant-booking' ),
                 __( 'Bookings', 'restaurant-booking' ),
-                'manage_options',
+                $capability,
                 'rb-dashboard',
                 array( $this, 'render_dashboard' ),
                 'dashicons-calendar-alt',
@@ -35,7 +497,7 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
                 'rb-dashboard',
                 __( 'Dashboard', 'restaurant-booking' ),
                 __( 'Dashboard', 'restaurant-booking' ),
-                'manage_options',
+                $capability,
                 'rb-dashboard',
                 array( $this, 'render_dashboard' )
             );
@@ -44,7 +506,7 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
                 'rb-dashboard',
                 __( 'Bookings', 'restaurant-booking' ),
                 __( 'Bookings', 'restaurant-booking' ),
-                'manage_options',
+                $capability,
                 'rb-bookings',
                 array( $this, 'render_bookings' )
             );
@@ -53,7 +515,7 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
                 'rb-dashboard',
                 __( 'Locations', 'restaurant-booking' ),
                 __( 'Locations', 'restaurant-booking' ),
-                'manage_options',
+                $capability,
                 'rb-locations',
                 array( $this, 'render_locations' )
             );
@@ -62,8 +524,8 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
                 'rb-dashboard',
                 __( 'Settings', 'restaurant-booking' ),
                 __( 'Settings', 'restaurant-booking' ),
-                'manage_options',
-                'rb-settings',
+                $capability,
+                $settings_slug,
                 array( $this, 'render_settings' )
             );
 
@@ -71,9 +533,17 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
                 'rb-dashboard',
                 __( 'Reports', 'restaurant-booking' ),
                 __( 'Reports', 'restaurant-booking' ),
-                'manage_options',
+                $capability,
                 'rb-reports',
                 array( $this, 'render_reports' )
+            );
+
+            add_options_page(
+                __( 'Restaurant Booking Settings', 'restaurant-booking' ),
+                __( 'Restaurant Booking', 'restaurant-booking' ),
+                $capability,
+                $settings_slug,
+                array( $this, 'render_settings' )
             );
         }
 

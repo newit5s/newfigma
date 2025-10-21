@@ -10,6 +10,13 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 $current_page = isset( $current_page ) ? $current_page : 'rb-dashboard';
+$settings_slug = function_exists( 'restaurant_booking_get_settings_page_slug' )
+    ? restaurant_booking_get_settings_page_slug()
+    : 'restaurant-booking-settings';
+
+if ( 'rb-settings' === $current_page ) {
+    $current_page = $settings_slug;
+}
 
 $menu_items = array(
     'rb-dashboard' => array(
@@ -24,7 +31,7 @@ $menu_items = array(
         'label' => __( 'Locations', 'restaurant-booking' ),
         'icon'  => 'dashicons-location-alt',
     ),
-    'rb-settings'  => array(
+    $settings_slug => array(
         'label' => __( 'Settings', 'restaurant-booking' ),
         'icon'  => 'dashicons-admin-generic',
     ),

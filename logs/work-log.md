@@ -198,6 +198,9 @@
 ### Issues Resolved
 - Plugin bootstrap and loader stack now exist, allowing WordPress to bootstrap the feature classes through `restaurant-booking-manager.php` and the `includes/class-plugin-manager.php` loader chain.
 - Animation token library has been added in `assets/css/animations.css`, providing shared motion variables and keyframes for the modern UI.
+- Added a `map_meta_cap` fallback so administrators inherit `manage_bookings` permissions via `manage_options`, preventing locked menus.
+- Introduced reusable permission notices with a portal login link, ensuring booking calendar, analytics, và table floor plan shortcodes guide unauthorized viewers to sign in.
+- Updated README with a new access-control section documenting the login notice behavior and `rb_portal_login_url` customization hook.
 - `assets/js/theme-manager.js` is enqueued across admin and portal entry points (including the booking widget, authentication screen, dashboard, and management modules), restoring synchronized light/dark theme behavior outside the style guide demo.
 - Implemented `includes/services/class-rb-analytics.php` and registered it with the plugin loader so the portal dashboard can instantiate `RB_Analytics` without triggering fatal errors.
 
@@ -266,3 +269,24 @@
 - [x] `php -l public/class-modern-dashboard.php`
 - [x] `php -l public/partials/portal-dashboard.php`
 - [x] Manually reviewed `assets/js/mobile-dashboard.js` and `sw.js` to confirm registration paths and caching strategy align with the plugin directory scope.
+
+## Settings URL Realignment
+- Documented the migration of the admin settings screen to the new `restaurant-booking-settings` slug with an automatic redirect from `rb-settings` for legacy links.
+- Noted the additional entry under WordPress **Settings → Restaurant Booking** so administrators can reach the configuration screen even when menu caching or role tweaks hide the custom top-level menu.
+- Captured the new `restaurant_booking_settings_page_slug` filter for teams that need to white-label or namespace the admin URL.
+
+### Testing Checklist
+- [x] `php -l restaurant-booking-manager.php`
+- [x] `php -l admin/class-modern-admin.php`
+- [x] `php -l admin/partials/settings-panel.php`
+
+## WordPress Settings Backend Integration
+- Migrated the plugin configuration screen to the native WordPress Settings API so changes persist via `options.php` without relying on custom JavaScript handlers.
+- Registered sections/fields for general, notification, and advanced options while exposing helper functions (`restaurant_booking_get_setting()`, `restaurant_booking_get_settings()`) and sanitization hooks for developers.
+- Updated activation defaults and documentation to highlight the new storage behaviour under the `restaurant_booking_settings` option.
+
+### Testing Checklist
+- [x] `php -l restaurant-booking-manager.php`
+- [x] `php -l admin/class-modern-admin.php`
+- [x] `php -l admin/partials/settings-panel.php`
+- [x] `php -l includes/class-plugin-activator.php`
