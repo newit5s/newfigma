@@ -152,13 +152,114 @@ add_action( 'admin_init', 'restaurant_booking_check_conflicts' );
 function restaurant_booking_plugin_action_links( $links ) {
     $settings_link = sprintf(
         '<a href="%s">%s</a>',
-        esc_url( admin_url( 'admin.php?page=rb-settings' ) ),
+        esc_url( restaurant_booking_get_settings_page_url() ),
         esc_html__( 'Settings', 'restaurant-booking' )
     );
     array_unshift( $links, $settings_link );
     return $links;
 }
 add_filter( 'plugin_action_links_' . RESTAURANT_BOOKING_BASENAME, 'restaurant_booking_plugin_action_links' );
+
+/**
+ * Resolve the slug used for the plugin settings screen.
+ *
+ * @return string
+ */
+function restaurant_booking_get_settings_page_slug() {
+    $default_slug = 'restaurant-booking-settings';
+
+    /**
+     * Filter the admin settings page slug.
+     *
+     * @since 2.0.0
+     *
+     * @param string $slug Default slug.
+     */
+    $slug = apply_filters( 'restaurant_booking_settings_page_slug', $default_slug );
+
+    if ( ! is_string( $slug ) ) {
+        $slug = $default_slug;
+    }
+
+    $slug = strtolower( $slug );
+    $slug = preg_replace( '/[^a-z0-9_\-]/', '', $slug );
+
+    if ( empty( $slug ) ) {
+        $slug = $default_slug;
+    }
+
+    return $slug;
+}
+
+/**
+ * Retrieve the admin URL for the plugin settings screen.
+ *
+ * @return string
+ */
+function restaurant_booking_get_settings_page_url() {
+    $slug = restaurant_booking_get_settings_page_slug();
+
+    return admin_url( 'admin.php?page=' . $slug );
+}
+
+/**
+ * Retrieve legacy settings slugs that should redirect to the current page.
+ *
+ * @return array
+ */
+function restaurant_booking_get_legacy_settings_slugs() {
+    /**
+     * Filter the legacy admin settings slugs for backward compatibility.
+     *
+     * @since 2.0.0
+     *
+     * @param array $slugs Legacy slugs.
+     */
+    $slugs = apply_filters( 'restaurant_booking_legacy_settings_slugs', array( 'rb-settings' ) );
+
+    if ( ! is_array( $slugs ) ) {
+        return array( 'rb-settings' );
+    }
+
+    return array_values( array_filter( array_map( function ( $slug ) {
+        if ( ! is_string( $slug ) ) {
+            return '';
+        }
+
+        $slug = strtolower( $slug );
+        $slug = preg_replace( '/[^a-z0-9_\-]/', '', $slug );
+
+        return $slug;
+    }, $slugs ) ) );
+}
+
+/**
+ * Redirect requests for legacy settings slugs to the current settings page.
+ */
+function restaurant_booking_redirect_legacy_settings_slug() {
+    if ( ! is_admin() ) {
+        return;
+    }
+
+    if ( empty( $_GET['page'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+        return;
+    }
+
+    $requested_slug = strtolower( sanitize_text_field( wp_unslash( $_GET['page'] ) ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+    $current_slug   = restaurant_booking_get_settings_page_slug();
+
+    if ( $requested_slug === $current_slug ) {
+        return;
+    }
+
+    $legacy_slugs = restaurant_booking_get_legacy_settings_slugs();
+
+    if ( in_array( $requested_slug, $legacy_slugs, true ) ) {
+        wp_safe_redirect( restaurant_booking_get_settings_page_url(), 301 );
+        exit;
+    }
+}
+add_action( 'admin_init', 'restaurant_booking_redirect_legacy_settings_slug', 1 );
 
 /**
  * Determine the capability required to manage the plugin.
@@ -475,7 +576,7 @@ function restaurant_booking_activation_notice() {
         echo '<div class="notice notice-success is-dismissible"><p>';
         printf(
             __( 'Restaurant Booking Manager activated successfully! <a href="%s">Configure settings</a>', 'restaurant-booking' ),
-            esc_url( admin_url( 'admin.php?page=rb-settings' ) )
+            esc_url( restaurant_booking_get_settings_page_url() )
         );
         echo '</p></div>';
         delete_transient( 'restaurant_booking_activated' );

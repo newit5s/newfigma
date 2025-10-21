@@ -269,3 +269,13 @@
 - [x] `php -l public/class-modern-dashboard.php`
 - [x] `php -l public/partials/portal-dashboard.php`
 - [x] Manually reviewed `assets/js/mobile-dashboard.js` and `sw.js` to confirm registration paths and caching strategy align with the plugin directory scope.
+
+## Settings URL Realignment
+- Documented the migration of the admin settings screen to the new `restaurant-booking-settings` slug with an automatic redirect from `rb-settings` for legacy links.
+- Noted the additional entry under WordPress **Settings → Restaurant Booking** so administrators can reach the configuration screen even when menu caching or role tweaks hide the custom top-level menu.
+- Captured the new `restaurant_booking_settings_page_slug` filter for teams that need to white-label or namespace the admin URL.
+
+### Testing Checklist
+- [x] `php -l restaurant-booking-manager.php`
+- [x] `php -l admin/class-modern-admin.php`
+- [x] `php -l admin/partials/settings-panel.php`

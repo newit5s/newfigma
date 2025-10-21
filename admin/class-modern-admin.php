@@ -29,6 +29,10 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
                 $capability = 'manage_options';
             }
 
+            $settings_slug = function_exists( 'restaurant_booking_get_settings_page_slug' )
+                ? restaurant_booking_get_settings_page_slug()
+                : 'restaurant-booking-settings';
+
             add_menu_page(
                 __( 'Restaurant Booking', 'restaurant-booking' ),
                 __( 'Bookings', 'restaurant-booking' ),
@@ -71,7 +75,7 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
                 __( 'Settings', 'restaurant-booking' ),
                 __( 'Settings', 'restaurant-booking' ),
                 $capability,
-                'rb-settings',
+                $settings_slug,
                 array( $this, 'render_settings' )
             );
 
@@ -82,6 +86,14 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
                 $capability,
                 'rb-reports',
                 array( $this, 'render_reports' )
+            );
+
+            add_options_page(
+                __( 'Restaurant Booking Settings', 'restaurant-booking' ),
+                __( 'Restaurant Booking', 'restaurant-booking' ),
+                $capability,
+                $settings_slug,
+                array( $this, 'render_settings' )
             );
         }
 

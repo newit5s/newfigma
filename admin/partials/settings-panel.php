@@ -5,7 +5,11 @@
  * @package RestaurantBooking
  */
 
-$current_page = 'rb-settings';
+$settings_slug = function_exists( 'restaurant_booking_get_settings_page_slug' )
+    ? restaurant_booking_get_settings_page_slug()
+    : 'restaurant-booking-settings';
+
+$current_page = $settings_slug;
 require __DIR__ . '/shared/header.php';
 ?>
 <div class="rb-admin-wrapper">
