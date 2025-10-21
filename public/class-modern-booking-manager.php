@@ -230,6 +230,10 @@ if ( ! class_exists( 'RB_Modern_Booking_Manager' ) ) {
             $this->current_user = $this->resolve_current_user();
 
             if ( ! restaurant_booking_user_can_manage() ) {
+                if ( function_exists( 'restaurant_booking_render_permission_notice' ) ) {
+                    return restaurant_booking_render_permission_notice( __( 'booking calendar', 'restaurant-booking' ) );
+                }
+
                 return '<div class="rb-alert rb-alert-warning">' . esc_html__( 'You do not have permission to view the booking calendar.', 'restaurant-booking' ) . '</div>';
             }
 

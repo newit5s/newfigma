@@ -291,6 +291,10 @@ if ( ! class_exists( 'RB_Modern_Dashboard' ) ) {
                 : current_user_can( 'manage_options' );
 
             if ( ! $has_access ) {
+                if ( function_exists( 'restaurant_booking_render_permission_notice' ) ) {
+                    return restaurant_booking_render_permission_notice( __( 'restaurant analytics', 'restaurant-booking' ) );
+                }
+
                 return '<div class="rb-alert rb-alert-warning">' . esc_html__( 'You do not have permission to view restaurant analytics.', 'restaurant-booking' ) . '</div>';
             }
 

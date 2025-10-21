@@ -202,6 +202,78 @@ function restaurant_booking_resolve_manage_capability() {
 }
 
 /**
+ * Ensure administrators retain access when the custom capability is missing.
+ *
+ * @param array  $caps    Required primitive capabilities.
+ * @param string $cap     Capability being checked.
+ * @param int    $user_id User identifier.
+ * @param array  $args    Additional arguments.
+ *
+ * @return array
+ */
+function restaurant_booking_map_manage_capability( $caps, $cap, $user_id, $args ) {
+    if ( 'manage_bookings' !== $cap ) {
+        return $caps;
+    }
+
+    $user = get_userdata( $user_id );
+    if ( ! $user instanceof WP_User ) {
+        return $caps;
+    }
+
+    if ( ! empty( $user->allcaps['manage_bookings'] ) ) {
+        return $caps;
+    }
+
+    if ( ! empty( $user->allcaps['manage_options'] ) ) {
+        return array( 'manage_options' );
+    }
+
+    return $caps;
+}
+add_filter( 'map_meta_cap', 'restaurant_booking_map_manage_capability', 10, 4 );
+
+/**
+ * Resolve the preferred portal login URL.
+ *
+ * @return string
+ */
+function restaurant_booking_get_portal_login_url() {
+    $login_url = apply_filters( 'rb_portal_login_url', home_url( '/portal/' ) );
+
+    if ( empty( $login_url ) ) {
+        $login_url = wp_login_url( admin_url( 'admin.php?page=rb-dashboard' ) );
+    }
+
+    return esc_url_raw( $login_url );
+}
+
+/**
+ * Render a consistent permission notice with a portal login link.
+ *
+ * @param string $feature_label Feature name for context.
+ *
+ * @return string
+ */
+function restaurant_booking_render_permission_notice( $feature_label ) {
+    $feature    = is_string( $feature_label ) ? $feature_label : '';
+    $login_url  = restaurant_booking_get_portal_login_url();
+    $message    = sprintf(
+        /* translators: 1: feature label, 2: portal login URL */
+        __( 'You do not have permission to view the %1$s. Please <a href="%2$s">sign in to the manager portal</a>.', 'restaurant-booking' ),
+        esc_html( $feature ),
+        esc_url( $login_url )
+    );
+
+    return '<div class="rb-alert rb-alert-warning">' . wp_kses(
+        $message,
+        array(
+            'a' => array( 'href' => array() ),
+        )
+    ) . '</div>';
+}
+
+/**
  * Check whether the current user can manage restaurant bookings.
  *
  * @return bool

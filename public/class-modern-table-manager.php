@@ -322,6 +322,10 @@ if ( ! class_exists( 'RB_Modern_Table_Manager' ) ) {
                 : current_user_can( 'manage_options' );
 
             if ( ! $has_access ) {
+                if ( function_exists( 'restaurant_booking_render_permission_notice' ) ) {
+                    return restaurant_booking_render_permission_notice( __( 'table floor plan', 'restaurant-booking' ) );
+                }
+
                 return '<div class="rb-alert rb-alert-warning">' . esc_html__( 'You do not have permission to view the table floor plan.', 'restaurant-booking' ) . '</div>';
             }
 
