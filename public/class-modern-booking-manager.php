@@ -11,6 +11,8 @@ if ( ! class_exists( 'RB_Modern_Booking_Manager' ) ) {
 
     class RB_Modern_Booking_Manager {
 
+        use RB_Asset_Loader;
+
         /**
          * Cached current user context.
          *
@@ -24,13 +26,6 @@ if ( ! class_exists( 'RB_Modern_Booking_Manager' ) ) {
          * @var string
          */
         protected $ajax_nonce = 'rb_booking_management_nonce';
-
-        /**
-         * Flag to avoid enqueueing assets multiple times.
-         *
-         * @var bool
-         */
-        protected $assets_enqueued = false;
 
         /**
          * Constructor.
@@ -101,54 +96,9 @@ if ( ! class_exists( 'RB_Modern_Booking_Manager' ) ) {
                 return;
             }
 
-            $this->assets_enqueued = true;
-
-            $version  = defined( 'RB_PLUGIN_VERSION' ) ? RB_PLUGIN_VERSION : '1.0.0';
-            $base_url = plugin_dir_url( __FILE__ ) . '../';
-
-            wp_enqueue_style(
-                'rb-design-system',
-                $base_url . 'assets/css/design-system.css',
-                array(),
-                $version
-            );
-
-            wp_enqueue_style(
-                'rb-components',
-                $base_url . 'assets/css/components.css',
-                array( 'rb-design-system' ),
-                $version
-            );
-
-            wp_enqueue_style(
-                'rb-animations',
-                $base_url . 'assets/css/animations.css',
-                array( 'rb-design-system' ),
-                $version
-            );
-
-            wp_enqueue_style(
-                'rb-booking-management',
-                $base_url . 'assets/css/booking-management.css',
-                array( 'rb-design-system', 'rb-components', 'rb-animations' ),
-                $version
-            );
-
-            wp_enqueue_script(
-                'rb-theme-manager',
-                $base_url . 'assets/js/theme-manager.js',
-                array(),
-                $version,
-                true
-            );
-
-            wp_enqueue_script(
-                'rb-booking-management',
-                $base_url . 'assets/js/booking-management.js',
-                array( 'rb-theme-manager' ),
-                $version,
-                true
-            );
+            $this->enqueue_core_assets( 'booking-management' );
+            $this->enqueue_context_css( 'booking-management' );
+            $this->enqueue_context_js( 'booking-management' );
 
             $defaults = array(
                 'date_from' => wp_date( 'Y-m-d' ),
@@ -156,12 +106,10 @@ if ( ! class_exists( 'RB_Modern_Booking_Manager' ) ) {
                 'location'  => $this->get_current_location(),
             );
 
-            wp_localize_script(
+            $this->localize_ajax_data(
                 'rb-booking-management',
                 'rbBookingManagement',
                 array(
-                    'ajax_url'         => admin_url( 'admin-ajax.php' ),
-                    'nonce'            => wp_create_nonce( $this->ajax_nonce ),
                     'current_location' => $this->get_current_location(),
                     'defaults'         => $defaults,
                     'strings'          => array(
@@ -174,7 +122,8 @@ if ( ! class_exists( 'RB_Modern_Booking_Manager' ) ) {
                         'success_deleted'       => __( 'Booking deleted.', 'restaurant-booking' ),
                         'reminders_sent'        => __( 'Reminder emails sent successfully.', 'restaurant-booking' ),
                     ),
-                )
+                ),
+                $this->ajax_nonce
             );
         }
 
@@ -260,341 +209,419 @@ if ( ! class_exists( 'RB_Modern_Booking_Manager' ) ) {
          * AJAX: fetch bookings for table view.
          */
         public function ajax_get_bookings_list() {
-            $this->verify_ajax_request();
-            $this->ensure_user_can_manage();
+            try {
+                $this->verify_ajax_request();
+                $this->ensure_user_can_manage();
 
-            $page      = max( 1, (int) filter_input( INPUT_POST, 'page', FILTER_SANITIZE_NUMBER_INT ) );
-            $page_size = max( 1, (int) filter_input( INPUT_POST, 'page_size', FILTER_SANITIZE_NUMBER_INT ) );
-            $sort_by   = sanitize_text_field( wp_unslash( $_POST['sort_by'] ?? 'booking_datetime' ) );
-            $sort_order = sanitize_text_field( wp_unslash( $_POST['sort_order'] ?? 'desc' ) );
+                $page      = max( 1, (int) filter_input( INPUT_POST, 'page', FILTER_SANITIZE_NUMBER_INT ) );
+                $page_size = max( 1, (int) filter_input( INPUT_POST, 'page_size', FILTER_SANITIZE_NUMBER_INT ) );
+                $sort_by   = sanitize_text_field( wp_unslash( $_POST['sort_by'] ?? 'booking_datetime' ) );
+                $sort_order = sanitize_text_field( wp_unslash( $_POST['sort_order'] ?? 'desc' ) );
 
-            $filters = array(
-                'date_from' => $this->read_filter_value( 'dateFrom', 'date_from' ),
-                'date_to'   => $this->read_filter_value( 'dateTo', 'date_to' ),
-                'status'    => sanitize_text_field( wp_unslash( $_POST['status'] ?? '' ) ),
-                'location'  => sanitize_text_field( wp_unslash( $_POST['location'] ?? '' ) ),
-                'search'    => sanitize_text_field( wp_unslash( $_POST['search'] ?? '' ) ),
-            );
+                $filters = array(
+                    'date_from' => $this->read_filter_value( 'dateFrom', 'date_from' ),
+                    'date_to'   => $this->read_filter_value( 'dateTo', 'date_to' ),
+                    'status'    => sanitize_text_field( wp_unslash( $_POST['status'] ?? '' ) ),
+                    'location'  => sanitize_text_field( wp_unslash( $_POST['location'] ?? '' ) ),
+                    'search'    => sanitize_text_field( wp_unslash( $_POST['search'] ?? '' ) ),
+                );
 
-            $results = $this->query_bookings( $filters, $page, $page_size, $sort_by, $sort_order );
+                $results = $this->query_bookings( $filters, $page, $page_size, $sort_by, $sort_order );
 
-            $bookings   = isset( $results['bookings'] ) ? $results['bookings'] : array();
-            $total      = isset( $results['total_items'] ) ? (int) $results['total_items'] : count( $bookings );
-            $total_page = isset( $results['total_pages'] ) ? max( 1, (int) $results['total_pages'] ) : max( 1, (int) ceil( $total / $page_size ) );
-            $current    = isset( $results['current_page'] ) ? max( 1, (int) $results['current_page'] ) : $page;
+                $bookings   = isset( $results['bookings'] ) ? $results['bookings'] : array();
+                $total      = isset( $results['total_items'] ) ? (int) $results['total_items'] : count( $bookings );
+                $total_page = isset( $results['total_pages'] ) ? max( 1, (int) $results['total_pages'] ) : max( 1, (int) ceil( $total / $page_size ) );
+                $current    = isset( $results['current_page'] ) ? max( 1, (int) $results['current_page'] ) : $page;
 
-            $formatted = array();
-            foreach ( $bookings as $booking ) {
-                $formatted[] = $this->format_booking_record( $booking );
+                $formatted = array();
+                foreach ( $bookings as $booking ) {
+                    $formatted[] = $this->format_booking_record( $booking );
+                }
+
+                $payload = array(
+                    'bookings'   => $formatted,
+                    'pagination' => array(
+                        'current_page' => $current,
+                        'total_pages'  => $total_page,
+                        'total'        => $total,
+                        'start'        => $total ? ( ( ( $current - 1 ) * $page_size ) + 1 ) : 0,
+                        'end'          => $total ? min( $total, $current * $page_size ) : 0,
+                    ),
+                );
+
+                wp_send_json_success( $payload );
+            } catch ( Exception $exception ) {
+                error_log( 'RB Booking Manager AJAX Error [ajax_get_bookings_list]: ' . $exception->getMessage() );
+
+                $status = $exception->getCode() ?: 400;
+                wp_send_json_error(
+                    array( 'message' => $exception->getMessage() ),
+                    $status
+                );
             }
-
-            $payload = array(
-                'bookings'   => $formatted,
-                'pagination' => array(
-                    'current_page' => $current,
-                    'total_pages'  => $total_page,
-                    'total'        => $total,
-                    'start'        => $total ? ( ( ( $current - 1 ) * $page_size ) + 1 ) : 0,
-                    'end'          => $total ? min( $total, $current * $page_size ) : 0,
-                ),
-            );
-
-            wp_send_json_success( $payload );
         }
 
         /**
          * AJAX: fetch calendar dataset.
          */
         public function ajax_get_calendar_data() {
-            $this->verify_ajax_request();
-            $this->ensure_user_can_manage();
+            try {
+                $this->verify_ajax_request();
+                $this->ensure_user_can_manage();
 
-            $month = max( 1, min( 12, (int) filter_input( INPUT_POST, 'month', FILTER_SANITIZE_NUMBER_INT ) ) );
-            $year  = (int) filter_input( INPUT_POST, 'year', FILTER_SANITIZE_NUMBER_INT );
-            if ( ! $year ) {
-                $year = (int) wp_date( 'Y' );
+                $month = max( 1, min( 12, (int) filter_input( INPUT_POST, 'month', FILTER_SANITIZE_NUMBER_INT ) ) );
+                $year  = (int) filter_input( INPUT_POST, 'year', FILTER_SANITIZE_NUMBER_INT );
+                if ( ! $year ) {
+                    $year = (int) wp_date( 'Y' );
+                }
+                $view = sanitize_text_field( wp_unslash( $_POST['view'] ?? 'month' ) );
+
+                $filters = array(
+                    'status'   => sanitize_text_field( wp_unslash( $_POST['status'] ?? '' ) ),
+                    'location' => sanitize_text_field( wp_unslash( $_POST['location'] ?? '' ) ),
+                    'search'   => sanitize_text_field( wp_unslash( $_POST['search'] ?? '' ) ),
+                    'date_from' => $this->read_filter_value( 'dateFrom', 'date_from' ),
+                    'date_to'   => $this->read_filter_value( 'dateTo', 'date_to' ),
+                );
+
+                $calendar = $this->query_calendar( $month, $year, $view, $filters );
+                wp_send_json_success( $calendar );
+            } catch ( Exception $exception ) {
+                error_log( 'RB Booking Manager AJAX Error [ajax_get_calendar_data]: ' . $exception->getMessage() );
+
+                $status = $exception->getCode() ?: 400;
+                wp_send_json_error(
+                    array( 'message' => $exception->getMessage() ),
+                    $status
+                );
             }
-            $view = sanitize_text_field( wp_unslash( $_POST['view'] ?? 'month' ) );
-
-            $filters = array(
-                'status'   => sanitize_text_field( wp_unslash( $_POST['status'] ?? '' ) ),
-                'location' => sanitize_text_field( wp_unslash( $_POST['location'] ?? '' ) ),
-                'search'   => sanitize_text_field( wp_unslash( $_POST['search'] ?? '' ) ),
-                'date_from' => $this->read_filter_value( 'dateFrom', 'date_from' ),
-                'date_to'   => $this->read_filter_value( 'dateTo', 'date_to' ),
-            );
-
-            $calendar = $this->query_calendar( $month, $year, $view, $filters );
-            wp_send_json_success( $calendar );
         }
 
         /**
          * AJAX: update booking status.
          */
         public function ajax_update_booking_status() {
-            $this->verify_ajax_request();
-            $this->ensure_user_can_manage();
+            try {
+                $this->verify_ajax_request();
+                $this->ensure_user_can_manage();
 
-            if ( ! class_exists( 'RB_Booking' ) ) {
-                wp_send_json_error( array( 'message' => __( 'Booking service unavailable.', 'restaurant-booking' ) ), 501 );
-            }
+                if ( ! class_exists( 'RB_Booking' ) ) {
+                    throw new Exception( __( 'Booking service unavailable.', 'restaurant-booking' ), 501 );
+                }
 
-            $booking_id = (int) filter_input( INPUT_POST, 'booking_id', FILTER_SANITIZE_NUMBER_INT );
-            $status     = sanitize_text_field( wp_unslash( $_POST['status'] ?? '' ) );
+                $booking_id = (int) filter_input( INPUT_POST, 'booking_id', FILTER_SANITIZE_NUMBER_INT );
+                $status     = sanitize_text_field( wp_unslash( $_POST['status'] ?? '' ) );
 
-            if ( ! $booking_id || ! $status ) {
-                wp_send_json_error( array( 'message' => __( 'Invalid booking data.', 'restaurant-booking' ) ), 400 );
-            }
+                if ( ! $booking_id || ! $status ) {
+                    throw new Exception( __( 'Invalid booking data.', 'restaurant-booking' ), 400 );
+                }
 
-            $booking = new RB_Booking( $booking_id );
-            if ( ! method_exists( $booking, 'exists' ) || ! $booking->exists() ) {
-                wp_send_json_error( array( 'message' => __( 'Booking not found.', 'restaurant-booking' ) ), 404 );
-            }
+                $booking = new RB_Booking( $booking_id );
+                if ( ! method_exists( $booking, 'exists' ) || ! $booking->exists() ) {
+                    throw new Exception( __( 'Booking not found.', 'restaurant-booking' ), 404 );
+                }
 
-            $result = method_exists( $booking, 'update_status' ) ? $booking->update_status( $status ) : false;
-            if ( ! $result ) {
-                wp_send_json_error( array( 'message' => __( 'Unable to update booking status.', 'restaurant-booking' ) ) );
-            }
+                $result = method_exists( $booking, 'update_status' ) ? $booking->update_status( $status ) : false;
+                if ( ! $result ) {
+                    throw new Exception( __( 'Unable to update booking status.', 'restaurant-booking' ), 500 );
+                }
 
-            if ( 'confirmed' === $status && method_exists( $booking, 'send_confirmation_email' ) ) {
-                $booking->send_confirmation_email();
-            } elseif ( 'cancelled' === $status && method_exists( $booking, 'send_cancellation_email' ) ) {
-                $booking->send_cancellation_email();
-            }
+                if ( 'confirmed' === $status && method_exists( $booking, 'send_confirmation_email' ) ) {
+                    $booking->send_confirmation_email();
+                } elseif ( 'cancelled' === $status && method_exists( $booking, 'send_cancellation_email' ) ) {
+                    $booking->send_cancellation_email();
+                }
 
-            $record = method_exists( $booking, 'get_data' ) ? $booking->get_data() : $booking;
+                $record = method_exists( $booking, 'get_data' ) ? $booking->get_data() : $booking;
 
-            if ( class_exists( 'RB_Logger' ) && method_exists( 'RB_Logger', 'log' ) ) {
-                RB_Logger::log(
-                    'booking_status_changed',
+                if ( class_exists( 'RB_Logger' ) && method_exists( 'RB_Logger', 'log' ) ) {
+                    RB_Logger::log(
+                        'booking_status_changed',
+                        array(
+                            'booking_id' => $booking_id,
+                            'status'     => $status,
+                            'user_id'    => $this->current_user['id'] ?? get_current_user_id(),
+                        )
+                    );
+                }
+
+                wp_send_json_success(
                     array(
-                        'booking_id' => $booking_id,
-                        'status'     => $status,
-                        'user_id'    => $this->current_user['id'] ?? get_current_user_id(),
+                        'message' => __( 'Booking status updated.', 'restaurant-booking' ),
+                        'booking' => $this->format_booking_record( $record ),
                     )
                 );
-            }
+            } catch ( Exception $exception ) {
+                error_log( 'RB Booking Manager AJAX Error [ajax_update_booking_status]: ' . $exception->getMessage() );
 
-            wp_send_json_success(
-                array(
-                    'message' => __( 'Booking status updated.', 'restaurant-booking' ),
-                    'booking' => $this->format_booking_record( $record ),
-                )
-            );
+                $status = $exception->getCode() ?: 400;
+                wp_send_json_error(
+                    array( 'message' => $exception->getMessage() ),
+                    $status
+                );
+            }
         }
 
         /**
          * AJAX: delete booking.
          */
         public function ajax_delete_booking() {
-            $this->verify_ajax_request();
-            $this->ensure_user_can_manage();
+            try {
+                $this->verify_ajax_request();
+                $this->ensure_user_can_manage();
 
-            if ( ! class_exists( 'RB_Booking' ) ) {
-                wp_send_json_error( array( 'message' => __( 'Booking service unavailable.', 'restaurant-booking' ) ), 501 );
-            }
+                if ( ! class_exists( 'RB_Booking' ) ) {
+                    throw new Exception( __( 'Booking service unavailable.', 'restaurant-booking' ), 501 );
+                }
 
-            $booking_id = (int) filter_input( INPUT_POST, 'booking_id', FILTER_SANITIZE_NUMBER_INT );
-            if ( ! $booking_id ) {
-                wp_send_json_error( array( 'message' => __( 'Invalid booking identifier.', 'restaurant-booking' ) ), 400 );
-            }
+                $booking_id = (int) filter_input( INPUT_POST, 'booking_id', FILTER_SANITIZE_NUMBER_INT );
+                if ( ! $booking_id ) {
+                    throw new Exception( __( 'Invalid booking identifier.', 'restaurant-booking' ), 400 );
+                }
 
-            $booking = new RB_Booking( $booking_id );
-            if ( ! method_exists( $booking, 'exists' ) || ! $booking->exists() ) {
-                wp_send_json_error( array( 'message' => __( 'Booking not found.', 'restaurant-booking' ) ), 404 );
-            }
+                $booking = new RB_Booking( $booking_id );
+                if ( ! method_exists( $booking, 'exists' ) || ! $booking->exists() ) {
+                    throw new Exception( __( 'Booking not found.', 'restaurant-booking' ), 404 );
+                }
 
-            $result = method_exists( $booking, 'delete' ) ? $booking->delete() : false;
-            if ( ! $result ) {
-                wp_send_json_error( array( 'message' => __( 'Unable to delete booking.', 'restaurant-booking' ) ) );
-            }
+                $result = method_exists( $booking, 'delete' ) ? $booking->delete() : false;
+                if ( ! $result ) {
+                    throw new Exception( __( 'Unable to delete booking.', 'restaurant-booking' ), 500 );
+                }
 
-            if ( class_exists( 'RB_Logger' ) && method_exists( 'RB_Logger', 'log' ) ) {
-                RB_Logger::log(
-                    'booking_deleted',
-                    array(
-                        'booking_id' => $booking_id,
-                        'user_id'    => $this->current_user['id'] ?? get_current_user_id(),
-                    )
+                if ( class_exists( 'RB_Logger' ) && method_exists( 'RB_Logger', 'log' ) ) {
+                    RB_Logger::log(
+                        'booking_deleted',
+                        array(
+                            'booking_id' => $booking_id,
+                            'user_id'    => $this->current_user['id'] ?? get_current_user_id(),
+                        )
+                    );
+                }
+
+                wp_send_json_success( array( 'message' => __( 'Booking deleted.', 'restaurant-booking' ) ) );
+            } catch ( Exception $exception ) {
+                error_log( 'RB Booking Manager AJAX Error [ajax_delete_booking]: ' . $exception->getMessage() );
+
+                $status = $exception->getCode() ?: 400;
+                wp_send_json_error(
+                    array( 'message' => $exception->getMessage() ),
+                    $status
                 );
             }
-
-            wp_send_json_success( array( 'message' => __( 'Booking deleted.', 'restaurant-booking' ) ) );
         }
 
         /**
          * AJAX: bulk status update.
          */
         public function ajax_bulk_update_bookings() {
-            $this->verify_ajax_request();
-            $this->ensure_user_can_manage();
+            $errors = array();
 
-            if ( ! class_exists( 'RB_Booking' ) ) {
-                wp_send_json_error( array( 'message' => __( 'Booking service unavailable.', 'restaurant-booking' ) ), 501 );
-            }
+            try {
+                $this->verify_ajax_request();
+                $this->ensure_user_can_manage();
 
-            $ids    = isset( $_POST['booking_ids'] ) ? explode( ',', sanitize_text_field( wp_unslash( $_POST['booking_ids'] ) ) ) : array();
-            $status = sanitize_text_field( wp_unslash( $_POST['status'] ?? '' ) );
-
-            $ids = array_filter( array_map( 'absint', $ids ) );
-            if ( empty( $ids ) || ! $status ) {
-                wp_send_json_error( array( 'message' => __( 'No bookings selected.', 'restaurant-booking' ) ), 400 );
-            }
-
-            $updated = 0;
-            $errors  = array();
-
-            foreach ( $ids as $booking_id ) {
-                $booking = new RB_Booking( $booking_id );
-                if ( ! method_exists( $booking, 'exists' ) || ! $booking->exists() ) {
-                    $errors[] = sprintf( __( 'Booking #%d not found.', 'restaurant-booking' ), $booking_id );
-                    continue;
+                if ( ! class_exists( 'RB_Booking' ) ) {
+                    throw new Exception( __( 'Booking service unavailable.', 'restaurant-booking' ), 501 );
                 }
 
-                $result = method_exists( $booking, 'update_status' ) ? $booking->update_status( $status ) : false;
-                if ( ! $result ) {
-                    $errors[] = sprintf( __( 'Failed to update booking #%d.', 'restaurant-booking' ), $booking_id );
-                    continue;
+                $ids    = isset( $_POST['booking_ids'] ) ? explode( ',', sanitize_text_field( wp_unslash( $_POST['booking_ids'] ) ) ) : array();
+                $status = sanitize_text_field( wp_unslash( $_POST['status'] ?? '' ) );
+
+                $ids = array_filter( array_map( 'absint', $ids ) );
+                if ( empty( $ids ) || ! $status ) {
+                    throw new Exception( __( 'No bookings selected.', 'restaurant-booking' ), 400 );
                 }
 
-                if ( 'confirmed' === $status && method_exists( $booking, 'send_confirmation_email' ) ) {
-                    $booking->send_confirmation_email();
-                }
-                if ( 'cancelled' === $status && method_exists( $booking, 'send_cancellation_email' ) ) {
-                    $booking->send_cancellation_email();
+                $updated = 0;
+
+                foreach ( $ids as $booking_id ) {
+                    $booking = new RB_Booking( $booking_id );
+                    if ( ! method_exists( $booking, 'exists' ) || ! $booking->exists() ) {
+                        $errors[] = sprintf( __( 'Booking #%d not found.', 'restaurant-booking' ), $booking_id );
+                        continue;
+                    }
+
+                    $result = method_exists( $booking, 'update_status' ) ? $booking->update_status( $status ) : false;
+                    if ( ! $result ) {
+                        $errors[] = sprintf( __( 'Failed to update booking #%d.', 'restaurant-booking' ), $booking_id );
+                        continue;
+                    }
+
+                    if ( 'confirmed' === $status && method_exists( $booking, 'send_confirmation_email' ) ) {
+                        $booking->send_confirmation_email();
+                    }
+                    if ( 'cancelled' === $status && method_exists( $booking, 'send_cancellation_email' ) ) {
+                        $booking->send_cancellation_email();
+                    }
+
+                    $updated++;
                 }
 
-                $updated++;
-            }
+                if ( class_exists( 'RB_Logger' ) && method_exists( 'RB_Logger', 'log' ) ) {
+                    RB_Logger::log(
+                        'bulk_booking_update',
+                        array(
+                            'booking_ids' => $ids,
+                            'status'      => $status,
+                            'user_id'     => $this->current_user['id'] ?? get_current_user_id(),
+                        )
+                    );
+                }
 
-            if ( class_exists( 'RB_Logger' ) && method_exists( 'RB_Logger', 'log' ) ) {
-                RB_Logger::log(
-                    'bulk_booking_update',
+                if ( 0 === $updated ) {
+                    throw new Exception( __( 'No bookings were updated.', 'restaurant-booking' ), 400 );
+                }
+
+                $message = sprintf(
+                    _n( '%d booking updated.', '%d bookings updated.', $updated, 'restaurant-booking' ),
+                    $updated
+                );
+
+                if ( ! empty( $errors ) ) {
+                    $message .= ' ' . __( 'Some bookings could not be updated.', 'restaurant-booking' );
+                }
+
+                wp_send_json_success( array( 'message' => $message, 'errors' => $errors ) );
+            } catch ( Exception $exception ) {
+                error_log( 'RB Booking Manager AJAX Error [ajax_bulk_update_bookings]: ' . $exception->getMessage() );
+
+                $status = $exception->getCode() ?: 400;
+                wp_send_json_error(
                     array(
-                        'booking_ids' => $ids,
-                        'status'      => $status,
-                        'user_id'     => $this->current_user['id'] ?? get_current_user_id(),
-                    )
+                        'message' => $exception->getMessage(),
+                        'errors'  => $errors,
+                    ),
+                    $status
                 );
             }
-
-            if ( 0 === $updated ) {
-                wp_send_json_error( array( 'message' => __( 'No bookings were updated.', 'restaurant-booking' ), 'errors' => $errors ) );
-            }
-
-            $message = sprintf(
-                _n( '%d booking updated.', '%d bookings updated.', $updated, 'restaurant-booking' ),
-                $updated
-            );
-
-            if ( ! empty( $errors ) ) {
-                $message .= ' ' . __( 'Some bookings could not be updated.', 'restaurant-booking' );
-            }
-
-            wp_send_json_success( array( 'message' => $message, 'errors' => $errors ) );
         }
 
         /**
          * AJAX: send bulk reminders.
          */
         public function ajax_send_bulk_reminders() {
-            $this->verify_ajax_request();
-            $this->ensure_user_can_manage();
-
-            if ( ! class_exists( 'RB_Booking' ) ) {
-                wp_send_json_error( array( 'message' => __( 'Booking service unavailable.', 'restaurant-booking' ) ), 501 );
-            }
-
-            $ids = isset( $_POST['booking_ids'] ) ? explode( ',', sanitize_text_field( wp_unslash( $_POST['booking_ids'] ) ) ) : array();
-            $ids = array_filter( array_map( 'absint', $ids ) );
-
-            if ( empty( $ids ) ) {
-                wp_send_json_error( array( 'message' => __( 'No bookings selected.', 'restaurant-booking' ) ), 400 );
-            }
-
-            $sent   = 0;
             $errors = array();
 
-            foreach ( $ids as $booking_id ) {
-                $booking = new RB_Booking( $booking_id );
-                if ( ! method_exists( $booking, 'exists' ) || ! $booking->exists() ) {
-                    $errors[] = sprintf( __( 'Booking #%d not found.', 'restaurant-booking' ), $booking_id );
-                    continue;
+            try {
+                $this->verify_ajax_request();
+                $this->ensure_user_can_manage();
+
+                if ( ! class_exists( 'RB_Booking' ) ) {
+                    throw new Exception( __( 'Booking service unavailable.', 'restaurant-booking' ), 501 );
                 }
 
-                if ( method_exists( $booking, 'get_status' ) && 'confirmed' !== $booking->get_status() ) {
-                    $errors[] = sprintf( __( 'Booking #%d is not confirmed.', 'restaurant-booking' ), $booking_id );
-                    continue;
+                $ids = isset( $_POST['booking_ids'] ) ? explode( ',', sanitize_text_field( wp_unslash( $_POST['booking_ids'] ) ) ) : array();
+                $ids = array_filter( array_map( 'absint', $ids ) );
+
+                if ( empty( $ids ) ) {
+                    throw new Exception( __( 'No bookings selected.', 'restaurant-booking' ), 400 );
                 }
 
-                $success = method_exists( $booking, 'send_reminder_email' ) ? $booking->send_reminder_email() : false;
-                if ( $success ) {
-                    $sent++;
-                } else {
-                    $errors[] = sprintf( __( 'Failed to send reminder for booking #%d.', 'restaurant-booking' ), $booking_id );
-                }
-            }
+                $sent = 0;
 
-            if ( class_exists( 'RB_Logger' ) && method_exists( 'RB_Logger', 'log' ) ) {
-                RB_Logger::log(
-                    'bulk_reminder_sent',
+                foreach ( $ids as $booking_id ) {
+                    $booking = new RB_Booking( $booking_id );
+                    if ( ! method_exists( $booking, 'exists' ) || ! $booking->exists() ) {
+                        $errors[] = sprintf( __( 'Booking #%d not found.', 'restaurant-booking' ), $booking_id );
+                        continue;
+                    }
+
+                    if ( method_exists( $booking, 'get_status' ) && 'confirmed' !== $booking->get_status() ) {
+                        $errors[] = sprintf( __( 'Booking #%d is not confirmed.', 'restaurant-booking' ), $booking_id );
+                        continue;
+                    }
+
+                    $success = method_exists( $booking, 'send_reminder_email' ) ? $booking->send_reminder_email() : false;
+                    if ( $success ) {
+                        $sent++;
+                    } else {
+                        $errors[] = sprintf( __( 'Failed to send reminder for booking #%d.', 'restaurant-booking' ), $booking_id );
+                    }
+                }
+
+                if ( class_exists( 'RB_Logger' ) && method_exists( 'RB_Logger', 'log' ) ) {
+                    RB_Logger::log(
+                        'bulk_reminder_sent',
+                        array(
+                            'booking_ids' => $ids,
+                            'sent'        => $sent,
+                            'user_id'     => $this->current_user['id'] ?? get_current_user_id(),
+                        )
+                    );
+                }
+
+                if ( 0 === $sent ) {
+                    throw new Exception( __( 'No reminder emails were sent.', 'restaurant-booking' ), 400 );
+                }
+
+                $message = sprintf(
+                    _n( '%d reminder sent.', '%d reminders sent.', $sent, 'restaurant-booking' ),
+                    $sent
+                );
+
+                if ( ! empty( $errors ) ) {
+                    $message .= ' ' . __( 'Some reminders could not be delivered.', 'restaurant-booking' );
+                }
+
+                wp_send_json_success( array( 'message' => $message, 'errors' => $errors ) );
+            } catch ( Exception $exception ) {
+                error_log( 'RB Booking Manager AJAX Error [ajax_send_bulk_reminders]: ' . $exception->getMessage() );
+
+                $status = $exception->getCode() ?: 400;
+                wp_send_json_error(
                     array(
-                        'booking_ids' => $ids,
-                        'sent'        => $sent,
-                        'user_id'     => $this->current_user['id'] ?? get_current_user_id(),
-                    )
+                        'message' => $exception->getMessage(),
+                        'errors'  => $errors,
+                    ),
+                    $status
                 );
             }
-
-            if ( 0 === $sent ) {
-                wp_send_json_error( array( 'message' => __( 'No reminder emails were sent.', 'restaurant-booking' ), 'errors' => $errors ) );
-            }
-
-            $message = sprintf(
-                _n( '%d reminder sent.', '%d reminders sent.', $sent, 'restaurant-booking' ),
-                $sent
-            );
-
-            if ( ! empty( $errors ) ) {
-                $message .= ' ' . __( 'Some reminders could not be delivered.', 'restaurant-booking' );
-            }
-
-            wp_send_json_success( array( 'message' => $message, 'errors' => $errors ) );
         }
 
         /**
          * AJAX: export bookings to CSV.
          */
         public function ajax_export_bookings() {
-            $this->verify_ajax_request();
-            $this->ensure_user_can_manage();
+            try {
+                $this->verify_ajax_request();
+                $this->ensure_user_can_manage();
 
-            if ( ! class_exists( 'RB_Booking' ) ) {
-                wp_send_json_error( array( 'message' => __( 'Booking service unavailable.', 'restaurant-booking' ) ), 501 );
+                if ( ! class_exists( 'RB_Booking' ) ) {
+                    throw new Exception( __( 'Booking service unavailable.', 'restaurant-booking' ), 501 );
+                }
+
+                $filters = array(
+                    'date_from' => $this->read_filter_value( 'dateFrom', 'date_from' ),
+                    'date_to'   => $this->read_filter_value( 'dateTo', 'date_to' ),
+                    'status'    => sanitize_text_field( wp_unslash( $_POST['status'] ?? '' ) ),
+                    'location'  => sanitize_text_field( wp_unslash( $_POST['location'] ?? '' ) ),
+                    'search'    => sanitize_text_field( wp_unslash( $_POST['search'] ?? '' ) ),
+                );
+
+                if ( ! method_exists( 'RB_Booking', 'get_bookings_for_export' ) ) {
+                    throw new Exception( __( 'Export not available.', 'restaurant-booking' ), 501 );
+                }
+
+                $records = RB_Booking::get_bookings_for_export( $filters );
+                $csv     = $this->generate_csv( $records );
+
+                nocache_headers();
+                header( 'Content-Type: text/csv; charset=UTF-8' );
+                header( 'Content-Disposition: attachment; filename="bookings-export-' . gmdate( 'Y-m-d' ) . '.csv"' );
+                header( 'Content-Length: ' . strlen( $csv ) );
+
+                echo $csv; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+                exit;
+            } catch ( Exception $exception ) {
+                error_log( 'RB Booking Manager AJAX Error [ajax_export_bookings]: ' . $exception->getMessage() );
+
+                $status = $exception->getCode() ?: 400;
+                wp_send_json_error(
+                    array( 'message' => $exception->getMessage() ),
+                    $status
+                );
             }
-
-            $filters = array(
-                'date_from' => $this->read_filter_value( 'dateFrom', 'date_from' ),
-                'date_to'   => $this->read_filter_value( 'dateTo', 'date_to' ),
-                'status'    => sanitize_text_field( wp_unslash( $_POST['status'] ?? '' ) ),
-                'location'  => sanitize_text_field( wp_unslash( $_POST['location'] ?? '' ) ),
-                'search'    => sanitize_text_field( wp_unslash( $_POST['search'] ?? '' ) ),
-            );
-
-            if ( ! method_exists( 'RB_Booking', 'get_bookings_for_export' ) ) {
-                wp_send_json_error( array( 'message' => __( 'Export not available.', 'restaurant-booking' ) ), 501 );
-            }
-
-            $records = RB_Booking::get_bookings_for_export( $filters );
-
-            $csv = $this->generate_csv( $records );
-            nocache_headers();
-            header( 'Content-Type: text/csv; charset=UTF-8' );
-            header( 'Content-Disposition: attachment; filename="bookings-export-' . gmdate( 'Y-m-d' ) . '.csv"' );
-            header( 'Content-Length: ' . strlen( $csv ) );
-
-            echo $csv; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
-            exit;
         }
 
         /**
@@ -707,12 +734,17 @@ if ( ! class_exists( 'RB_Modern_Booking_Manager' ) ) {
          * Verify AJAX nonce value.
          */
         protected function verify_ajax_request() {
-            check_ajax_referer( $this->ajax_nonce, 'nonce' );
+            if ( ! check_ajax_referer( $this->ajax_nonce, 'nonce', false ) ) {
+                throw new Exception( __( 'Security check failed. Please refresh and try again.', 'restaurant-booking' ), 403 );
+            }
+
             $this->current_user = $this->resolve_current_user();
         }
 
         /**
          * Ensure current user can manage bookings.
+         *
+         * @throws Exception When the user lacks permission.
          */
         protected function ensure_user_can_manage() {
             $allowed = function_exists( 'restaurant_booking_user_can_manage' )
@@ -721,7 +753,7 @@ if ( ! class_exists( 'RB_Modern_Booking_Manager' ) ) {
             $allowed = apply_filters( 'rb_booking_manager_user_can', $allowed, $this->current_user );
 
             if ( ! $allowed ) {
-                wp_send_json_error( array( 'message' => __( 'You do not have permission to manage bookings.', 'restaurant-booking' ) ), 403 );
+                throw new Exception( __( 'You do not have permission to manage bookings.', 'restaurant-booking' ), 403 );
             }
         }
 
