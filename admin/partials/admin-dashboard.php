@@ -7,6 +7,14 @@
 
 $current_page = 'rb-dashboard';
 require __DIR__ . '/shared/header.php';
+
+$settings_slug = function_exists( 'restaurant_booking_get_settings_page_slug' )
+    ? restaurant_booking_get_settings_page_slug()
+    : 'restaurant-booking-settings';
+
+$settings_url = function_exists( 'restaurant_booking_get_settings_page_url' )
+    ? restaurant_booking_get_settings_page_url()
+    : admin_url( 'admin.php?page=' . $settings_slug );
 ?>
 <div class="rb-admin-wrapper">
     <aside class="rb-admin-sidebar" aria-label="<?php esc_attr_e( 'Quick statistics', 'restaurant-booking' ); ?>">
@@ -52,7 +60,7 @@ require __DIR__ . '/shared/header.php';
                         <div class="rb-admin-activity-meta"><?php esc_html_e( 'Update seating capacity and operating hours.', 'restaurant-booking' ); ?></div>
                     </div>
                 </a>
-                <a class="rb-admin-activity-item" href="<?php echo esc_url( admin_url( 'admin.php?page=rb-settings' ) ); ?>">
+                <a class="rb-admin-activity-item" href="<?php echo esc_url( $settings_url ); ?>">
                     <div class="rb-admin-activity-icon" aria-hidden="true">⚙️</div>
                     <div>
                         <div class="rb-admin-stat-label"><?php esc_html_e( 'Adjust policies', 'restaurant-booking' ); ?></div>

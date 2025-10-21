@@ -379,7 +379,7 @@ if ( ! class_exists( 'RB_Modern_Portal_Auth' ) ) {
          * @return string
          */
         protected function get_default_redirect_url() {
-            $default = apply_filters( 'rb_portal_dashboard_url', home_url( '/portal-dashboard/' ) );
+            $default = apply_filters( 'rb_portal_dashboard_url', home_url( '/portal/dashboard/' ) );
             return esc_url_raw( $default );
         }
 

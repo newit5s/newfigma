@@ -26,6 +26,13 @@ if ( ! class_exists( 'RB_Modern_Table_Manager' ) ) {
         protected $ajax_nonce = 'rb_table_manager_nonce';
 
         /**
+         * Flag to avoid duplicate asset registration.
+         *
+         * @var bool
+         */
+        protected $assets_enqueued = false;
+
+        /**
          * Cached customer records.
          *
          * @var array
@@ -68,7 +75,7 @@ if ( ! class_exists( 'RB_Modern_Table_Manager' ) ) {
                 exit;
             }
 
-            $this->enqueue_assets();
+            $this->enqueue_management_assets();
 
             add_filter(
                 'pre_get_document_title',
@@ -94,6 +101,19 @@ if ( ! class_exists( 'RB_Modern_Table_Manager' ) ) {
             if ( ! $this->should_load_assets() ) {
                 return;
             }
+
+            $this->enqueue_management_assets();
+        }
+
+        /**
+         * Enqueue shared assets for table and customer management interfaces.
+         */
+        protected function enqueue_management_assets() {
+            if ( $this->assets_enqueued ) {
+                return;
+            }
+
+            $this->assets_enqueued = true;
 
             $version  = defined( 'RB_PLUGIN_VERSION' ) ? RB_PLUGIN_VERSION : '1.0.0';
             $base_url = plugin_dir_url( __FILE__ ) . '../';
@@ -265,7 +285,61 @@ if ( ! class_exists( 'RB_Modern_Table_Manager' ) ) {
                 return $content;
             }
 
-            $this->enqueue_assets();
+            $this->enqueue_management_assets();
+
+            ob_start();
+            $is_embed = true;
+            $template = 'customers' === $view ? 'customer-profiles.php' : 'table-management.php';
+            $template_path = plugin_dir_path( __FILE__ ) . 'partials/' . $template;
+            if ( file_exists( $template_path ) ) {
+                include $template_path;
+            }
+
+            return ob_get_clean();
+        }
+
+        /**
+         * Render the floor plan shortcode for public embeds.
+         *
+         * @param array $atts Shortcode attributes.
+         *
+         * @return string
+         */
+        public function render_floor_plan_shortcode( $atts ) {
+            $atts = shortcode_atts(
+                array(
+                    'view'     => 'tables',
+                    'location' => '',
+                ),
+                $atts,
+                'table_floor_plan'
+            );
+
+            $this->current_user = $this->resolve_current_user();
+
+            $has_access = function_exists( 'restaurant_booking_user_can_manage' )
+                ? restaurant_booking_user_can_manage()
+                : current_user_can( 'manage_options' );
+
+            if ( ! $has_access ) {
+                if ( function_exists( 'restaurant_booking_render_permission_notice' ) ) {
+                    return restaurant_booking_render_permission_notice( __( 'table floor plan', 'restaurant-booking' ) );
+                }
+
+                return '<div class="rb-alert rb-alert-warning">' . esc_html__( 'You do not have permission to view the table floor plan.', 'restaurant-booking' ) . '</div>';
+            }
+
+            $location = sanitize_text_field( $atts['location'] );
+            if ( '' !== $location ) {
+                $this->current_user['location_id'] = $location;
+            }
+
+            $view = sanitize_key( $atts['view'] );
+            if ( ! in_array( $view, array( 'tables', 'customers' ), true ) ) {
+                $view = 'tables';
+            }
+
+            $this->enqueue_management_assets();
 
             ob_start();
             $is_embed = true;
@@ -697,7 +771,9 @@ if ( ! class_exists( 'RB_Modern_Table_Manager' ) ) {
          * Ensure user has permissions.
          */
         protected function ensure_user_can_manage() {
-            $allowed = current_user_can( 'manage_options' );
+            $allowed = function_exists( 'restaurant_booking_user_can_manage' )
+                ? restaurant_booking_user_can_manage()
+                : current_user_can( 'manage_options' );
             $allowed = apply_filters( 'rb_table_manager_user_can', $allowed, $this->current_user );
 
             if ( ! $allowed ) {
@@ -742,11 +818,10 @@ if ( ! class_exists( 'RB_Modern_Table_Manager' ) ) {
          * @return bool
          */
         protected function is_direct_request() {
-            if ( ! isset( $_GET['rb_portal'] ) ) {
-                return false;
-            }
+            $view = function_exists( 'restaurant_booking_get_portal_view' )
+                ? restaurant_booking_get_portal_view()
+                : ( isset( $_GET['rb_portal'] ) ? sanitize_key( wp_unslash( $_GET['rb_portal'] ) ) : '' );
 
-            $view = sanitize_key( wp_unslash( $_GET['rb_portal'] ) );
             return in_array( $view, array( 'tables', 'customers' ), true );
         }
 
@@ -756,7 +831,10 @@ if ( ! class_exists( 'RB_Modern_Table_Manager' ) ) {
          * @return string
          */
         protected function get_requested_view() {
-            $view = isset( $_GET['rb_portal'] ) ? sanitize_key( wp_unslash( $_GET['rb_portal'] ) ) : 'tables';
+            $view = function_exists( 'restaurant_booking_get_portal_view' )
+                ? restaurant_booking_get_portal_view()
+                : ( isset( $_GET['rb_portal'] ) ? sanitize_key( wp_unslash( $_GET['rb_portal'] ) ) : '' );
+
             return in_array( $view, array( 'tables', 'customers' ), true ) ? $view : 'tables';
         }
 
@@ -766,7 +844,68 @@ if ( ! class_exists( 'RB_Modern_Table_Manager' ) ) {
          * @return bool
          */
         protected function is_embed_context() {
-            return did_action( 'rb_portal_render_view' ) > 0;
+            if ( did_action( 'rb_portal_render_view' ) > 0 ) {
+                return true;
+            }
+
+            if ( ! is_singular() ) {
+                return false;
+            }
+
+            global $post;
+
+            if ( ! $post instanceof WP_Post ) {
+                return false;
+            }
+
+            if ( has_shortcode( $post->post_content, 'table_floor_plan' ) ) {
+                return true;
+            }
+
+            return $this->page_has_portal_view( array( 'tables', 'customers' ) );
+        }
+
+        /**
+         * Determine if current post renders the portal shortcode for specific views.
+         *
+         * @param array $views Accepted portal view slugs.
+         *
+         * @return bool
+         */
+        protected function page_has_portal_view( $views ) {
+            if ( ! is_singular() ) {
+                return false;
+            }
+
+            global $post;
+
+            if ( ! $post instanceof WP_Post ) {
+                return false;
+            }
+
+            if ( ! has_shortcode( $post->post_content, 'modern_booking_portal' ) ) {
+                return false;
+            }
+
+            $shortcode_regex = get_shortcode_regex( array( 'modern_booking_portal' ) );
+            if ( empty( $shortcode_regex ) ) {
+                return false;
+            }
+
+            preg_match_all( '/'. $shortcode_regex .'/s', $post->post_content, $matches, PREG_SET_ORDER );
+
+            $views = (array) $views;
+
+            foreach ( $matches as $shortcode ) {
+                $atts = shortcode_parse_atts( $shortcode[3] );
+                $requested_view = isset( $atts['view'] ) ? sanitize_key( $atts['view'] ) : 'login';
+
+                if ( in_array( $requested_view, $views, true ) ) {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         /**

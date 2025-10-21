@@ -28,6 +28,27 @@ if ( ! class_exists( 'Restaurant_Booking_Plugin_Manager' ) ) {
          */
         protected $public_bootstrapped = false;
 
+        /**
+         * Booking manager instance.
+         *
+         * @var RB_Modern_Booking_Manager|null
+         */
+        protected $booking_manager = null;
+
+        /**
+         * Dashboard instance.
+         *
+         * @var RB_Modern_Dashboard|null
+         */
+        protected $dashboard = null;
+
+        /**
+         * Table manager instance.
+         *
+         * @var RB_Modern_Table_Manager|null
+         */
+        protected $table_manager = null;
+
         public static function instance() {
             if ( null === self::$instance ) {
                 self::$instance = new self();
@@ -80,12 +101,28 @@ if ( ! class_exists( 'Restaurant_Booking_Plugin_Manager' ) ) {
             }
 
             new RB_Modern_Booking_Widget();
-            new RB_Modern_Booking_Manager();
-            new RB_Modern_Dashboard();
-            new RB_Modern_Table_Manager();
+            $this->booking_manager = new RB_Modern_Booking_Manager();
+            $this->dashboard       = new RB_Modern_Dashboard();
+            $this->table_manager   = new RB_Modern_Table_Manager();
             new RB_Modern_Portal_Auth();
 
+            $this->register_public_shortcodes();
+
             $this->public_bootstrapped = true;
+        }
+
+        protected function register_public_shortcodes() {
+            if ( $this->booking_manager && method_exists( $this->booking_manager, 'render_calendar_shortcode' ) ) {
+                add_shortcode( 'booking_calendar', array( $this->booking_manager, 'render_calendar_shortcode' ) );
+            }
+
+            if ( $this->dashboard && method_exists( $this->dashboard, 'render_analytics_shortcode' ) ) {
+                add_shortcode( 'restaurant_analytics', array( $this->dashboard, 'render_analytics_shortcode' ) );
+            }
+
+            if ( $this->table_manager && method_exists( $this->table_manager, 'render_floor_plan_shortcode' ) ) {
+                add_shortcode( 'table_floor_plan', array( $this->table_manager, 'render_floor_plan_shortcode' ) );
+            }
         }
 
         public function bootstrap_admin_components() {

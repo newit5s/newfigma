@@ -278,6 +278,27 @@ wp_send_json_success( [ 'data' => $result ] );
 | `[restaurant_analytics]` | Analytics dashboard | `period="7d/30d/90d"` |
 | `[table_floor_plan]` | Visual table management | `location="id"`, `editable="true/false"` |
 
+### 🔐 Quyền truy cập & thông báo đăng nhập
+
+- Plugin tự động thêm capability `manage_bookings` cho vai trò **Administrator** và **Editor** mỗi khi khởi tạo.
+- Administrator vẫn có thể vào menu và shortcode dù bị mất capability tùy chỉnh nhờ fallback `manage_options` mới (filter `map_meta_cap`).
+- Người dùng không đủ quyền sẽ thấy thông báo kèm liên kết đăng nhập portal (`/portal/` hoặc URL tùy chỉnh qua filter `rb_portal_login_url`).
+- Có thể điều chỉnh trang đăng nhập bằng cách thêm vào theme/plugin:
+- Trang **Settings** hiện dùng slug admin `restaurant-booking-settings`, xuất hiện cả trong menu **Bookings** của plugin và mục **Settings** mặc định. Có thể đổi slug thông qua filter `restaurant_booking_settings_page_slug`; các URL cũ `admin.php?page=rb-settings` sẽ tự động chuyển hướng.
+
+```php
+add_filter( 'rb_portal_login_url', function( $url ) {
+    return home_url( '/staff-login/' );
+} );
+```
+
+```php
+// Tùy chỉnh slug trang cấu hình admin
+add_filter( 'restaurant_booking_settings_page_slug', function( $slug ) {
+    return 'nha-hang-settings';
+} );
+```
+
 ## 🔧 Cấu hình Design System
 
 ### Theme Customization
