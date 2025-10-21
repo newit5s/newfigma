@@ -79,13 +79,6 @@ require_once RESTAURANT_BOOKING_PATH . 'includes/class-plugin-manager.php';
  * Initialize the plugin
  */
 function restaurant_booking_init() {
-    // Load text domain for internationalization
-    load_plugin_textdomain(
-        'restaurant-booking',
-        false,
-        dirname( RESTAURANT_BOOKING_BASENAME ) . '/languages/'
-    );
-
     // Initialize plugin manager
     $plugin = Restaurant_Booking_Plugin_Manager::instance();
     $plugin->run();

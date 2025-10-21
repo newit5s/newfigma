@@ -11,6 +11,8 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
 
     class RB_Modern_Admin {
 
+        use RB_Asset_Loader;
+
         /**
          * Cached plugin settings for rendering.
          *
@@ -552,52 +554,9 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
                 return;
             }
 
-            $version  = defined( 'RB_PLUGIN_VERSION' ) ? RB_PLUGIN_VERSION : '1.0.0';
-            $base_url = plugin_dir_url( __FILE__ ) . '../';
-
-            wp_enqueue_style(
-                'rb-design-system',
-                $base_url . 'assets/css/design-system.css',
-                array(),
-                $version
-            );
-
-            wp_enqueue_style(
-                'rb-components',
-                $base_url . 'assets/css/components.css',
-                array( 'rb-design-system' ),
-                $version
-            );
-
-            wp_enqueue_style(
-                'rb-animations',
-                $base_url . 'assets/css/animations.css',
-                array( 'rb-design-system' ),
-                $version
-            );
-
-            wp_enqueue_style(
-                'rb-modern-admin',
-                $base_url . 'assets/css/modern-admin.css',
-                array( 'rb-design-system', 'rb-components', 'rb-animations' ),
-                $version
-            );
-
-            wp_enqueue_script(
-                'rb-theme-manager',
-                $base_url . 'assets/js/theme-manager.js',
-                array(),
-                $version,
-                true
-            );
-
-            wp_enqueue_script(
-                'rb-modern-admin',
-                $base_url . 'assets/js/modern-admin.js',
-                array( 'jquery', 'rb-theme-manager' ),
-                $version,
-                true
-            );
+            $this->enqueue_core_assets( 'admin' );
+            $this->enqueue_context_css( 'modern-admin' );
+            $this->enqueue_context_js( 'modern-admin', array( 'jquery' ) );
 
             $currency_symbol = apply_filters( 'rb_booking_currency', '$', 0 );
             $currency_code   = apply_filters( 'rb_booking_currency_code', 'USD', 0 );
@@ -609,13 +568,11 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
                 )
             );
 
-            wp_localize_script(
+            $this->localize_ajax_data(
                 'rb-modern-admin',
                 'rbAdmin',
                 array(
-                    'ajax_url' => admin_url( 'admin-ajax.php' ),
-                    'nonce'    => wp_create_nonce( 'rb_admin_nonce' ),
-                    'strings'  => array(
+                    'strings' => array(
                         'loading'         => __( 'Loading…', 'restaurant-booking' ),
                         'error'           => __( 'Error loading data', 'restaurant-booking' ),
                         'bookings'        => __( 'Bookings', 'restaurant-booking' ),
@@ -651,7 +608,8 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
                     'reports' => array(
                         'defaultRange' => 30,
                     ),
-                )
+                ),
+                'rb_admin_nonce'
             );
         }
 
@@ -676,9 +634,9 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
         }
 
         public function ajax_get_dashboard() {
-            check_ajax_referer( 'rb_admin_nonce', 'nonce' );
-
             try {
+                $this->verify_admin_ajax_request();
+
                 $locations = RB_Location::get_all_locations();
                 $formatted = array_map( array( $this, 'format_location_stats' ), $locations );
 
@@ -689,56 +647,70 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
                     )
                 );
             } catch ( Exception $exception ) {
+                error_log( 'RB Admin AJAX Error [ajax_get_dashboard]: ' . $exception->getMessage() );
+
+                $status = $exception->getCode() ?: 400;
                 wp_send_json_error(
                     array( 'message' => $exception->getMessage() ),
-                    500
+                    $status
                 );
             }
         }
 
         public function ajax_get_bookings() {
-            check_ajax_referer( 'rb_admin_nonce', 'nonce' );
-
-            $location  = sanitize_text_field( wp_unslash( $_POST['location'] ?? '' ) );
-            $status    = sanitize_text_field( wp_unslash( $_POST['status'] ?? '' ) );
-            $page      = max( 1, (int) ( $_POST['page'] ?? 1 ) );
-            $search    = sanitize_text_field( wp_unslash( $_POST['search'] ?? '' ) );
-            $date_from = sanitize_text_field( wp_unslash( $_POST['date_from'] ?? '' ) );
-            $date_to   = sanitize_text_field( wp_unslash( $_POST['date_to'] ?? '' ) );
-            $per_page  = isset( $_POST['per_page'] ) ? max( 1, min( 100, (int) $_POST['per_page'] ) ) : 20;
-            $sort_by   = sanitize_key( wp_unslash( $_POST['sort_by'] ?? '' ) );
-            $sort_order = sanitize_key( wp_unslash( $_POST['sort_order'] ?? '' ) );
-
-            $args = array(
-                'search'    => $search,
-                'date_from' => $date_from,
-                'date_to'   => $date_to,
-                'per_page'  => $per_page,
-            );
-
-            if ( ! empty( $sort_by ) ) {
-                $args['sort_by'] = $sort_by;
-            }
-
-            if ( ! empty( $sort_order ) ) {
-                $args['sort_order'] = $sort_order;
-            }
-
             try {
-                $bookings = RB_Booking::get_admin_bookings( $location, $status, $page, $args );
-                wp_send_json_success( $bookings );
+                $this->verify_admin_ajax_request();
+
+                $location  = sanitize_text_field( wp_unslash( $_POST['location'] ?? '' ) );
+                $status    = sanitize_text_field( wp_unslash( $_POST['status'] ?? '' ) );
+                $page      = max( 1, (int) ( $_POST['page'] ?? 1 ) );
+                $search    = sanitize_text_field( wp_unslash( $_POST['search'] ?? '' ) );
+                $date_from = sanitize_text_field( wp_unslash( $_POST['date_from'] ?? '' ) );
+                $date_to   = sanitize_text_field( wp_unslash( $_POST['date_to'] ?? '' ) );
+                $per_page  = isset( $_POST['per_page'] ) ? max( 1, min( 100, (int) $_POST['per_page'] ) ) : 20;
+                $sort_by   = sanitize_key( wp_unslash( $_POST['sort_by'] ?? '' ) );
+                $sort_order = sanitize_key( wp_unslash( $_POST['sort_order'] ?? '' ) );
+
+                $args = array(
+                    'search'    => $search,
+                    'date_from' => $date_from,
+                    'date_to'   => $date_to,
+                    'per_page'  => $per_page,
+                );
+
+                if ( ! empty( $sort_by ) ) {
+                    $args['sort_by'] = $sort_by;
+                }
+
+                if ( ! empty( $sort_order ) ) {
+                    $args['sort_order'] = $sort_order;
+                }
+
+                $results = RB_Booking::get_bookings( $location, $status, $page, $args );
+
+                wp_send_json_success(
+                    array(
+                        'items'      => $results['items'] ?? array(),
+                        'total'      => $results['total'] ?? 0,
+                        'totalPages' => $results['total_pages'] ?? 1,
+                        'page'       => $page,
+                    )
+                );
             } catch ( Exception $exception ) {
+                error_log( 'RB Admin AJAX Error [ajax_get_bookings]: ' . $exception->getMessage() );
+
+                $status = $exception->getCode() ?: 400;
                 wp_send_json_error(
                     array( 'message' => $exception->getMessage() ),
-                    500
+                    $status
                 );
             }
         }
 
         public function ajax_get_locations() {
-            check_ajax_referer( 'rb_admin_nonce', 'nonce' );
-
             try {
+                $this->verify_admin_ajax_request();
+
                 $locations = RB_Location::get_all_locations();
 
                 $formatted      = array();
@@ -779,10 +751,34 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
                     )
                 );
             } catch ( Exception $exception ) {
+                error_log( 'RB Admin AJAX Error [ajax_get_locations]: ' . $exception->getMessage() );
+
+                $status = $exception->getCode() ?: 400;
                 wp_send_json_error(
                     array( 'message' => $exception->getMessage() ),
-                    500
+                    $status
                 );
+            }
+        }
+
+        /**
+         * Validate nonce and permissions for admin AJAX requests.
+         *
+         * @throws Exception When the request fails security or permission checks.
+         */
+        protected function verify_admin_ajax_request() {
+            if ( ! check_ajax_referer( 'rb_admin_nonce', 'nonce', false ) ) {
+                throw new Exception( __( 'Security check failed. Please refresh and try again.', 'restaurant-booking' ), 403 );
+            }
+
+            $allowed = function_exists( 'restaurant_booking_user_can_manage' )
+                ? restaurant_booking_user_can_manage()
+                : current_user_can( 'manage_options' );
+
+            $allowed = apply_filters( 'rb_admin_user_can_manage', $allowed );
+
+            if ( ! $allowed ) {
+                throw new Exception( __( 'You do not have permission to perform this action.', 'restaurant-booking' ), 403 );
             }
         }
 
