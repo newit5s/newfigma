@@ -37,7 +37,7 @@ if ( ! trait_exists( 'RB_Asset_Loader' ) ) {
             $this->assets_enqueued = true;
 
             $version  = defined( 'RB_PLUGIN_VERSION' ) ? RB_PLUGIN_VERSION : '1.0.0';
-            $base_url = defined( 'RESTAURANT_BOOKING_URL' ) ? RESTAURANT_BOOKING_URL : plugin_dir_url( dirname( __DIR__ ) . '/' );
+            $base_url = $this->get_plugin_base_url();
 
             // Core styles.
             wp_enqueue_style(
@@ -132,9 +132,9 @@ if ( ! trait_exists( 'RB_Asset_Loader' ) ) {
          */
         protected function enqueue_context_css( $context, $dependencies = array() ) {
             $version  = defined( 'RB_PLUGIN_VERSION' ) ? RB_PLUGIN_VERSION : '1.0.0';
-            $base_url = defined( 'RESTAURANT_BOOKING_URL' ) ? RESTAURANT_BOOKING_URL : plugin_dir_url( dirname( __DIR__ ) . '/' );
+            $base_url = $this->get_plugin_base_url();
 
-            $dependencies = array_unique( array_merge( array( 'rb-design-system', 'rb-components', 'rb-animations' ), $dependencies ) );
+            $dependencies = array_values( array_unique( array_merge( array( 'rb-design-system', 'rb-components', 'rb-animations' ), $dependencies ) ) );
 
             wp_enqueue_style(
                 'rb-' . $context,
@@ -152,11 +152,13 @@ if ( ! trait_exists( 'RB_Asset_Loader' ) ) {
          */
         protected function enqueue_context_js( $context, $dependencies = array() ) {
             $version  = defined( 'RB_PLUGIN_VERSION' ) ? RB_PLUGIN_VERSION : '1.0.0';
-            $base_url = defined( 'RESTAURANT_BOOKING_URL' ) ? RESTAURANT_BOOKING_URL : plugin_dir_url( dirname( __DIR__ ) . '/' );
+            $base_url = $this->get_plugin_base_url();
 
             if ( ! in_array( 'rb-theme-manager', $dependencies, true ) ) {
                 $dependencies[] = 'rb-theme-manager';
             }
+
+            $dependencies = array_values( array_unique( $dependencies ) );
 
             wp_enqueue_script(
                 'rb-' . $context,
@@ -165,6 +167,34 @@ if ( ! trait_exists( 'RB_Asset_Loader' ) ) {
                 $version,
                 true
             );
+        }
+
+        /**
+         * Resolve the plugin base URL for asset loading.
+         *
+         * @return string
+         */
+        protected function get_plugin_base_url() {
+            if ( defined( 'RESTAURANT_BOOKING_URL' ) ) {
+                return RESTAURANT_BOOKING_URL;
+            }
+
+            if ( defined( 'RB_PLUGIN_URL' ) ) {
+                return RB_PLUGIN_URL;
+            }
+
+            if ( defined( 'RB_PLUGIN_FILE' ) ) {
+                return trailingslashit( plugins_url( '', RB_PLUGIN_FILE ) );
+            }
+
+            $plugin_root = dirname( __DIR__, 2 );
+            $plugin_file = $plugin_root . '/restaurant-booking-manager.php';
+
+            if ( file_exists( $plugin_file ) ) {
+                return trailingslashit( plugins_url( '', $plugin_file ) );
+            }
+
+            return trailingslashit( plugins_url() );
         }
     }
 }
