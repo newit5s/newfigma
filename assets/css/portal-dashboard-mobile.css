@@ -1,0 +1,660 @@
+/*
+ * Portal dashboard mobile styles (Phase 8)
+ *
+ * Provides touch-optimised layout, navigation, and offline affordances
+ * for the manager dashboard when viewed on small screens.
+ */
+
+:root {
+  --rb-mobile-bottom-nav-height: 72px;
+  --rb-mobile-header-height: 56px;
+}
+
+.rb-mobile-shell {
+  display: none;
+}
+
+.rb-mobile-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+  z-index: 1020;
+}
+
+.rb-mobile-overlay.rb-active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.rb-mobile-nav {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 280px;
+  background: var(--rb-bg-primary);
+  box-shadow: var(--rb-shadow-lg);
+  transform: translateX(-100%);
+  transition: transform 0.3s ease;
+  z-index: 1030;
+  display: flex;
+  flex-direction: column;
+}
+
+.rb-mobile-nav.open {
+  transform: translateX(0);
+}
+
+.rb-mobile-nav-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--rb-space-5) var(--rb-space-4);
+  border-bottom: 1px solid var(--rb-border-color);
+}
+
+.rb-mobile-logo {
+  display: flex;
+  align-items: center;
+  gap: var(--rb-space-3);
+  font-weight: var(--rb-font-semibold);
+  color: var(--rb-text-primary);
+}
+
+.rb-mobile-nav-close {
+  border: none;
+  background: transparent;
+  padding: var(--rb-space-2);
+  border-radius: var(--rb-radius-full);
+  color: var(--rb-text-secondary);
+}
+
+.rb-mobile-nav-menu {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--rb-space-4) 0;
+}
+
+.rb-mobile-nav-item {
+  display: flex;
+  align-items: center;
+  gap: var(--rb-space-3);
+  padding: var(--rb-space-3) var(--rb-space-6) var(--rb-space-3) var(--rb-space-5);
+  color: var(--rb-text-secondary);
+  text-decoration: none;
+  font-weight: var(--rb-font-medium);
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.rb-nav-badge {
+  margin-left: auto;
+  min-width: 20px;
+  height: 20px;
+  border-radius: var(--rb-radius-full);
+  background: var(--rb-primary-600);
+  color: #fff;
+  font-size: var(--rb-text-xs);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--rb-space-2);
+}
+
+.rb-mobile-nav-item:focus-visible {
+  outline: 2px solid var(--rb-primary-500);
+  outline-offset: 2px;
+}
+
+.rb-mobile-nav-item.active,
+.rb-mobile-nav-item:hover {
+  background: var(--rb-primary-50);
+  color: var(--rb-primary-600);
+}
+
+.rb-mobile-nav-item .rb-nav-icon {
+  flex-shrink: 0;
+}
+
+.rb-mobile-nav-footer {
+  padding: var(--rb-space-4) var(--rb-space-5);
+  border-top: 1px solid var(--rb-border-color);
+  display: grid;
+  gap: var(--rb-space-4);
+}
+
+.rb-mobile-user {
+  display: flex;
+  align-items: center;
+  gap: var(--rb-space-3);
+}
+
+.rb-mobile-avatar,
+.rb-mobile-nav-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: var(--rb-font-semibold);
+  background: linear-gradient(135deg, var(--rb-primary-500), var(--rb-primary-700));
+  color: #fff;
+}
+
+.rb-mobile-user-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--rb-text-sm);
+}
+
+.rb-mobile-logout {
+  color: var(--rb-primary-600);
+  font-weight: var(--rb-font-medium);
+  text-decoration: none;
+}
+
+.rb-install-banner,
+.rb-update-banner,
+.rb-offline-banner,
+.rb-toast {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  border-radius: var(--rb-radius-lg);
+  box-shadow: var(--rb-shadow-lg);
+  background: var(--rb-bg-primary);
+  z-index: 1200;
+  transform: translateY(20px);
+  opacity: 0;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+.rb-install-banner.show,
+.rb-update-banner.show,
+.rb-offline-banner.show,
+.rb-toast.show {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+.rb-offline-banner {
+  bottom: calc(var(--rb-mobile-bottom-nav-height) + 24px);
+  padding: var(--rb-space-3) var(--rb-space-4);
+  display: flex;
+  align-items: center;
+  gap: var(--rb-space-3);
+  background: var(--rb-warning-100, #fef3c7);
+  color: var(--rb-warning-900, #78350f);
+  font-size: var(--rb-text-sm);
+}
+
+.rb-install-banner,
+.rb-update-banner {
+  bottom: calc(var(--rb-mobile-bottom-nav-height) + 16px);
+  padding: var(--rb-space-4);
+}
+
+.rb-install-content,
+.rb-update-content {
+  display: flex;
+  align-items: center;
+  gap: var(--rb-space-4);
+}
+
+.rb-install-actions {
+  margin-left: auto;
+  display: flex;
+  gap: var(--rb-space-3);
+}
+
+.rb-toast {
+  bottom: calc(var(--rb-mobile-bottom-nav-height) + 24px);
+  padding: var(--rb-space-3) var(--rb-space-4);
+  font-size: var(--rb-text-sm);
+}
+
+.rb-toast.rb-toast-success {
+  border-left: 4px solid var(--rb-success, #22c55e);
+}
+
+.rb-toast.rb-toast-error {
+  border-left: 4px solid var(--rb-error, #ef4444);
+}
+
+.rb-toast-close {
+  border: none;
+  background: transparent;
+  font-size: 18px;
+  color: var(--rb-text-secondary);
+  margin-left: var(--rb-space-3);
+}
+
+.rb-mobile-loading-spinner {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 3px solid rgba(148, 163, 184, 0.35);
+  border-top-color: var(--rb-primary-500);
+  animation: rb-spin 1s linear infinite;
+}
+
+.rb-pull-indicator {
+  position: absolute;
+  top: -60px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--rb-bg-primary);
+  box-shadow: var(--rb-shadow-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: top 0.2s ease, opacity 0.2s ease;
+  z-index: 1010;
+}
+
+.rb-pull-indicator.ready {
+  background: var(--rb-primary-500);
+  color: #fff;
+}
+
+.rb-pull-indicator.loading {
+  background: var(--rb-primary-600);
+  color: #fff;
+}
+
+.rb-mobile-content {
+  position: relative;
+  flex: 1;
+  padding: var(--rb-space-6) var(--rb-space-5) calc(var(--rb-mobile-bottom-nav-height) + var(--rb-space-6));
+  background: var(--rb-bg-secondary);
+  color: var(--rb-text-primary);
+}
+
+.rb-mobile-section-title {
+  margin: 0 0 var(--rb-space-3);
+  font-size: var(--rb-text-lg);
+  font-weight: var(--rb-font-semibold);
+}
+
+.rb-mobile-stats {
+  display: grid;
+  gap: var(--rb-space-4);
+  margin-bottom: var(--rb-space-6);
+}
+
+.rb-mobile-stat-card {
+  background: var(--rb-bg-primary);
+  border-radius: var(--rb-radius-xl);
+  padding: var(--rb-space-5);
+  box-shadow: var(--rb-shadow-sm);
+  display: grid;
+  gap: var(--rb-space-2);
+}
+
+.rb-mobile-stat-number {
+  font-size: var(--rb-text-3xl);
+  font-weight: var(--rb-font-bold);
+}
+
+.rb-mobile-stat-label {
+  color: var(--rb-text-secondary);
+  font-size: var(--rb-text-sm);
+}
+
+.rb-mobile-stat-change {
+  font-size: var(--rb-text-sm);
+  font-weight: var(--rb-font-medium);
+}
+
+.rb-mobile-stat-change.positive {
+  color: var(--rb-success, #22c55e);
+}
+
+.rb-mobile-stat-change.negative {
+  color: var(--rb-error, #ef4444);
+}
+
+.rb-mobile-quick-actions {
+  margin-bottom: var(--rb-space-6);
+}
+
+.rb-mobile-action-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--rb-space-4);
+}
+
+.rb-mobile-action-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--rb-space-3);
+  border-radius: var(--rb-radius-xl);
+  padding: var(--rb-space-4);
+  background: var(--rb-bg-primary);
+  box-shadow: var(--rb-shadow-sm);
+  border: none;
+  color: inherit;
+  text-align: left;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  position: relative;
+}
+
+.rb-mobile-action-btn:focus-visible {
+  outline: 2px solid var(--rb-primary-500);
+  outline-offset: 2px;
+}
+
+.rb-mobile-action-btn:active,
+.rb-mobile-action-btn.rb-haptic-feedback {
+  transform: scale(0.98);
+  box-shadow: var(--rb-shadow-xs);
+}
+
+.rb-mobile-action-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--rb-radius-lg);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--rb-primary-50);
+  color: var(--rb-primary-600);
+}
+
+.rb-mobile-action-btn .rb-nav-badge {
+  position: absolute;
+  top: var(--rb-space-4);
+  right: var(--rb-space-4);
+}
+
+.rb-mobile-schedule {
+  margin-bottom: var(--rb-space-6);
+}
+
+.rb-mobile-schedule-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: var(--rb-space-4);
+}
+
+.rb-mobile-booking-list {
+  display: grid;
+  gap: var(--rb-space-4);
+}
+
+.rb-booking-card-mobile {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--rb-radius-xl);
+  background: var(--rb-bg-primary);
+  box-shadow: var(--rb-shadow-sm);
+}
+
+.rb-booking-card-content {
+  padding: var(--rb-space-4);
+  transition: transform 0.3s ease;
+}
+
+.rb-booking-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--rb-space-3);
+  font-size: var(--rb-text-sm);
+  color: var(--rb-text-secondary);
+}
+
+.rb-booking-details {
+  display: grid;
+  gap: var(--rb-space-2);
+}
+
+.rb-booking-notes {
+  color: var(--rb-text-secondary);
+  font-size: var(--rb-text-sm);
+}
+
+.rb-booking-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--rb-space-2);
+  padding: 4px 10px;
+  border-radius: var(--rb-radius-lg);
+  font-size: var(--rb-text-xs);
+  font-weight: var(--rb-font-medium);
+  text-transform: capitalize;
+}
+
+.rb-booking-status.rb-status-confirmed {
+  background: rgba(34, 197, 94, 0.12);
+  color: var(--rb-success, #22c55e);
+}
+
+.rb-booking-status.rb-status-pending {
+  background: rgba(250, 204, 21, 0.16);
+  color: var(--rb-warning-800, #854d0e);
+}
+
+.rb-booking-status.rb-status-cancelled {
+  background: rgba(239, 68, 68, 0.16);
+  color: var(--rb-error, #ef4444);
+}
+
+.rb-booking-card-swipe-actions {
+  position: absolute;
+  top: 0;
+  right: -240px;
+  bottom: 0;
+  width: 240px;
+  display: flex;
+  justify-content: space-around;
+  align-items: stretch;
+  background: var(--rb-bg-muted);
+  transition: right 0.3s ease;
+}
+
+.rb-swipe-action {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--rb-space-2);
+  color: #fff;
+  font-size: var(--rb-text-sm);
+}
+
+.rb-swipe-action[data-action="confirm"] {
+  background: var(--rb-success, #22c55e);
+}
+
+.rb-swipe-action[data-action="reschedule"] {
+  background: var(--rb-primary-600);
+}
+
+.rb-swipe-action[data-action="cancel"] {
+  background: var(--rb-error, #ef4444);
+}
+
+.rb-mobile-empty {
+  display: grid;
+  gap: var(--rb-space-3);
+  align-items: center;
+  justify-items: center;
+  padding: var(--rb-space-6);
+  border-radius: var(--rb-radius-xl);
+  background: var(--rb-bg-primary);
+  color: var(--rb-text-secondary);
+}
+
+.rb-mobile-bottom-nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--rb-mobile-bottom-nav-height);
+  background: var(--rb-bg-primary);
+  border-top: 1px solid var(--rb-border-color);
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  align-items: center;
+  z-index: 1050;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+.rb-bottom-nav-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+  justify-content: center;
+  color: var(--rb-text-secondary);
+  text-decoration: none;
+  font-size: var(--rb-text-xs);
+  padding: 6px 0;
+}
+
+.rb-bottom-nav-item.active {
+  color: var(--rb-primary-600);
+}
+
+.rb-bottom-nav-icon {
+  width: 22px;
+  height: 22px;
+}
+
+.rb-mobile-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--rb-mobile-header-height);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--rb-space-4);
+  background: var(--rb-bg-primary);
+  border-bottom: 1px solid var(--rb-border-color);
+  z-index: 1040;
+}
+
+.rb-mobile-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--rb-space-3);
+}
+
+.rb-mobile-icon-button {
+  border: none;
+  background: transparent;
+  padding: var(--rb-space-2);
+  border-radius: var(--rb-radius-full);
+  color: var(--rb-text-secondary);
+}
+
+.rb-mobile-notification-badge {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  min-width: 16px;
+  height: 16px;
+  border-radius: var(--rb-radius-full);
+  background: var(--rb-error, #ef4444);
+  color: #fff;
+  font-size: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rb-mobile-title {
+  font-weight: var(--rb-font-semibold);
+  font-size: var(--rb-text-base);
+}
+
+.rb-hamburger {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rb-hamburger span {
+  width: 22px;
+  height: 2px;
+  background: currentColor;
+  border-radius: 999px;
+}
+
+.rb-mobile-shell .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.rb-booking-card-mobile.slide-out {
+  animation: rb-card-slide-out 0.3s ease forwards;
+}
+
+@keyframes rb-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes rb-card-slide-out {
+  to {
+    opacity: 0;
+    transform: translateX(-40px);
+  }
+}
+
+@media (max-width: 900px) {
+  .rb-dashboard-container {
+    display: none;
+  }
+
+  .rb-mobile-shell {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    padding-top: var(--rb-mobile-header-height);
+    background: var(--rb-bg-secondary);
+  }
+}
+
+@media (min-width: 901px) {
+  .rb-mobile-overlay,
+  .rb-mobile-nav,
+  .rb-mobile-bottom-nav,
+  .rb-install-banner,
+  .rb-update-banner,
+  .rb-offline-banner,
+  .rb-toast {
+    display: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rb-mobile-nav,
+  .rb-mobile-overlay,
+  .rb-booking-card-content,
+  .rb-booking-card-swipe-actions {
+    transition: none;
+  }
+}
