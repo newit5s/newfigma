@@ -209,3 +209,33 @@
 - Implemented `RB_Analytics_Service` to aggregate booking statistics, time-series trends, and popular time slots, enabling the dashboard to surface meaningful KPIs.
 - Added the missing `assets/css/modern-admin.css` and `assets/js/modern-admin.js` bundles that power the WordPress admin experience, eliminating 404 errors and rendering the modern dashboard layout with interactive data fetching.
 - Verified that the new data access layer degrades gracefully when custom tables are absent, returning empty datasets without fatal errors.
+
+## Test Phrase 7
+- Captured the seventh verification phrase to mark the completion of the WordPress admin modernization scope.
+- Summarized the PHP helper work that unlocks the new dashboard cards, badge counts, and booking summaries introduced in Phase 7.
+- Noted that the bookings endpoint now returns the enriched summary payload consumed by `assets/js/modern-admin.js`, enabling the UI to render KPIs and status chips without placeholders.
+
+## Phase 7 Checklist Verification
+- Reviewed `admin/class-modern-admin.php` to confirm the new dashboard summary, badge count, and currency helpers return the data structures used by the rebuilt admin UI templates.
+- Audited `includes/models/class-booking.php` to verify the admin query now accepts extended filters, calculates status totals, revenue, and average party size, and exposes a safe fallback summary when the bookings table is absent.
+- Confirmed that shared helpers such as `RB_Booking::count_by_status` and the new summary builder degrade gracefully when custom tables or columns are missing, preventing fatal errors in legacy installations.
+
+### Acceptance Criteria
+1. **Dashboard Summary Aggregation**
+   - [x] `build_dashboard_summary()` totals bookings, revenue, occupancy, and top-location insights for the dashboard header cards.
+   - [x] Location stats guard against missing table data while still surfacing pending counts for badge indicators.
+2. **Badge Counts & Currency Formatting**
+   - [x] `get_pending_badge_count()` delegates to `RB_Booking::count_by_status()` with a safe fallback when the helper is unavailable.
+   - [x] `format_currency()` respects WordPress currency filters and locale-aware number formatting.
+3. **Booking Endpoint Summary**
+   - [x] `get_admin_bookings()` now accepts pagination, sorting, and filtering arguments while always returning a summary block for the UI cards.
+   - [x] `query_bookings()` supports `include_summary` to calculate revenue totals, status counts, guest averages, and pending badges alongside the paginated rows.
+4. **Model Utilities & Fallbacks**
+   - [x] Introduced `RB_Booking::count_by_status()` so dashboard and navigation badges display live counts.
+   - [x] Added `get_empty_summary()` to guarantee consistent payloads even when custom database tables are unavailable.
+
+### Testing Checklist
+- [x] `php -l admin/class-modern-admin.php`
+- [x] `php -l includes/models/class-booking.php`
+- [x] Reviewed `assets/js/modern-admin.js` expectations to confirm summary keys (`total_revenue`, `status_counts`, `average_party_size`) match the updated PHP responses.
+- [x] Manually inspected guard clauses for `RB_Table` and bookings table availability to ensure empty datasets do not trigger errors.
