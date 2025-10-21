@@ -34,17 +34,12 @@ if ( ! class_exists( 'Restaurant_Booking_Plugin_Activator' ) ) {
         }
 
         protected static function set_default_options() {
-            if ( ! get_option( 'restaurant_booking_settings' ) ) {
-                add_option(
-                    'restaurant_booking_settings',
-                    array(
-                        'theme'                 => 'light',
-                        'enable_dark_mode'      => true,
-                        'booking_buffer_time'   => 30,
-                        'max_party_size'        => 20,
-                        'booking_advance_days'  => 90,
-                    )
-                );
+            if ( false === get_option( 'restaurant_booking_settings', false ) ) {
+                $defaults = function_exists( 'restaurant_booking_get_default_settings' )
+                    ? restaurant_booking_get_default_settings()
+                    : array();
+
+                add_option( 'restaurant_booking_settings', $defaults );
             }
         }
     }

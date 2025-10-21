@@ -203,6 +203,178 @@ function restaurant_booking_get_settings_page_url() {
 }
 
 /**
+ * Retrieve the default plugin settings.
+ *
+ * @return array
+ */
+function restaurant_booking_get_default_settings() {
+    $defaults = array(
+        'restaurant_name'       => __( 'Modern Restaurant', 'restaurant-booking' ),
+        'default_currency'      => 'USD',
+        'max_party_size'        => 6,
+        'buffer_time'           => 30,
+        'allow_walkins'         => false,
+        'reminder_hours'        => 24,
+        'confirmation_template' => __( 'Thank you for your reservation! We look forward to welcoming you.', 'restaurant-booking' ),
+        'send_sms'              => false,
+        'send_followup'         => false,
+        'auto_cancel_minutes'   => 15,
+        'hold_time_minutes'     => 10,
+        'integrations'          => array(),
+        'maintenance_mode'      => false,
+    );
+
+    /**
+     * Filter the default restaurant booking settings.
+     *
+     * @since 2.0.0
+     *
+     * @param array $defaults Default settings values.
+     */
+    return apply_filters( 'restaurant_booking_default_settings', $defaults );
+}
+
+/**
+ * Retrieve the stored plugin settings merged with defaults.
+ *
+ * @return array
+ */
+function restaurant_booking_get_settings() {
+    $defaults = restaurant_booking_get_default_settings();
+    $options  = get_option( 'restaurant_booking_settings', array() );
+
+    if ( ! is_array( $options ) ) {
+        $options = array();
+    }
+
+    $settings = array_merge( $defaults, $options );
+
+    /**
+     * Filter the resolved restaurant booking settings.
+     *
+     * @since 2.0.0
+     *
+     * @param array $settings Resolved settings values.
+     */
+    return apply_filters( 'restaurant_booking_settings', $settings );
+}
+
+/**
+ * Retrieve a single restaurant booking setting.
+ *
+ * @param string $key     Setting key.
+ * @param mixed  $default Default value when the key is missing.
+ *
+ * @return mixed
+ */
+function restaurant_booking_get_setting( $key, $default = null ) {
+    $settings = restaurant_booking_get_settings();
+
+    if ( array_key_exists( $key, $settings ) ) {
+        return $settings[ $key ];
+    }
+
+    return $default;
+}
+
+/**
+ * Sanitize plugin settings before persisting.
+ *
+ * @param array $settings Raw settings submitted from the form.
+ *
+ * @return array
+ */
+function restaurant_booking_sanitize_settings( $settings ) {
+    $defaults = restaurant_booking_get_default_settings();
+
+    if ( ! is_array( $settings ) ) {
+        $settings = array();
+    }
+
+    $settings = wp_unslash( $settings );
+
+    $clean = array();
+
+    $clean['restaurant_name'] = isset( $settings['restaurant_name'] )
+        ? sanitize_text_field( $settings['restaurant_name'] )
+        : $defaults['restaurant_name'];
+
+    $allowed_currencies = array( 'USD', 'EUR', 'GBP', 'JPY' );
+    $currency           = isset( $settings['default_currency'] ) ? strtoupper( sanitize_text_field( $settings['default_currency'] ) ) : $defaults['default_currency'];
+    if ( ! in_array( $currency, $allowed_currencies, true ) ) {
+        $currency = $defaults['default_currency'];
+    }
+    $clean['default_currency'] = $currency;
+
+    $clean['max_party_size'] = isset( $settings['max_party_size'] )
+        ? max( 1, min( 30, (int) $settings['max_party_size'] ) )
+        : $defaults['max_party_size'];
+
+    $clean['buffer_time'] = isset( $settings['buffer_time'] )
+        ? max( 0, min( 180, (int) $settings['buffer_time'] ) )
+        : $defaults['buffer_time'];
+
+    $clean['allow_walkins'] = ! empty( $settings['allow_walkins'] );
+
+    $clean['reminder_hours'] = isset( $settings['reminder_hours'] )
+        ? max( 1, min( 168, (int) $settings['reminder_hours'] ) )
+        : $defaults['reminder_hours'];
+
+    $clean['confirmation_template'] = isset( $settings['confirmation_template'] )
+        ? wp_kses_post( $settings['confirmation_template'] )
+        : $defaults['confirmation_template'];
+
+    $clean['send_sms'] = ! empty( $settings['send_sms'] );
+
+    $clean['send_followup'] = ! empty( $settings['send_followup'] );
+
+    $clean['auto_cancel_minutes'] = isset( $settings['auto_cancel_minutes'] )
+        ? max( 0, min( 240, (int) $settings['auto_cancel_minutes'] ) )
+        : $defaults['auto_cancel_minutes'];
+
+    $clean['hold_time_minutes'] = isset( $settings['hold_time_minutes'] )
+        ? max( 0, min( 180, (int) $settings['hold_time_minutes'] ) )
+        : $defaults['hold_time_minutes'];
+
+    $allowed_integrations = array( 'zapier', 'slack', 'teams', 'webhooks' );
+    $integrations         = array();
+
+    if ( ! empty( $settings['integrations'] ) ) {
+        $raw_integrations = $settings['integrations'];
+
+        if ( ! is_array( $raw_integrations ) ) {
+            $raw_integrations = array( $raw_integrations );
+        }
+
+        foreach ( $raw_integrations as $integration ) {
+            $normalized = sanitize_key( $integration );
+
+            if ( in_array( $normalized, $allowed_integrations, true ) ) {
+                $integrations[] = $normalized;
+            }
+        }
+
+        $integrations = array_values( array_unique( $integrations ) );
+    }
+
+    $clean['integrations'] = $integrations;
+
+    $clean['maintenance_mode'] = ! empty( $settings['maintenance_mode'] );
+
+    $sanitized = array_merge( $defaults, $clean );
+
+    /**
+     * Filter the sanitized restaurant booking settings.
+     *
+     * @since 2.0.0
+     *
+     * @param array $sanitized Sanitized settings.
+     * @param array $settings  Raw submitted settings.
+     */
+    return apply_filters( 'restaurant_booking_sanitized_settings', $sanitized, $settings );
+}
+
+/**
  * Retrieve legacy settings slugs that should redirect to the current page.
  *
  * @return array
