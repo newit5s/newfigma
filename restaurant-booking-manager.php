@@ -470,6 +470,9 @@ function restaurant_booking_resolve_manage_capability() {
 /**
  * Ensure administrators retain access when the custom capability is missing.
  *
+ * Supports both the default `manage_bookings` capability and any custom
+ * capability provided via the `restaurant_booking_manage_capability` filter.
+ *
  * @param array  $caps    Required primitive capabilities.
  * @param string $cap     Capability being checked.
  * @param int    $user_id User identifier.
@@ -478,7 +481,18 @@ function restaurant_booking_resolve_manage_capability() {
  * @return array
  */
 function restaurant_booking_map_manage_capability( $caps, $cap, $user_id, $args ) {
-    if ( 'manage_bookings' !== $cap ) {
+    $managed_caps = array( 'manage_bookings' );
+
+    $configured_cap = restaurant_booking_get_manage_capability();
+    if (
+        ! empty( $configured_cap )
+        && 'manage_options' !== $configured_cap
+        && ! in_array( $configured_cap, $managed_caps, true )
+    ) {
+        $managed_caps[] = $configured_cap;
+    }
+
+    if ( ! in_array( $cap, $managed_caps, true ) ) {
         return $caps;
     }
 
