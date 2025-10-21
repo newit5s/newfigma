@@ -171,18 +171,34 @@ if ( ! class_exists( 'RB_Booking' ) ) {
          * @param string $location Location filter.
          * @param string $status   Status filter.
          * @param int    $page     Page number.
+         * @param array  $args     Additional query arguments.
          *
          * @return array
          */
-        public static function get_admin_bookings( $location = '', $status = '', $page = 1 ) {
+        public static function get_admin_bookings( $location = '', $status = '', $page = 1, $args = array() ) {
             $model = new self();
 
-            $filters = array(
-                'location_id' => absint( $location ),
-                'status'      => $status,
-                'page'        => max( 1, (int) $page ),
-                'per_page'    => 20,
+            $filters = array_merge(
+                array(
+                    'location_id'     => absint( $location ),
+                    'page'            => max( 1, (int) $page ),
+                    'per_page'        => 20,
+                    'include_summary' => true,
+                ),
+                (array) $args
             );
+
+            $filters['location_id'] = absint( $location );
+            $filters['page']        = max( 1, (int) $filters['page'] );
+            $filters['per_page']    = isset( $filters['per_page'] ) ? max( 1, (int) $filters['per_page'] ) : 20;
+
+            if ( '' !== $status ) {
+                $filters['status'] = sanitize_key( $status );
+            } elseif ( isset( $filters['status'] ) ) {
+                $filters['status'] = sanitize_key( $filters['status'] );
+            } else {
+                $filters['status'] = '';
+            }
 
             $results = $model->query_bookings( $filters );
 
@@ -192,7 +208,9 @@ if ( ! class_exists( 'RB_Booking' ) ) {
                     'current_page' => $results['page'],
                     'total_pages'  => $results['total_pages'],
                     'total_items'  => $results['total'],
+                    'per_page'     => $results['per_page'],
                 ),
+                'summary'    => isset( $results['summary'] ) ? $results['summary'] : array(),
             );
         }
 
@@ -265,6 +283,42 @@ if ( ! class_exists( 'RB_Booking' ) ) {
         }
 
         /**
+         * Count bookings by status.
+         *
+         * @param string $status      Booking status.
+         * @param int    $location_id Optional location identifier.
+         *
+         * @return int
+         */
+        public static function count_by_status( $status, $location_id = 0 ) {
+            $model = new self();
+
+            if ( ! $model->bookings_table_exists() || ! $model->has_column( 'status' ) ) {
+                return 0;
+            }
+
+            $status = sanitize_key( $status );
+
+            if ( '' === $status ) {
+                return 0;
+            }
+
+            $where   = array( 'b.status = %s' );
+            $params  = array( $status );
+
+            $location_id = absint( $location_id );
+            if ( $location_id > 0 ) {
+                $where[]  = 'b.location_id = %d';
+                $params[] = $location_id;
+            }
+
+            $sql = 'SELECT COUNT(*) FROM ' . $model->table . ' b WHERE ' . implode( ' AND ', $where );
+            $sql = $model->prepare( $sql, $params );
+
+            return (int) $model->wpdb->get_var( $sql );
+        }
+
+        /**
          * Fetch recent bookings for portal dashboards.
          *
          * @param int $location_id Location identifier.
@@ -302,6 +356,7 @@ if ( ! class_exists( 'RB_Booking' ) ) {
                 'items'      => $results['rows'],
                 'total'      => $results['total'],
                 'totalPages' => $results['total_pages'],
+                'summary'    => isset( $results['summary'] ) ? $results['summary'] : array(),
             );
         }
 
@@ -569,6 +624,7 @@ if ( ! class_exists( 'RB_Booking' ) ) {
                     'total_pages'=> 1,
                     'page'       => 1,
                     'per_page'   => isset( $args['per_page'] ) ? (int) $args['per_page'] : 1,
+                    'summary'    => $this->get_empty_summary(),
                 );
             }
 
@@ -583,6 +639,7 @@ if ( ! class_exists( 'RB_Booking' ) ) {
                 'sort_by'     => 'booking_datetime',
                 'sort_order'  => 'desc',
                 'no_limit'    => false,
+                'include_summary' => false,
             );
 
             $args = wp_parse_args( $args, $defaults );
@@ -741,12 +798,62 @@ if ( ! class_exists( 'RB_Booking' ) ) {
 
             $total_pages = max( 1, (int) ceil( $total / $per_page ) );
 
+            $summary                    = $this->get_empty_summary();
+            $summary['total_bookings']  = $total;
+            $summary['revenue_total']   = 0.0;
+
+            if ( ! empty( $args['include_summary'] ) ) {
+                $status_sql = 'SELECT b.status, COUNT(*) AS status_count FROM ' . $this->table . ' b' . $join_sql . ' ' . $where_sql . ' GROUP BY b.status';
+                $status_sql = $this->prepare( $status_sql, $params );
+                $status_rows = $this->wpdb->get_results( $status_sql );
+
+                if ( $status_rows ) {
+                    foreach ( $status_rows as $status_row ) {
+                        $status_key = isset( $status_row->status ) ? sanitize_key( $status_row->status ) : '';
+                        $count      = isset( $status_row->status_count ) ? (int) $status_row->status_count : 0;
+
+                        if ( '' === $status_key ) {
+                            continue;
+                        }
+
+                        if ( ! isset( $summary['status_counts'][ $status_key ] ) ) {
+                            $summary['status_counts'][ $status_key ] = 0;
+                        }
+
+                        $summary['status_counts'][ $status_key ] = $count;
+                    }
+                }
+
+                $amount_expression = $this->has_column( 'total_amount' ) ? 'COALESCE(b.total_amount, 0)' : '0';
+                $party_expression  = $this->has_column( 'party_size' ) ? 'COALESCE(b.party_size, 0)' : '0';
+
+                $summary_sql = 'SELECT SUM(' . $party_expression . ') AS total_guests, SUM(' . $amount_expression . ') AS total_revenue FROM ' . $this->table . ' b' . $join_sql . ' ' . $where_sql;
+                $summary_sql = $this->prepare( $summary_sql, $params );
+                $summary_row = $this->wpdb->get_row( $summary_sql, ARRAY_A );
+
+                if ( $summary_row ) {
+                    $summary['total_guests']  = isset( $summary_row['total_guests'] ) ? (int) $summary_row['total_guests'] : 0;
+                    $summary['total_revenue'] = isset( $summary_row['total_revenue'] ) ? (float) $summary_row['total_revenue'] : 0.0;
+                    $summary['revenue_total'] = $summary['total_revenue'];
+                }
+
+                if ( $summary['total_bookings'] > 0 ) {
+                    $summary['average_party_size'] = round( $summary['total_guests'] / $summary['total_bookings'], 1 );
+                }
+
+                $summary['pending_total']    = isset( $summary['status_counts']['pending'] ) ? (int) $summary['status_counts']['pending'] : 0;
+                $summary['bookings_change']  = isset( $summary['bookings_change'] ) ? (float) $summary['bookings_change'] : 0.0;
+                $summary['revenue_change']   = isset( $summary['revenue_change'] ) ? (float) $summary['revenue_change'] : 0.0;
+                $summary['party_size_change'] = isset( $summary['party_size_change'] ) ? (float) $summary['party_size_change'] : 0.0;
+            }
+
             return array(
                 'rows'        => $mapped,
                 'total'       => $total,
                 'total_pages' => $total_pages,
                 'page'        => $page,
                 'per_page'    => $per_page,
+                'summary'     => $summary,
             );
         }
 
@@ -811,6 +918,31 @@ if ( ! class_exists( 'RB_Booking' ) ) {
                 'occupancy_rate'  => 0.0,
                 'available_tables'=> 0,
                 'used_tables'     => 0,
+            );
+        }
+
+        /**
+         * Provide a default summary payload for admin tables.
+         *
+         * @return array
+         */
+        protected function get_empty_summary() {
+            return array(
+                'total_bookings'    => 0,
+                'total_revenue'     => 0.0,
+                'revenue_total'     => 0.0,
+                'total_guests'      => 0,
+                'average_party_size'=> 0.0,
+                'bookings_change'   => 0.0,
+                'revenue_change'    => 0.0,
+                'party_size_change' => 0.0,
+                'pending_total'     => 0,
+                'status_counts'     => array(
+                    'pending'   => 0,
+                    'confirmed' => 0,
+                    'completed' => 0,
+                    'cancelled' => 0,
+                ),
             );
         }
 
