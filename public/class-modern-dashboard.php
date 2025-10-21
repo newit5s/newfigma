@@ -15,6 +15,8 @@ if ( ! class_exists( 'RB_Modern_Dashboard' ) ) {
 
     class RB_Modern_Dashboard {
 
+        use RB_Asset_Loader;
+
         /**
          * Analytics service instance.
          *
@@ -34,7 +36,7 @@ if ( ! class_exists( 'RB_Modern_Dashboard' ) ) {
          *
          * @var bool
          */
-        protected $assets_enqueued = false;
+        protected $portal_assets_loaded = false;
 
         /**
          * Default chart period for shortcode embeds.
@@ -94,123 +96,52 @@ if ( ! class_exists( 'RB_Modern_Dashboard' ) ) {
          * Register dashboard assets for reuse across embeds.
          */
         protected function enqueue_portal_assets() {
-            if ( $this->assets_enqueued ) {
+            if ( $this->portal_assets_loaded ) {
                 return;
             }
 
-            $this->assets_enqueued = true;
+            $this->enqueue_core_assets( 'portal-dashboard' );
+            $this->enqueue_chartjs();
 
-            $version  = defined( 'RB_PLUGIN_VERSION' ) ? RB_PLUGIN_VERSION : '1.0.0';
-            $base_url = plugin_dir_url( __FILE__ ) . '../';
+            $this->enqueue_context_css( 'portal-dashboard' );
+            $this->enqueue_context_css( 'portal-dashboard-mobile', array( 'rb-portal-dashboard' ) );
 
-            wp_enqueue_style(
-                'rb-design-system',
-                $base_url . 'assets/css/design-system.css',
-                array(),
-                $version
-            );
+            $this->enqueue_context_js( 'dashboard-charts', array( 'chart-js' ) );
+            $this->enqueue_context_js( 'portal-dashboard', array( 'rb-dashboard-charts' ) );
+            $this->enqueue_context_js( 'mobile-dashboard', array( 'rb-portal-dashboard' ) );
 
-            wp_enqueue_style(
-                'rb-components',
-                $base_url . 'assets/css/components.css',
-                array( 'rb-design-system' ),
-                $version
-            );
+            $current_location = $this->get_current_location();
 
-            wp_enqueue_style(
-                'rb-animations',
-                $base_url . 'assets/css/animations.css',
-                array( 'rb-design-system' ),
-                $version
-            );
-
-            wp_enqueue_style(
-                'rb-portal-dashboard',
-                $base_url . 'assets/css/portal-dashboard.css',
-                array( 'rb-design-system', 'rb-components', 'rb-animations' ),
-                $version
-            );
-
-            wp_enqueue_style(
-                'rb-portal-dashboard-mobile',
-                $base_url . 'assets/css/portal-dashboard-mobile.css',
-                array( 'rb-portal-dashboard' ),
-                $version
-            );
-
-            wp_enqueue_script(
-                'chart-js',
-                'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js',
-                array(),
-                '3.9.1',
-                true
-            );
-
-            wp_enqueue_script(
-                'rb-dashboard-charts',
-                $base_url . 'assets/js/dashboard-charts.js',
-                array( 'chart-js' ),
-                $version,
-                true
-            );
-
-            wp_enqueue_script(
-                'rb-theme-manager',
-                $base_url . 'assets/js/theme-manager.js',
-                array(),
-                $version,
-                true
-            );
-
-            wp_enqueue_script(
-                'rb-portal-dashboard',
-                $base_url . 'assets/js/portal-dashboard.js',
-                array( 'rb-dashboard-charts', 'rb-theme-manager' ),
-                $version,
-                true
-            );
-
-            wp_enqueue_script(
-                'rb-mobile-dashboard',
-                $base_url . 'assets/js/mobile-dashboard.js',
-                array( 'rb-portal-dashboard' ),
-                $version,
-                true
-            );
-
-            wp_localize_script(
+            $this->localize_ajax_data(
                 'rb-portal-dashboard',
                 'rbDashboard',
                 array(
-                    'ajax_url'          => admin_url( 'admin-ajax.php' ),
-                    'nonce'             => wp_create_nonce( 'rb_dashboard_nonce' ),
-                    'current_location'  => $this->get_current_location(),
-                    'calendar_url'      => $this->build_portal_url( 'calendar' ),
-                    'tables_url'        => $this->build_portal_url( 'tables' ),
-                    'reports_url'       => $this->build_portal_url( 'reports' ),
-                    'settings_url'      => $this->build_portal_url( 'settings' ),
+                    'current_location' => $current_location,
+                    'calendar_url'     => $this->build_portal_url( 'calendar' ),
+                    'tables_url'       => $this->build_portal_url( 'tables' ),
+                    'reports_url'      => $this->build_portal_url( 'reports' ),
+                    'settings_url'     => $this->build_portal_url( 'settings' ),
                     'chartDefaults'    => array(
                         'range' => $this->chart_default_period,
                     ),
-                    'strings'           => array(
+                    'strings'          => array(
                         'loading'     => __( 'Loading...', 'restaurant-booking' ),
                         'error'       => __( 'Unable to load data.', 'restaurant-booking' ),
                         'no_data'     => __( 'No bookings', 'restaurant-booking' ),
                         'add_booking' => __( 'Add Booking', 'restaurant-booking' ),
                     ),
-                )
+                ),
+                'rb_dashboard_nonce'
             );
 
-            wp_localize_script(
+            $this->localize_ajax_data(
                 'rb-mobile-dashboard',
                 'rbMobileConfig',
                 array(
-                    'ajaxUrl'      => admin_url( 'admin-ajax.php' ),
-                    'nonce'        => wp_create_nonce( 'rb_dashboard_nonce' ),
-                    'serviceWorker'=> plugins_url( 'sw.js', RB_PLUGIN_FILE ),
-                    'manifestUrl'  => plugins_url( 'manifest.json', RB_PLUGIN_FILE ),
-                    'homeUrl'      => home_url( '/' ),
-                    'strings'      => array(
+                    'serviceWorker' => plugins_url( 'sw.js', RB_PLUGIN_FILE ),
+                    'manifestUrl'   => plugins_url( 'manifest.json', RB_PLUGIN_FILE ),
+                    'homeUrl'       => home_url( '/' ),
+                    'strings'       => array(
                         'pullToRefresh' => __( 'Pull to refresh', 'restaurant-booking' ),
                         'refreshing'    => __( 'Refreshing dashboard…', 'restaurant-booking' ),
                         'refreshed'     => __( 'Dashboard updated', 'restaurant-booking' ),
@@ -224,8 +155,13 @@ if ( ! class_exists( 'RB_Modern_Dashboard' ) ) {
                         'cancelSuccess' => __( 'Booking cancelled', 'restaurant-booking' ),
                         'actionError'   => __( 'Unable to complete the action. Please try again.', 'restaurant-booking' ),
                     ),
-                )
+                ),
+                'rb_dashboard_nonce',
+                'nonce',
+                'ajaxUrl'
             );
+
+            $this->portal_assets_loaded = true;
         }
 
         /**
@@ -338,68 +274,88 @@ if ( ! class_exists( 'RB_Modern_Dashboard' ) ) {
          * AJAX: Return aggregated dashboard stats for the current period.
          */
         public function get_dashboard_stats() {
-            $this->verify_ajax_nonce();
+            try {
+                $this->verify_ajax_nonce();
+                $this->ensure_user_can_manage();
 
-            $location_id = isset( $_POST['location_id'] ) ? sanitize_text_field( wp_unslash( $_POST['location_id'] ) ) : $this->get_current_location();
-            $period      = isset( $_POST['period'] ) ? sanitize_key( wp_unslash( $_POST['period'] ) ) : 'today';
+                $location_id = isset( $_POST['location_id'] ) ? sanitize_text_field( wp_unslash( $_POST['location_id'] ) ) : $this->get_current_location();
+                $period      = isset( $_POST['period'] ) ? sanitize_key( wp_unslash( $_POST['period'] ) ) : 'today';
 
-            $metrics      = array_keys( $this->get_default_metric_periods() );
-            $metrics_data = array();
+                $metrics      = array_keys( $this->get_default_metric_periods() );
+                $metrics_data = array();
 
-            foreach ( $metrics as $metric ) {
-                $metrics_data[ $metric ] = $this->get_metric_payload( $location_id, $metric, $period );
+                foreach ( $metrics as $metric ) {
+                    $metrics_data[ $metric ] = $this->get_metric_payload( $location_id, $metric, $period );
+                }
+
+                wp_send_json_success( $metrics_data );
+            } catch ( Exception $exception ) {
+                $this->handle_ajax_exception( 'get_dashboard_stats', $exception );
             }
-
-            wp_send_json_success( $metrics_data );
         }
 
         /**
          * AJAX: Update a single metric based on selected period.
          */
         public function update_stat_period() {
-            $this->verify_ajax_nonce();
+            try {
+                $this->verify_ajax_nonce();
+                $this->ensure_user_can_manage();
 
-            $metric      = isset( $_POST['metric'] ) ? sanitize_key( wp_unslash( $_POST['metric'] ) ) : '';
-            $period      = isset( $_POST['period'] ) ? sanitize_key( wp_unslash( $_POST['period'] ) ) : 'today';
-            $location_id = isset( $_POST['location_id'] ) ? sanitize_text_field( wp_unslash( $_POST['location_id'] ) ) : $this->get_current_location();
+                $metric      = isset( $_POST['metric'] ) ? sanitize_key( wp_unslash( $_POST['metric'] ) ) : '';
+                $period      = isset( $_POST['period'] ) ? sanitize_key( wp_unslash( $_POST['period'] ) ) : 'today';
+                $location_id = isset( $_POST['location_id'] ) ? sanitize_text_field( wp_unslash( $_POST['location_id'] ) ) : $this->get_current_location();
 
-            $allowed_metrics = array( 'bookings', 'revenue', 'occupancy', 'pending' );
-            if ( ! in_array( $metric, $allowed_metrics, true ) ) {
-                wp_send_json_error(
-                    array(
-                        'message' => __( 'Unknown metric requested.', 'restaurant-booking' ),
-                    ),
-                    400
-                );
+                $allowed_metrics = array( 'bookings', 'revenue', 'occupancy', 'pending' );
+                if ( ! in_array( $metric, $allowed_metrics, true ) ) {
+                    wp_send_json_error(
+                        array(
+                            'message' => __( 'Unknown metric requested.', 'restaurant-booking' ),
+                        ),
+                        400
+                    );
+                }
+
+                $payload = $this->get_metric_payload( $location_id, $metric, $period );
+                wp_send_json_success( $payload );
+            } catch ( Exception $exception ) {
+                $this->handle_ajax_exception( 'update_stat_period', $exception );
             }
-
-            $payload = $this->get_metric_payload( $location_id, $metric, $period );
-            wp_send_json_success( $payload );
         }
 
         /**
          * AJAX: Return chart dataset.
          */
         public function get_chart_data() {
-            $this->verify_ajax_nonce();
+            try {
+                $this->verify_ajax_nonce();
+                $this->ensure_user_can_manage();
 
-            $location_id = isset( $_POST['location_id'] ) ? sanitize_text_field( wp_unslash( $_POST['location_id'] ) ) : $this->get_current_location();
-            $period      = isset( $_POST['period'] ) ? sanitize_key( wp_unslash( $_POST['period'] ) ) : '7d';
+                $location_id = isset( $_POST['location_id'] ) ? sanitize_text_field( wp_unslash( $_POST['location_id'] ) ) : $this->get_current_location();
+                $period      = isset( $_POST['period'] ) ? sanitize_key( wp_unslash( $_POST['period'] ) ) : '7d';
 
-            $data = $this->fetch_chart_data( $location_id, $period );
-            wp_send_json_success( $data );
+                $data = $this->fetch_chart_data( $location_id, $period );
+                wp_send_json_success( $data );
+            } catch ( Exception $exception ) {
+                $this->handle_ajax_exception( 'get_chart_data', $exception );
+            }
         }
 
         /**
          * AJAX: Return today's schedule for the selected location.
          */
         public function get_todays_schedule() {
-            $this->verify_ajax_nonce();
+            try {
+                $this->verify_ajax_nonce();
+                $this->ensure_user_can_manage();
 
-            $location_id = isset( $_POST['location_id'] ) ? sanitize_text_field( wp_unslash( $_POST['location_id'] ) ) : $this->get_current_location();
-            $schedule    = $this->get_schedule_payload( $location_id );
+                $location_id = isset( $_POST['location_id'] ) ? sanitize_text_field( wp_unslash( $_POST['location_id'] ) ) : $this->get_current_location();
+                $schedule    = $this->get_schedule_payload( $location_id );
 
-            wp_send_json_success( $schedule );
+                wp_send_json_success( $schedule );
+            } catch ( Exception $exception ) {
+                $this->handle_ajax_exception( 'get_todays_schedule', $exception );
+            }
         }
 
         /**
@@ -962,10 +918,54 @@ if ( ! class_exists( 'RB_Modern_Dashboard' ) ) {
         }
 
         /**
+         * Ensure the current user has permission to access dashboard data.
+         *
+         * @throws Exception When the user cannot manage the dashboard.
+         */
+        protected function ensure_user_can_manage() {
+            if ( empty( $this->current_user ) ) {
+                $this->current_user = $this->resolve_current_user();
+            }
+
+            $allowed = function_exists( 'restaurant_booking_user_can_manage' )
+                ? restaurant_booking_user_can_manage()
+                : current_user_can( 'manage_options' );
+
+            $allowed = apply_filters( 'rb_dashboard_user_can_manage', $allowed, $this->current_user );
+
+            if ( ! $allowed ) {
+                throw new Exception( __( 'You do not have permission to access the dashboard.', 'restaurant-booking' ), 403 );
+            }
+        }
+
+        /**
+         * Handle AJAX exceptions with logging and consistent JSON errors.
+         *
+         * @param string    $context    Context label.
+         * @param Exception $exception Exception instance.
+         */
+        protected function handle_ajax_exception( $context, Exception $exception ) {
+            error_log( sprintf( 'RB Dashboard AJAX Error [%s]: %s', $context, $exception->getMessage() ) );
+
+            $status = $exception->getCode() ?: 400;
+
+            wp_send_json_error(
+                array(
+                    'message' => $exception->getMessage(),
+                ),
+                $status
+            );
+        }
+
+        /**
          * Verify AJAX nonce value.
          */
         protected function verify_ajax_nonce() {
-            check_ajax_referer( 'rb_dashboard_nonce', 'nonce' );
+            if ( ! check_ajax_referer( 'rb_dashboard_nonce', 'nonce', false ) ) {
+                throw new Exception( __( 'Security check failed. Please refresh and try again.', 'restaurant-booking' ), 403 );
+            }
+
+            $this->current_user = $this->resolve_current_user();
         }
     }
 

@@ -64,35 +64,98 @@ if ( ! class_exists( 'Restaurant_Booking_Plugin_Manager' ) ) {
         }
 
         protected function load_dependencies() {
-            require_once RESTAURANT_BOOKING_PATH . 'includes/class-plugin-activator.php';
-            require_once RESTAURANT_BOOKING_PATH . 'includes/class-plugin-deactivator.php';
+            $required_files = array(
+                'includes/class-plugin-activator.php',
+                'includes/class-plugin-deactivator.php',
+                'includes/traits/trait-rb-asset-loader.php',
+                'includes/models/class-booking.php',
+                'includes/models/class-location.php',
+                'includes/models/class-table.php',
+                'includes/models/class-customer.php',
+                'includes/services/class-analytics-service.php',
+                'includes/services/class-rb-analytics.php',
+                'includes/services/class-calendar-service.php',
+                'includes/services/class-notification-service.php',
+                'includes/database/schema.php',
+            );
 
-            require_once RESTAURANT_BOOKING_PATH . 'includes/models/class-booking.php';
-            require_once RESTAURANT_BOOKING_PATH . 'includes/models/class-location.php';
-            require_once RESTAURANT_BOOKING_PATH . 'includes/models/class-table.php';
-            require_once RESTAURANT_BOOKING_PATH . 'includes/models/class-customer.php';
+            foreach ( $required_files as $file ) {
+                $path = RESTAURANT_BOOKING_PATH . $file;
 
-            require_once RESTAURANT_BOOKING_PATH . 'includes/services/class-analytics-service.php';
-            require_once RESTAURANT_BOOKING_PATH . 'includes/services/class-rb-analytics.php';
-            require_once RESTAURANT_BOOKING_PATH . 'includes/services/class-calendar-service.php';
-            require_once RESTAURANT_BOOKING_PATH . 'includes/services/class-notification-service.php';
-
-            require_once RESTAURANT_BOOKING_PATH . 'includes/database/schema.php';
-
-            if ( file_exists( RESTAURANT_BOOKING_PATH . 'admin/class-modern-admin.php' ) ) {
-                require_once RESTAURANT_BOOKING_PATH . 'admin/class-modern-admin.php';
+                if ( file_exists( $path ) ) {
+                    require_once $path;
+                } else {
+                    $this->register_missing_file_notice( $file );
+                }
             }
 
-            require_once RESTAURANT_BOOKING_PATH . 'public/class-modern-booking-widget.php';
-            require_once RESTAURANT_BOOKING_PATH . 'public/class-modern-booking-manager.php';
-            require_once RESTAURANT_BOOKING_PATH . 'public/class-modern-dashboard.php';
-            require_once RESTAURANT_BOOKING_PATH . 'public/class-modern-table-manager.php';
-            require_once RESTAURANT_BOOKING_PATH . 'public/class-modern-portal-auth.php';
+            $admin_file = RESTAURANT_BOOKING_PATH . 'admin/class-modern-admin.php';
+            if ( file_exists( $admin_file ) ) {
+                require_once $admin_file;
+            }
+
+            $public_files = array(
+                'public/class-modern-booking-widget.php',
+                'public/class-modern-portal-auth.php',
+                'public/class-modern-dashboard.php',
+                'public/class-modern-booking-manager.php',
+                'public/class-modern-table-manager.php',
+            );
+
+            foreach ( $public_files as $file ) {
+                $path = RESTAURANT_BOOKING_PATH . $file;
+
+                if ( file_exists( $path ) ) {
+                    require_once $path;
+                } else {
+                    $this->register_missing_file_notice( $file );
+                }
+            }
         }
 
         protected function define_hooks() {
+            if ( did_action( 'plugins_loaded' ) ) {
+                $this->load_textdomain();
+            } else {
+                $this->loader->add_action( 'plugins_loaded', $this, 'load_textdomain' );
+            }
+
             $this->loader->add_action( 'init', $this, 'bootstrap_public_components' );
             $this->loader->add_action( 'admin_init', $this, 'bootstrap_admin_components' );
+        }
+
+        /**
+         * Load plugin translations.
+         */
+        public function load_textdomain() {
+            load_plugin_textdomain(
+                'restaurant-booking',
+                false,
+                dirname( RESTAURANT_BOOKING_BASENAME ) . '/languages/'
+            );
+        }
+
+        /**
+         * Register an admin notice when a required file is missing.
+         *
+         * @param string $file Missing file path relative to the plugin root.
+         */
+        protected function register_missing_file_notice( $file ) {
+            error_log( sprintf( 'Restaurant Booking Error: Missing required file - %s', $file ) );
+
+            add_action(
+                'admin_notices',
+                function () use ( $file ) {
+                    printf(
+                        '<div class="notice notice-error"><p>%s</p></div>',
+                        sprintf(
+                            /* translators: %s: Missing file name. */
+                            __( 'Restaurant Booking: Missing file %s. Please reinstall the plugin.', 'restaurant-booking' ),
+                            esc_html( basename( $file ) )
+                        )
+                    );
+                }
+            );
         }
 
         public function bootstrap_public_components() {
