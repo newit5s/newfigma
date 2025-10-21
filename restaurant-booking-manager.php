@@ -183,6 +183,25 @@ function restaurant_booking_get_manage_capability() {
 }
 
 /**
+ * Resolve the required management capability for the current user context.
+ *
+ * @return string
+ */
+function restaurant_booking_resolve_manage_capability() {
+    $capability = restaurant_booking_get_manage_capability();
+
+    if ( current_user_can( $capability ) ) {
+        return $capability;
+    }
+
+    if ( 'manage_options' !== $capability && current_user_can( 'manage_options' ) ) {
+        return 'manage_options';
+    }
+
+    return $capability;
+}
+
+/**
  * Check whether the current user can manage restaurant bookings.
  *
  * @return bool
@@ -220,6 +239,8 @@ function restaurant_booking_add_role_capabilities() {
     }
 }
 
+add_action( 'init', 'restaurant_booking_add_role_capabilities', 5 );
+
 /**
  * Remove management capability from default roles.
  */
@@ -247,6 +268,98 @@ function restaurant_booking_register_rewrite_rules() {
     add_rewrite_rule( '^portal/([^/]+)/?$', 'index.php?rb_portal=$matches[1]', 'top' );
 }
 add_action( 'init', 'restaurant_booking_register_rewrite_rules', 5 );
+
+/**
+ * Determine whether the portal rewrite rules are currently registered.
+ *
+ * @return bool
+ */
+function restaurant_booking_portal_rewrite_rules_active() {
+    $rules = get_option( 'rewrite_rules' );
+
+    if ( empty( $rules ) || ! is_array( $rules ) ) {
+        return false;
+    }
+
+    $has_dashboard_rule = false;
+    $has_portal_rule    = false;
+
+    foreach ( $rules as $rewrite ) {
+        if ( false !== strpos( $rewrite, 'rb_portal=dashboard' ) ) {
+            $has_dashboard_rule = true;
+        }
+
+        if ( false !== strpos( $rewrite, 'rb_portal=$matches[1]' ) ) {
+            $has_portal_rule = true;
+        }
+
+        if ( $has_dashboard_rule && $has_portal_rule ) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * Flag missing rewrite rules so an admin notice can provide recovery guidance.
+ */
+function restaurant_booking_check_portal_rewrite_rules() {
+    if ( ! is_admin() || ! current_user_can( 'manage_options' ) ) {
+        return;
+    }
+
+    if ( empty( get_option( 'permalink_structure' ) ) ) {
+        // Pretty permalinks are disabled so .htaccess rules are not required.
+        delete_transient( 'restaurant_booking_rewrite_missing' );
+        return;
+    }
+
+    if ( restaurant_booking_portal_rewrite_rules_active() ) {
+        delete_transient( 'restaurant_booking_rewrite_missing' );
+        return;
+    }
+
+    set_transient( 'restaurant_booking_rewrite_missing', 1, MINUTE_IN_SECONDS * 10 );
+}
+add_action( 'admin_init', 'restaurant_booking_check_portal_rewrite_rules', 20 );
+
+/**
+ * Display an admin notice when rewrite rules need to be regenerated manually.
+ */
+function restaurant_booking_portal_rewrite_notice() {
+    if ( ! is_admin() || ! current_user_can( 'manage_options' ) ) {
+        return;
+    }
+
+    if ( ! get_transient( 'restaurant_booking_rewrite_missing' ) ) {
+        return;
+    }
+
+    $permalink_url = admin_url( 'options-permalink.php' );
+
+    echo '<div class="notice notice-warning">';
+    $message = sprintf(
+        /* translators: %s: Permalink settings admin URL. */
+        __( 'The Restaurant Booking portal URL rewrite rules are missing. Visit <a href="%s">Settings → Permalinks</a> and click “Save Changes” to regenerate them. If WordPress cannot write to <code>.htaccess</code>, copy the suggested rewrite block into your server configuration manually.', 'restaurant-booking' ),
+        esc_url( $permalink_url )
+    );
+
+    echo '<p>' . wp_kses(
+        $message,
+        array(
+            'a'    => array( 'href' => array() ),
+            'code' => array(),
+        )
+    ) . '</p>';
+
+    $htaccess_block = "<IfModule mod_rewrite.c>\nRewriteEngine On\nRewriteBase /\nRewriteRule ^index\\.php$ - [L]\nRewriteCond %{REQUEST_FILENAME} !-f\nRewriteCond %{REQUEST_FILENAME} !-d\nRewriteRule . /index.php [L]\n</IfModule>";
+
+    echo '<p><strong>' . esc_html__( 'Standard WordPress rewrite snippet:', 'restaurant-booking' ) . '</strong></p>';
+    echo '<pre><code>' . esc_html( $htaccess_block ) . '</code></pre>';
+    echo '</div>';
+}
+add_action( 'admin_notices', 'restaurant_booking_portal_rewrite_notice' );
 
 /**
  * Register custom query vars.

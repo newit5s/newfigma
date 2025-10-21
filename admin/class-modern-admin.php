@@ -21,9 +21,13 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
         }
 
         public function add_admin_pages() {
-            $capability = function_exists( 'restaurant_booking_get_manage_capability' )
-                ? restaurant_booking_get_manage_capability()
-                : 'manage_options';
+            if ( function_exists( 'restaurant_booking_resolve_manage_capability' ) ) {
+                $capability = restaurant_booking_resolve_manage_capability();
+            } elseif ( function_exists( 'restaurant_booking_get_manage_capability' ) ) {
+                $capability = restaurant_booking_get_manage_capability();
+            } else {
+                $capability = 'manage_options';
+            }
 
             add_menu_page(
                 __( 'Restaurant Booking', 'restaurant-booking' ),
