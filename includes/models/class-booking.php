@@ -1,10 +1,13 @@
 <?php
 /**
- * Booking model implementation backed by WordPress database tables.
+ * Booking model implementation powered by custom database tables.
  *
- * The legacy plugin shipped with placeholder data models. This implementation
- * replaces those placeholders with real `wpdb` powered queries so analytics,
- * dashboards, and managers surface actual booking information.
+ * Provides data access helpers for bookings that are consumed by
+ * the booking management UI, analytics dashboards, and WordPress
+ * admin controllers.
+ *
+ * @package RestaurantBooking\Models
+ * @since   2.0.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -19,221 +22,931 @@ if ( ! class_exists( 'RB_Booking' ) ) {
     class RB_Booking {
 
         /**
-         * Shared singleton instance for convenience wrappers.
-         *
-         * @var RB_Booking|null
-         */
-        protected static $instance = null;
-
-        /**
-         * Cache table existence lookups to avoid repeated SHOW TABLES queries.
-         *
-         * @var array<string,bool>
-         */
-        protected static $table_exists_cache = array();
-
-        /**
-         * Cache column existence lookups keyed by table+column.
-         *
-         * @var array<string,bool>
-         */
-        protected static $column_exists_cache = array();
-
-        /**
-         * Cached currency symbol for revenue reporting.
-         *
-         * @var string|null
-         */
-        protected static $currency_symbol = null;
-
-        /**
-         * Current booking identifier.
+         * Booking identifier.
          *
          * @var int
          */
         protected $id = 0;
 
         /**
-         * Loaded booking record data.
+         * Cached booking record.
+         *
+         * @var array|null
+         */
+        protected $data = null;
+
+        /**
+         * WordPress database instance.
+         *
+         * @var wpdb
+         */
+        protected $wpdb;
+
+        /**
+         * Fully qualified bookings table name.
+         *
+         * @var string
+         */
+        protected $table;
+
+        /**
+         * Related tables.
          *
          * @var array
          */
-        protected $record = array();
+        protected $related_tables = array();
 
         /**
-         * Primary bookings table name.
+         * Cached list of table columns.
          *
-         * @var string|null
+         * @var array|null
          */
-        protected $table_name;
+        protected $columns = null;
 
         /**
-         * Tables table name (for capacity and availability calculations).
+         * Constructor.
          *
-         * @var string|null
-         */
-        protected $tables_table;
-
-        /**
-         * Locations table name.
-         *
-         * @var string|null
-         */
-        protected $locations_table;
-
-        /**
-         * Booking date column name.
-         *
-         * @var string
-         */
-        protected $date_column = 'booking_date';
-
-        /**
-         * Booking time column name.
-         *
-         * @var string
-         */
-        protected $time_column = 'booking_time';
-
-        /**
-         * Revenue column name when available.
-         *
-         * @var string|null
-         */
-        protected $total_column = null;
-
-        /**
-         * Constructor optionally loads a specific booking record.
-         *
-         * @param int $id Booking identifier.
+         * @param int $id Optional booking identifier.
          */
         public function __construct( $id = 0 ) {
             global $wpdb;
 
-            $this->table_name      = $this->resolve_table_name( $wpdb->prefix . 'rb_bookings', $wpdb->prefix . 'restaurant_bookings' );
-            $this->tables_table    = $this->resolve_table_name( $wpdb->prefix . 'rb_tables', $wpdb->prefix . 'restaurant_tables' );
-            $this->locations_table = $this->resolve_table_name( $wpdb->prefix . 'rb_locations', $wpdb->prefix . 'restaurant_locations' );
+            $this->wpdb  = $wpdb;
+            $this->table = $wpdb->prefix . 'rb_bookings';
 
-            $this->date_column  = $this->detect_column( array( 'booking_date', 'booking_day', 'booking_datetime' ), 'booking_date' );
-            $this->time_column  = $this->detect_column( array( 'booking_time', 'booking_datetime' ), 'booking_time' );
-            $this->total_column = $this->detect_column( array( 'total_amount', 'total', 'estimated_total' ), null );
+            $this->related_tables = array(
+                'customers' => $wpdb->prefix . 'rb_customers',
+                'locations' => $wpdb->prefix . 'rb_locations',
+                'tables'    => $wpdb->prefix . 'rb_tables',
+            );
 
-            if ( $id ) {
-                $this->load( absint( $id ) );
+            $this->id = absint( $id );
+
+            if ( $this->id > 0 ) {
+                $this->load();
             }
         }
 
         /**
-         * Retrieve shared singleton instance.
+         * Determine whether the booking exists.
          *
-         * @return RB_Booking
+         * @return bool
          */
-        public static function instance() {
-            if ( null === self::$instance ) {
-                self::$instance = new self();
-            }
+        public function exists() {
+            $this->load();
 
-            return self::$instance;
+            return ! empty( $this->data );
         }
 
         /**
-         * Resolve an available table name, preferring the provided table.
+         * Return the hydrated booking record as an associative array.
          *
-         * @param string      $preferred Preferred table name.
-         * @param string|null $fallback  Optional fallback table name.
-         *
-         * @return string|null
+         * @return array
          */
-        protected function resolve_table_name( $preferred, $fallback = null ) {
-            if ( $this->table_exists( $preferred ) ) {
-                return $preferred;
-            }
+        public function get_data() {
+            $this->load();
 
-            if ( $fallback && $this->table_exists( $fallback ) ) {
-                return $fallback;
-            }
-
-            return $this->table_exists( $preferred ) ? $preferred : $preferred;
+            return is_array( $this->data ) ? $this->data : array();
         }
 
         /**
-         * Detect the first available column from a list of candidates.
+         * Update the booking status.
          *
-         * @param array       $candidates Ordered list of column names.
-         * @param string|null $default    Fallback when no column exists.
+         * @param string $status New status identifier.
          *
-         * @return string|null
+         * @return bool
          */
-        protected function detect_column( $candidates, $default = null ) {
-            if ( empty( $this->table_name ) || ! $this->table_exists( $this->table_name ) ) {
-                return $default;
+        public function update_status( $status ) {
+            if ( ! $this->id || ! $this->bookings_table_exists() ) {
+                return false;
             }
 
-            foreach ( $candidates as $candidate ) {
-                if ( $this->column_exists( $this->table_name, $candidate ) ) {
-                    return $candidate;
+            $status = sanitize_key( $status );
+
+            $data   = array( 'status' => $status );
+            $format = array( '%s' );
+
+            if ( $this->has_column( 'updated_at' ) ) {
+                $data['updated_at'] = current_time( 'mysql', true );
+                $format[]           = '%s';
+            }
+
+            $updated = $this->wpdb->update(
+                $this->table,
+                $data,
+                array( 'id' => $this->id ),
+                $format,
+                array( '%d' )
+            );
+
+            if ( false !== $updated ) {
+                $this->load( true );
+            }
+
+            return false !== $updated;
+        }
+
+        /**
+         * Delete the booking record.
+         *
+         * @return bool
+         */
+        public function delete() {
+            if ( ! $this->id || ! $this->bookings_table_exists() ) {
+                return false;
+            }
+
+            $deleted = $this->wpdb->delete(
+                $this->table,
+                array( 'id' => $this->id ),
+                array( '%d' )
+            );
+
+            return false !== $deleted;
+        }
+
+        /**
+         * Fetch paginated booking data for the WordPress admin table.
+         *
+         * @param string $location Location filter.
+         * @param string $status   Status filter.
+         * @param int    $page     Page number.
+         *
+         * @return array
+         */
+        public static function get_admin_bookings( $location = '', $status = '', $page = 1 ) {
+            $model = new self();
+
+            $filters = array(
+                'location_id' => absint( $location ),
+                'status'      => $status,
+                'page'        => max( 1, (int) $page ),
+                'per_page'    => 20,
+            );
+
+            $results = $model->query_bookings( $filters );
+
+            return array(
+                'items'      => $results['rows'],
+                'pagination' => array(
+                    'current_page' => $results['page'],
+                    'total_pages'  => $results['total_pages'],
+                    'total_items'  => $results['total'],
+                ),
+            );
+        }
+
+        /**
+         * Count bookings for a given date and location.
+         *
+         * @param string $date        Target date (Y-m-d).
+         * @param int    $location_id Location identifier.
+         *
+         * @return int
+         */
+        public static function count_by_date_and_location( $date, $location_id ) {
+            $model = new self();
+
+            if ( ! $model->bookings_table_exists() ) {
+                return 0;
+            }
+
+            $date        = $model->normalize_date( $date );
+            $location_id = absint( $location_id );
+
+            $where   = array();
+            $params  = array();
+            $where[] = $model->get_date_expression() . ' = %s';
+            $params[] = $date;
+
+            if ( $location_id > 0 ) {
+                $where[]  = 'b.location_id = %d';
+                $params[] = $location_id;
+            }
+
+            $sql = 'SELECT COUNT(*) FROM ' . $model->table . ' b WHERE ' . implode( ' AND ', $where );
+            $sql = $model->prepare( $sql, $params );
+
+            return (int) $model->wpdb->get_var( $sql );
+        }
+
+        /**
+         * Sum booking revenue for a given date and location.
+         *
+         * @param string $date        Target date (Y-m-d).
+         * @param int    $location_id Location identifier.
+         *
+         * @return float
+         */
+        public static function sum_revenue_by_date_and_location( $date, $location_id ) {
+            $model = new self();
+
+            if ( ! $model->bookings_table_exists() || ! $model->has_column( 'total_amount' ) ) {
+                return 0.0;
+            }
+
+            $date        = $model->normalize_date( $date );
+            $location_id = absint( $location_id );
+
+            $where   = array( $model->get_date_expression() . ' = %s' );
+            $params  = array( $date );
+
+            if ( $location_id > 0 ) {
+                $where[]  = 'b.location_id = %d';
+                $params[] = $location_id;
+            }
+
+            $sql = 'SELECT SUM(total_amount) FROM ' . $model->table . ' b WHERE ' . implode( ' AND ', $where );
+            $sql = $model->prepare( $sql, $params );
+
+            $value = $model->wpdb->get_var( $sql );
+
+            return $value ? (float) $value : 0.0;
+        }
+
+        /**
+         * Fetch recent bookings for portal dashboards.
+         *
+         * @param int $location_id Location identifier.
+         * @param int $limit       Result limit.
+         *
+         * @return array
+         */
+        public static function get_recent_for_portal( $location_id, $limit = 5 ) {
+            $model = new self();
+
+            $args = array(
+                'location_id' => absint( $location_id ),
+                'per_page'    => max( 1, (int) $limit ),
+                'page'        => 1,
+                'sort_by'     => 'booking_datetime',
+                'sort_order'  => 'desc',
+            );
+
+            $results = $model->query_bookings( $args );
+
+            return $results['rows'];
+        }
+
+        /**
+         * Run a generic booking query.
+         *
+         * @param array $args Query arguments.
+         *
+         * @return array
+         */
+        public function query( $args = array() ) {
+            $results = $this->query_bookings( $args );
+
+            return array(
+                'items'      => $results['rows'],
+                'total'      => $results['total'],
+                'totalPages' => $results['total_pages'],
+            );
+        }
+
+        /**
+         * Fetch bookings with filters for the management UI.
+         *
+         * @param array  $filters   Filter arguments.
+         * @param int    $page      Page number.
+         * @param int    $page_size Items per page.
+         * @param string $sort_by   Sort field.
+         * @param string $sort_order Sort direction.
+         *
+         * @return array
+         */
+        public static function get_bookings_with_filters( $filters, $page = 1, $page_size = 25, $sort_by = 'booking_datetime', $sort_order = 'desc' ) {
+            $model = new self();
+
+            $args = array_merge(
+                (array) $filters,
+                array(
+                    'page'       => max( 1, (int) $page ),
+                    'per_page'   => max( 1, (int) $page_size ),
+                    'sort_by'    => sanitize_key( $sort_by ),
+                    'sort_order' => sanitize_key( $sort_order ),
+                )
+            );
+
+            $results = $model->query_bookings( $args );
+
+            return array(
+                'bookings'     => $results['rows'],
+                'total_items'  => $results['total'],
+                'total_pages'  => $results['total_pages'],
+                'current_page' => $results['page'],
+                'page_size'    => $results['per_page'],
+            );
+        }
+
+        /**
+         * Retrieve bookings suitable for CSV export.
+         *
+         * @param array $filters Filter arguments.
+         *
+         * @return array
+         */
+        public static function get_bookings_for_export( $filters ) {
+            $model = new self();
+
+            $args = array_merge(
+                (array) $filters,
+                array(
+                    'per_page'  => apply_filters( 'rb_booking_export_limit', 1000 ),
+                    'page'      => 1,
+                    'no_limit'  => true,
+                    'sort_by'   => 'booking_datetime',
+                    'sort_order'=> 'desc',
+                )
+            );
+
+            $results = $model->query_bookings( $args, true );
+
+            return $results['rows'];
+        }
+
+        /**
+         * Provide calendar view data grouped by date.
+         *
+         * @param int    $month   Month (1-12).
+         * @param int    $year    Four-digit year.
+         * @param string $view    Calendar view (month/week/day).
+         * @param array  $filters Additional filters.
+         *
+         * @return array
+         */
+        public static function get_calendar_data( $month, $year, $view, $filters = array() ) {
+            $model = new self();
+
+            if ( ! $model->bookings_table_exists() ) {
+                return array();
+            }
+
+            $month = max( 1, min( 12, (int) $month ) );
+            $year  = max( 1970, (int) $year );
+
+            $start = gmdate( 'Y-m-d', strtotime( sprintf( '%04d-%02d-01', $year, $month ) ) );
+            $end   = gmdate( 'Y-m-d', strtotime( $start . ' +1 month -1 day' ) );
+
+            $args = array_merge(
+                (array) $filters,
+                array(
+                    'date_from' => isset( $filters['date_from'] ) && $filters['date_from'] ? $filters['date_from'] : $start,
+                    'date_to'   => isset( $filters['date_to'] ) && $filters['date_to'] ? $filters['date_to'] : $end,
+                    'per_page'  => 500,
+                    'page'      => 1,
+                    'no_limit'  => true,
+                )
+            );
+
+            $results = $model->query_bookings( $args, true );
+
+            $grouped = array();
+
+            foreach ( $results['rows'] as $booking ) {
+                $date_key = isset( $booking['booking_date'] ) ? $booking['booking_date'] : $start;
+
+                if ( ! isset( $grouped[ $date_key ] ) ) {
+                    $grouped[ $date_key ] = array(
+                        'bookings' => array(),
+                        'count'    => 0,
+                    );
+                }
+
+                $grouped[ $date_key ]['count']++;
+                $grouped[ $date_key ]['bookings'][] = array(
+                    'id'            => $booking['id'],
+                    'customer_name' => $booking['customer_name'],
+                    'time'          => $booking['booking_time'],
+                    'status'        => $booking['status'],
+                    'party_size'    => $booking['party_size'],
+                    'table_number'  => $booking['table_number'],
+                );
+            }
+
+            return $grouped;
+        }
+
+        /**
+         * Fetch bookings on a specific date for a location.
+         *
+         * @param int    $location_id Location identifier.
+         * @param string $date        Target date (Y-m-d).
+         *
+         * @return array
+         */
+        public static function get_bookings_by_date( $location_id, $date ) {
+            $model = new self();
+
+            $args = array(
+                'location_id' => absint( $location_id ),
+                'date_from'   => $model->normalize_date( $date ),
+                'date_to'     => $model->normalize_date( $date ),
+                'per_page'    => 200,
+                'page'        => 1,
+                'no_limit'    => true,
+                'sort_by'     => 'booking_datetime',
+                'sort_order'  => 'asc',
+            );
+
+            $results = $model->query_bookings( $args, true );
+
+            return $results['rows'];
+        }
+
+        /**
+         * Retrieve aggregated statistics for a location on a given date.
+         *
+         * @param int    $location_id Location identifier.
+         * @param string $date        Target date (Y-m-d).
+         *
+         * @return array
+         */
+        public function get_location_stats( $location_id, $date = null ) {
+            if ( ! $this->bookings_table_exists() ) {
+                return $this->get_default_stats();
+            }
+
+            $location_id = absint( $location_id );
+            $date        = $this->normalize_date( $date );
+
+            $where   = array();
+            $params  = array();
+            $where[] = $this->get_date_expression() . ' = %s';
+            $params[] = $date;
+
+            if ( $location_id > 0 ) {
+                $where[]  = 'b.location_id = %d';
+                $params[] = $location_id;
+            }
+
+            $amount_expression = $this->has_column( 'total_amount' ) ? 'COALESCE(b.total_amount, 0)' : '0';
+            $table_expression  = $this->has_column( 'table_id' ) ? 'b.table_id' : 'NULL';
+
+            $sql = 'SELECT
+                COUNT(*) AS total_bookings,
+                SUM(CASE WHEN b.status = "confirmed" THEN 1 ELSE 0 END) AS confirmed,
+                SUM(CASE WHEN b.status = "pending" THEN 1 ELSE 0 END) AS pending,
+                SUM(CASE WHEN b.status = "cancelled" THEN 1 ELSE 0 END) AS cancelled,
+                SUM(COALESCE(b.party_size, 0)) AS total_guests,
+                SUM(' . $amount_expression . ') AS revenue,
+                COUNT(DISTINCT CASE WHEN b.status != "cancelled" THEN ' . $table_expression . ' END) AS used_tables
+            FROM ' . $this->table . ' b';
+
+            if ( $where ) {
+                $sql .= ' WHERE ' . implode( ' AND ', $where );
+            }
+
+            $sql = $this->prepare( $sql, $params );
+
+            $row = $this->wpdb->get_row( $sql, ARRAY_A );
+
+            if ( ! is_array( $row ) ) {
+                return $this->get_default_stats();
+            }
+
+            $available_tables = 0;
+            if ( class_exists( 'RB_Table' ) ) {
+                $available_tables = RB_Table::count_by_location( $location_id );
+            }
+
+            $used_tables = isset( $row['used_tables'] ) ? (int) $row['used_tables'] : 0;
+            $occupancy   = ( 0 < $available_tables ) ? min( 100.0, round( ( $used_tables / $available_tables ) * 100, 1 ) ) : 0.0;
+
+            return array(
+                'total_bookings'  => (int) $row['total_bookings'],
+                'confirmed'       => (int) $row['confirmed'],
+                'pending'         => (int) $row['pending'],
+                'cancelled'       => (int) $row['cancelled'],
+                'total_guests'    => (int) $row['total_guests'],
+                'revenue'         => $row['revenue'] ? (float) $row['revenue'] : 0.0,
+                'currency'        => apply_filters( 'rb_booking_currency', '$', $location_id ),
+                'occupancy_rate'  => $occupancy,
+                'available_tables'=> $available_tables,
+                'used_tables'     => $used_tables,
+            );
+        }
+
+        /**
+         * Internal loader.
+         *
+         * @param bool $force_refresh Force re-fetch.
+         */
+        protected function load( $force_refresh = false ) {
+            if ( $this->data !== null && ! $force_refresh ) {
+                return;
+            }
+
+            if ( ! $this->id || ! $this->bookings_table_exists() ) {
+                $this->data = null;
+                return;
+            }
+
+            $sql = $this->prepare(
+                'SELECT * FROM ' . $this->table . ' WHERE id = %d',
+                array( $this->id )
+            );
+
+            $row = $this->wpdb->get_row( $sql, ARRAY_A );
+
+            $this->data = $row ? $this->map_booking_row_from_array( $row ) : null;
+        }
+
+        /**
+         * Execute the underlying booking query.
+         *
+         * @param array $args        Query arguments.
+         * @param bool  $allow_unbounded Allow unlimited results.
+         *
+         * @return array
+         */
+        protected function query_bookings( $args, $allow_unbounded = false ) {
+            if ( ! $this->bookings_table_exists() ) {
+                return array(
+                    'rows'       => array(),
+                    'total'      => 0,
+                    'total_pages'=> 1,
+                    'page'       => 1,
+                    'per_page'   => isset( $args['per_page'] ) ? (int) $args['per_page'] : 1,
+                );
+            }
+
+            $defaults = array(
+                'status'      => '',
+                'location_id' => 0,
+                'date_from'   => '',
+                'date_to'     => '',
+                'search'      => '',
+                'page'        => 1,
+                'per_page'    => 25,
+                'sort_by'     => 'booking_datetime',
+                'sort_order'  => 'desc',
+                'no_limit'    => false,
+            );
+
+            $args = wp_parse_args( $args, $defaults );
+
+            $page      = max( 1, (int) $args['page'] );
+            $per_page  = max( 1, (int) $args['per_page'] );
+            $no_limit  = $allow_unbounded && ! empty( $args['no_limit'] );
+            $sort_by   = sanitize_key( $args['sort_by'] );
+            $sort_order = strtolower( sanitize_key( $args['sort_order'] ) );
+            $sort_order = 'asc' === $sort_order ? 'ASC' : 'DESC';
+
+            $joins = array();
+            $select_fields = array(
+                'b.id',
+                'b.status',
+                'b.location_id',
+                'COALESCE(b.party_size, 0) AS party_size',
+                'COALESCE(b.special_requests, "") AS special_requests',
+            );
+
+            $date_expression = $this->get_date_expression();
+            $time_expression = $this->get_time_expression();
+
+            $select_fields[] = $date_expression . ' AS booking_date';
+            $select_fields[] = $time_expression . ' AS booking_time';
+
+            if ( $this->has_column( 'table_id' ) ) {
+                $select_fields[] = 'b.table_id';
+            } else {
+                $select_fields[] = '0 AS table_id';
+            }
+
+            if ( $this->has_column( 'total_amount' ) ) {
+                $select_fields[] = 'COALESCE(b.total_amount, 0) AS total_amount';
+            } else {
+                $select_fields[] = '0 AS total_amount';
+            }
+
+            if ( $this->has_column( 'created_at' ) ) {
+                $select_fields[] = 'b.created_at';
+            } else {
+                $select_fields[] = 'COALESCE(b.updated_at, NOW()) AS created_at';
+            }
+
+            if ( $this->has_column( 'updated_at' ) ) {
+                $select_fields[] = 'b.updated_at';
+            } else {
+                $select_fields[] = 'COALESCE(b.created_at, NOW()) AS updated_at';
+            }
+
+            // Customer fields.
+            if ( $this->has_column( 'customer_name' ) ) {
+                $select_fields[] = 'COALESCE(b.customer_name, "") AS customer_name';
+                $select_fields[] = $this->has_column( 'customer_email' ) ? 'COALESCE(b.customer_email, "") AS customer_email' : '"" AS customer_email';
+                $select_fields[] = $this->has_column( 'customer_phone' ) ? 'COALESCE(b.customer_phone, "") AS customer_phone' : '"" AS customer_phone';
+            } elseif ( $this->table_exists( $this->related_tables['customers'] ) ) {
+                $joins[]          = 'LEFT JOIN ' . $this->related_tables['customers'] . ' c ON c.id = b.customer_id';
+                $select_fields[]  = 'COALESCE(CONCAT_WS(" ", c.first_name, c.last_name), "") AS customer_name';
+                $select_fields[]  = 'COALESCE(c.email, "") AS customer_email';
+                $select_fields[]  = 'COALESCE(c.phone, "") AS customer_phone';
+            } else {
+                $select_fields[] = '"" AS customer_name';
+                $select_fields[] = '"" AS customer_email';
+                $select_fields[] = '"" AS customer_phone';
+            }
+
+            // Table details.
+            if ( $this->table_exists( $this->related_tables['tables'] ) ) {
+                $joins[]         = 'LEFT JOIN ' . $this->related_tables['tables'] . ' t ON t.id = b.table_id';
+                $select_fields[] = 'COALESCE(t.table_number, "") AS table_number';
+            } else {
+                $select_fields[] = '"" AS table_number';
+            }
+
+            // Location label.
+            if ( $this->table_exists( $this->related_tables['locations'] ) ) {
+                $joins[]         = 'LEFT JOIN ' . $this->related_tables['locations'] . ' l ON l.id = b.location_id';
+                $select_fields[] = 'COALESCE(l.name, "") AS location_name';
+            } else {
+                $select_fields[] = '"" AS location_name';
+            }
+
+            $where  = array();
+            $params = array();
+
+            if ( ! empty( $args['status'] ) ) {
+                $where[]  = 'b.status = %s';
+                $params[] = sanitize_key( $args['status'] );
+            }
+
+            $location_id = absint( $args['location_id'] );
+            if ( $location_id > 0 ) {
+                $where[]  = 'b.location_id = %d';
+                $params[] = $location_id;
+            }
+
+            if ( ! empty( $args['date_from'] ) ) {
+                $where[]  = $date_expression . ' >= %s';
+                $params[] = $this->normalize_date( $args['date_from'] );
+            }
+
+            if ( ! empty( $args['date_to'] ) ) {
+                $where[]  = $date_expression . ' <= %s';
+                $params[] = $this->normalize_date( $args['date_to'] );
+            }
+
+            if ( ! empty( $args['search'] ) ) {
+                $like     = '%' . $this->wpdb->esc_like( $args['search'] ) . '%';
+                $where[]  = '(b.customer_name LIKE %s OR b.customer_email LIKE %s OR b.customer_phone LIKE %s)';
+                $params[] = $like;
+                $params[] = $like;
+                $params[] = $like;
+            }
+
+            $where_sql = $where ? 'WHERE ' . implode( ' AND ', $where ) : '';
+            $join_sql  = $joins ? ' ' . implode( ' ', $joins ) : '';
+
+            $count_sql = 'SELECT COUNT(*) FROM ' . $this->table . ' b' . $join_sql . ' ' . $where_sql;
+            $count_sql = $this->prepare( $count_sql, $params );
+            $total     = (int) $this->wpdb->get_var( $count_sql );
+
+            $allowed_sort_fields = array(
+                'booking_datetime' => $date_expression . ' ' . $sort_order . ', ' . $time_expression,
+                'booking_date'     => $date_expression,
+                'status'           => 'b.status',
+                'customer_name'    => 'customer_name',
+                'party_size'       => 'b.party_size',
+                'table_number'     => 'table_number',
+                'created_at'       => $this->has_column( 'created_at' ) ? 'b.created_at' : $date_expression,
+            );
+
+            $sort_field = isset( $allowed_sort_fields[ $sort_by ] ) ? $allowed_sort_fields[ $sort_by ] : $allowed_sort_fields['booking_datetime'];
+
+            $select_sql = 'SELECT ' . implode( ', ', $select_fields ) . ' FROM ' . $this->table . ' b' . $join_sql . ' ' . $where_sql . ' ORDER BY ' . $sort_field . ' ' . $sort_order;
+
+            $select_params = $params;
+
+            if ( ! $no_limit ) {
+                $offset         = ( $page - 1 ) * $per_page;
+                $select_sql    .= ' LIMIT %d OFFSET %d';
+                $select_params[] = $per_page;
+                $select_params[] = $offset;
+            }
+
+            $select_sql = $this->prepare( $select_sql, $select_params );
+
+            $rows = $this->wpdb->get_results( $select_sql );
+
+            $mapped = array();
+
+            if ( $rows ) {
+                foreach ( $rows as $row ) {
+                    $mapped[] = $this->map_booking_row( $row );
                 }
             }
 
-            return $default;
+            $total_pages = max( 1, (int) ceil( $total / $per_page ) );
+
+            return array(
+                'rows'        => $mapped,
+                'total'       => $total,
+                'total_pages' => $total_pages,
+                'page'        => $page,
+                'per_page'    => $per_page,
+            );
         }
 
         /**
-         * Determine if a table exists in the current database.
+         * Convert a database row to a structured array.
          *
-         * @param string|null $table Table name.
+         * @param object $row Database row.
+         *
+         * @return array
+         */
+        protected function map_booking_row( $row ) {
+            $booking_date = isset( $row->booking_date ) ? $row->booking_date : '';
+            $booking_time = isset( $row->booking_time ) ? $row->booking_time : '';
+
+            return array(
+                'id'              => isset( $row->id ) ? (int) $row->id : 0,
+                'status'          => isset( $row->status ) ? $row->status : 'pending',
+                'location_id'     => isset( $row->location_id ) ? (int) $row->location_id : 0,
+                'location_name'   => isset( $row->location_name ) ? $row->location_name : '',
+                'customer_name'   => isset( $row->customer_name ) ? $row->customer_name : '',
+                'customer_email'  => isset( $row->customer_email ) ? $row->customer_email : '',
+                'customer_phone'  => isset( $row->customer_phone ) ? $row->customer_phone : '',
+                'booking_date'    => $booking_date,
+                'booking_time'    => $booking_time,
+                'party_size'      => isset( $row->party_size ) ? (int) $row->party_size : 0,
+                'table_id'        => isset( $row->table_id ) ? (int) $row->table_id : 0,
+                'table_number'    => isset( $row->table_number ) ? $row->table_number : '',
+                'special_requests'=> isset( $row->special_requests ) ? $row->special_requests : '',
+                'created_at'      => isset( $row->created_at ) ? $row->created_at : $booking_date,
+                'updated_at'      => isset( $row->updated_at ) ? $row->updated_at : $booking_date,
+                'total_amount'    => isset( $row->total_amount ) ? (float) $row->total_amount : 0.0,
+            );
+        }
+
+        /**
+         * Map array data (used by loader).
+         *
+         * @param array $row Raw database row.
+         *
+         * @return array
+         */
+        protected function map_booking_row_from_array( $row ) {
+            $object = (object) $row;
+
+            return $this->map_booking_row( $object );
+        }
+
+        /**
+         * Provide default stats payload.
+         *
+         * @return array
+         */
+        protected function get_default_stats() {
+            return array(
+                'total_bookings'  => 0,
+                'confirmed'       => 0,
+                'pending'         => 0,
+                'cancelled'       => 0,
+                'total_guests'    => 0,
+                'revenue'         => 0.0,
+                'currency'        => apply_filters( 'rb_booking_currency', '$', 0 ),
+                'occupancy_rate'  => 0.0,
+                'available_tables'=> 0,
+                'used_tables'     => 0,
+            );
+        }
+
+        /**
+         * Determine if the bookings table exists.
          *
          * @return bool
          */
-        protected function table_exists( $table ) {
-            if ( empty( $table ) ) {
-                return false;
-            }
-
-            if ( isset( self::$table_exists_cache[ $table ] ) ) {
-                return self::$table_exists_cache[ $table ];
-            }
-
-            global $wpdb;
-            $result = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) );
-            self::$table_exists_cache[ $table ] = ( $result === $table );
-
-            return self::$table_exists_cache[ $table ];
+        protected function bookings_table_exists() {
+            return $this->table_exists( $this->table );
         }
 
         /**
-         * Determine if the given column exists on a table.
+         * Check if a table exists in the database.
          *
-         * @param string|null $table  Table name.
-         * @param string      $column Column name.
+         * @param string $table_name Table name.
          *
          * @return bool
          */
-        protected function column_exists( $table, $column ) {
-            if ( empty( $table ) || empty( $column ) ) {
+        protected function table_exists( $table_name ) {
+            $table_name = trim( $table_name );
+            if ( '' === $table_name ) {
                 return false;
             }
 
-            $cache_key = $table . ':' . $column;
-            if ( isset( self::$column_exists_cache[ $cache_key ] ) ) {
-                return self::$column_exists_cache[ $cache_key ];
-            }
+            $query = $this->prepare( 'SHOW TABLES LIKE %s', array( $table_name ) );
 
-            global $wpdb;
-            $exists = (bool) $wpdb->get_var( $wpdb->prepare( 'SHOW COLUMNS FROM ' . $table . ' LIKE %s', $column ) );
-            self::$column_exists_cache[ $cache_key ] = $exists;
+            $result = $this->wpdb->get_var( $query );
 
-            return $exists;
+            return $result === $table_name;
         }
 
         /**
-         * Normalise a date string to Y-m-d or return today's date.
+         * Load table columns lazily.
+         */
+        protected function load_columns() {
+            if ( null !== $this->columns ) {
+                return;
+            }
+
+            if ( ! $this->bookings_table_exists() ) {
+                $this->columns = array();
+                return;
+            }
+
+            $results = $this->wpdb->get_results( 'SHOW COLUMNS FROM ' . $this->table, ARRAY_A );
+            $this->columns = array();
+
+            if ( $results ) {
+                foreach ( $results as $column ) {
+                    if ( isset( $column['Field'] ) ) {
+                        $this->columns[] = $column['Field'];
+                    }
+                }
+            }
+        }
+
+        /**
+         * Determine if a column exists on the bookings table.
          *
-         * @param string|null $date Date input.
+         * @param string $column Column name.
+         *
+         * @return bool
+         */
+        protected function has_column( $column ) {
+            $this->load_columns();
+
+            return in_array( $column, $this->columns, true );
+        }
+
+        /**
+         * Return the SQL expression for the booking date.
          *
          * @return string
          */
-        protected function normalize_date( $date = null ) {
+        protected function get_date_expression() {
+            if ( $this->has_column( 'booking_date' ) ) {
+                return 'b.booking_date';
+            }
+
+            if ( $this->has_column( 'booking_datetime' ) ) {
+                return 'DATE(b.booking_datetime)';
+            }
+
+            if ( $this->has_column( 'created_at' ) ) {
+                return 'DATE(b.created_at)';
+            }
+
+            return 'DATE(NOW())';
+        }
+
+        /**
+         * Return the SQL expression for the booking time.
+         *
+         * @return string
+         */
+        protected function get_time_expression() {
+            if ( $this->has_column( 'booking_time' ) ) {
+                return 'b.booking_time';
+            }
+
+            if ( $this->has_column( 'booking_datetime' ) ) {
+                return 'DATE_FORMAT(b.booking_datetime, "%H:%i")';
+            }
+
+            if ( $this->has_column( 'created_at' ) ) {
+                return 'DATE_FORMAT(b.created_at, "%H:%i")';
+            }
+
+            return '\'00:00\'';
+        }
+
+        /**
+         * Prepare an SQL query safely.
+         *
+         * @param string $sql    SQL statement.
+         * @param array  $params Parameters.
+         *
+         * @return string
+         */
+        protected function prepare( $sql, $params = array() ) {
+            if ( empty( $params ) ) {
+                return $sql;
+            }
+
+            return $this->wpdb->prepare( $sql, $params );
+        }
+
+        /**
+         * Normalise date input.
+         *
+         * @param string $date Date string.
+         *
+         * @return string
+         */
+        protected function normalize_date( $date ) {
             if ( empty( $date ) ) {
                 return gmdate( 'Y-m-d' );
             }
@@ -244,917 +957,6 @@ if ( ! class_exists( 'RB_Booking' ) ) {
             }
 
             return gmdate( 'Y-m-d', $timestamp );
-        }
-
-        /**
-         * Load a booking record into the current instance.
-         *
-         * @param int $id Booking identifier.
-         */
-        protected function load( $id ) {
-            $row = $this->fetch_booking_row( $id );
-            if ( $row ) {
-                $this->id     = (int) $id;
-                $this->record = $this->normalize_booking_row( $row );
-            }
-        }
-
-        /**
-         * Fetch a raw booking database row.
-         *
-         * @param int $id Booking identifier.
-         *
-         * @return array|null
-         */
-        protected function fetch_booking_row( $id ) {
-            if ( ! $this->table_exists( $this->table_name ) ) {
-                return null;
-            }
-
-            global $wpdb;
-
-            $select = 'b.*';
-            $joins  = '';
-
-            if ( $this->tables_table && $this->column_exists( $this->table_name, 'table_id' ) && $this->table_exists( $this->tables_table ) ) {
-                $table_label = $this->column_exists( $this->tables_table, 'table_number' ) ? 'table_number' : 'name';
-                $select     .= ', t.' . $table_label . ' AS table_label';
-                $joins      .= ' LEFT JOIN ' . $this->tables_table . ' t ON t.id = b.table_id';
-            }
-
-            $sql = $wpdb->prepare( 'SELECT ' . $select . ' FROM ' . $this->table_name . ' b ' . $joins . ' WHERE b.id = %d LIMIT 1', $id );
-
-            $row = $wpdb->get_row( $sql, ARRAY_A );
-            if ( ! $row ) {
-                return null;
-            }
-
-            return $row;
-        }
-
-        /**
-         * Determine whether the loaded record exists.
-         *
-         * @return bool
-         */
-        public function exists() {
-            return ! empty( $this->record );
-        }
-
-        /**
-         * Return loaded booking data.
-         *
-         * @return array
-         */
-        public function get_data() {
-            return $this->record;
-        }
-
-        /**
-         * Retrieve bookings using database-backed filters.
-         *
-         * @param array $args Query arguments.
-         *
-         * @return array{
-         *     bookings: array<int,object>,
-         *     total: int,
-         *     pages: int,
-         *     page: int,
-         *     per_page: int
-         * }
-         */
-        public function get_bookings( $args = array() ) {
-            $defaults = array(
-                'status'      => '',
-                'location_id' => 0,
-                'date_from'   => '',
-                'date_to'     => '',
-                'search'      => '',
-                'per_page'    => 20,
-                'page'        => 1,
-                'orderby'     => $this->date_column ? $this->date_column : 'id',
-                'order'       => 'DESC',
-            );
-
-            $args = wp_parse_args( $args, $defaults );
-
-            if ( ! $this->table_exists( $this->table_name ) ) {
-                return array(
-                    'bookings' => array(),
-                    'total'    => 0,
-                    'pages'    => 0,
-                    'page'     => (int) $args['page'],
-                    'per_page' => (int) $args['per_page'],
-                );
-            }
-
-            global $wpdb;
-
-            $where = array();
-
-            if ( ! empty( $args['status'] ) && $this->column_exists( $this->table_name, 'status' ) ) {
-                $where[] = $wpdb->prepare( 'b.status = %s', sanitize_text_field( $args['status'] ) );
-            }
-
-            $location_id = absint( $args['location_id'] );
-            if ( $location_id && $this->column_exists( $this->table_name, 'location_id' ) ) {
-                $where[] = $wpdb->prepare( 'b.location_id = %d', $location_id );
-            }
-
-            if ( ! empty( $args['date_from'] ) ) {
-                $where[] = $this->build_date_clause( '>=', $args['date_from'] );
-            }
-
-            if ( ! empty( $args['date_to'] ) ) {
-                $where[] = $this->build_date_clause( '<=', $args['date_to'] );
-            }
-
-            if ( ! empty( $args['search'] ) ) {
-                $search_like = '%' . $wpdb->esc_like( sanitize_text_field( $args['search'] ) ) . '%';
-                $search_cols = array();
-
-                if ( $this->column_exists( $this->table_name, 'customer_name' ) ) {
-                    $search_cols[] = 'b.customer_name LIKE %s';
-                }
-
-                if ( $this->column_exists( $this->table_name, 'customer_email' ) ) {
-                    $search_cols[] = 'b.customer_email LIKE %s';
-                }
-
-                if ( $this->column_exists( $this->table_name, 'customer_phone' ) ) {
-                    $search_cols[] = 'b.customer_phone LIKE %s';
-                }
-
-                if ( ! empty( $search_cols ) ) {
-                    $prepared = array();
-                    foreach ( $search_cols as $clause ) {
-                        $prepared[] = $wpdb->prepare( $clause, $search_like );
-                    }
-                    $where[] = '(' . implode( ' OR ', $prepared ) . ')';
-                }
-            }
-
-            $where_sql = $where ? 'WHERE ' . implode( ' AND ', $where ) : '';
-
-            $orderby = $this->normalize_orderby( $args['orderby'] );
-            $order   = 'ASC' === strtoupper( $args['order'] ) ? 'ASC' : 'DESC';
-
-            $count_sql = 'SELECT COUNT(*) FROM ' . $this->table_name . ' b ' . $where_sql;
-            $total     = (int) $wpdb->get_var( $count_sql );
-
-            $per_page = max( 1, (int) $args['per_page'] );
-            $pages    = $per_page ? (int) ceil( $total / $per_page ) : 0;
-            $page     = max( 1, (int) $args['page'] );
-            if ( $pages && $page > $pages ) {
-                $page = $pages;
-            }
-            $offset = ( $page - 1 ) * $per_page;
-
-            $select = 'b.*';
-            $joins  = '';
-
-            if ( $this->tables_table && $this->column_exists( $this->table_name, 'table_id' ) && $this->table_exists( $this->tables_table ) ) {
-                $table_label = $this->column_exists( $this->tables_table, 'table_number' ) ? 'table_number' : 'name';
-                $select     .= ', t.' . $table_label . ' AS table_label';
-                $joins      .= ' LEFT JOIN ' . $this->tables_table . ' t ON t.id = b.table_id';
-            }
-
-            $data_sql  = 'SELECT ' . $select . ' FROM ' . $this->table_name . ' b ' . $joins . ' ' . $where_sql;
-            $data_sql .= ' ORDER BY ' . $orderby . ' ' . $order;
-            $data_sql .= $wpdb->prepare( ' LIMIT %d OFFSET %d', $per_page, $offset );
-
-            $rows     = $wpdb->get_results( $data_sql, ARRAY_A );
-            $bookings = array();
-
-            if ( $rows ) {
-                foreach ( $rows as $row ) {
-                    $bookings[] = (object) $this->normalize_booking_row( $row );
-                }
-            }
-
-            return array(
-                'bookings' => $bookings,
-                'total'    => $total,
-                'pages'    => $pages,
-                'page'     => $page,
-                'per_page' => $per_page,
-            );
-        }
-
-        /**
-         * Normalise order by input into a safe SQL fragment.
-         *
-         * @param string $orderby Order by key.
-         *
-         * @return string
-         */
-        protected function normalize_orderby( $orderby ) {
-            $orderby = sanitize_key( $orderby );
-
-            $map = array(
-                'id'            => 'b.id',
-                'status'        => $this->column_exists( $this->table_name, 'status' ) ? 'b.status' : 'b.id',
-                'party_size'    => $this->column_exists( $this->table_name, 'party_size' ) ? 'b.party_size' : 'b.id',
-                'created_at'    => $this->column_exists( $this->table_name, 'created_at' ) ? 'b.created_at' : 'b.id',
-                'updated_at'    => $this->column_exists( $this->table_name, 'updated_at' ) ? 'b.updated_at' : 'b.id',
-                'booking_date'  => $this->date_column && 'booking_datetime' !== $this->date_column ? 'b.' . $this->date_column : 'DATE(b.' . $this->date_column . ')',
-                'booking_time'  => $this->time_column && 'booking_datetime' !== $this->time_column ? 'b.' . $this->time_column : 'TIME(b.' . $this->time_column . ')',
-            );
-
-            if ( isset( $map[ $orderby ] ) ) {
-                return $map[ $orderby ];
-            }
-
-            return isset( $map['created_at'] ) ? $map['created_at'] : 'b.id';
-        }
-
-        /**
-         * Build a date comparison clause accounting for schema differences.
-         *
-         * @param string $operator SQL comparison operator.
-         * @param string $value    Date value.
-         *
-         * @return string
-         */
-        protected function build_date_clause( $operator, $value ) {
-            global $wpdb;
-
-            $normalized = $this->normalize_date( $value );
-
-            if ( $this->date_column && 'booking_datetime' === $this->date_column ) {
-                return $wpdb->prepare( 'DATE(b.' . $this->date_column . ') ' . $operator . ' %s', $normalized );
-            }
-
-            return $wpdb->prepare( 'b.' . $this->date_column . ' ' . $operator . ' %s', $normalized );
-        }
-
-        /**
-         * Normalise a raw booking row into a predictable array structure.
-         *
-         * @param array $row Raw booking row.
-         *
-         * @return array
-         */
-        protected function normalize_booking_row( array $row ) {
-            $defaults = array(
-                'id'               => 0,
-                'customer_name'    => '',
-                'customer_email'   => '',
-                'customer_phone'   => '',
-                'booking_date'     => null,
-                'booking_time'     => null,
-                'party_size'       => 0,
-                'table_id'         => 0,
-                'location_id'      => 0,
-                'status'           => '',
-                'special_requests' => '',
-                'total_amount'     => 0.0,
-                'created_at'       => null,
-                'updated_at'       => null,
-            );
-
-            $data = array_merge( $defaults, $row );
-
-            if ( isset( $row['table_label'] ) && ! isset( $row['table_number'] ) ) {
-                $data['table_number'] = $row['table_label'];
-            }
-
-            if ( $this->date_column && 'booking_datetime' === $this->date_column && isset( $row[ $this->date_column ] ) ) {
-                $timestamp = strtotime( $row[ $this->date_column ] );
-                if ( ! isset( $row['booking_date'] ) ) {
-                    $data['booking_date'] = $timestamp ? gmdate( 'Y-m-d', $timestamp ) : null;
-                }
-                if ( ! $this->column_exists( $this->table_name, 'booking_time' ) || empty( $row['booking_time'] ) ) {
-                    $data['booking_time'] = $timestamp ? gmdate( 'H:i:s', $timestamp ) : null;
-                }
-            }
-
-            if ( $this->total_column && isset( $row[ $this->total_column ] ) ) {
-                $data['total_amount'] = (float) $row[ $this->total_column ];
-            }
-
-            $data['id']          = (int) $data['id'];
-            $data['party_size']  = isset( $data['party_size'] ) ? (int) $data['party_size'] : 0;
-            $data['table_id']    = isset( $data['table_id'] ) ? (int) $data['table_id'] : 0;
-            $data['location_id'] = isset( $data['location_id'] ) ? (int) $data['location_id'] : 0;
-
-            return $data;
-        }
-
-        /**
-         * Retrieve a single booking as an object.
-         *
-         * @param int $booking_id Booking identifier.
-         *
-         * @return object|false
-         */
-        public function get_booking( $booking_id ) {
-            $row = $this->fetch_booking_row( absint( $booking_id ) );
-            if ( ! $row ) {
-                return false;
-            }
-
-            return (object) $this->normalize_booking_row( $row );
-        }
-
-        /**
-         * Retrieve bookings scheduled for the provided date.
-         *
-         * @param int|null $location_id Location identifier.
-         * @param string   $date        Date string.
-         *
-         * @return array<int,object>
-         */
-        public function get_todays_bookings( $location_id = null, $date = null ) {
-            $date = $this->normalize_date( $date );
-            $args = array(
-                'date_from'   => $date,
-                'date_to'     => $date,
-                'per_page'    => 200,
-                'page'        => 1,
-                'orderby'     => 'booking_time',
-                'order'       => 'ASC',
-                'location_id' => absint( $location_id ),
-            );
-
-            $results = $this->get_bookings( $args );
-
-            return $results['bookings'];
-        }
-
-        /**
-         * Convenience wrapper for booking lists by date.
-         *
-         * @param int    $location_id Location identifier.
-         * @param string $date        Date string.
-         *
-         * @return array<int,object>
-         */
-        /**
-         * Aggregate booking statistics for dashboards.
-         *
-         * @param int         $location_id Location identifier.
-         * @param string|null $date        Date to analyse.
-         *
-         * @return array
-         */
-        public function get_location_stats( $location_id, $date = null ) {
-            if ( ! $this->table_exists( $this->table_name ) ) {
-                return $this->empty_stats();
-            }
-
-            global $wpdb;
-
-            $location_id = absint( $location_id );
-            $date        = $this->normalize_date( $date );
-
-            $where = array( $this->build_date_clause( '=', $date ) );
-            if ( $location_id && $this->column_exists( $this->table_name, 'location_id' ) ) {
-                $where[] = $wpdb->prepare( 'b.location_id = %d', $location_id );
-            }
-
-            $where_sql = 'WHERE ' . implode( ' AND ', $where );
-
-            $guest_expression = $this->column_exists( $this->table_name, 'party_size' ) ? 'COALESCE(SUM(b.party_size), 0)' : '0';
-            $revenue_expression = $this->total_column ? 'COALESCE(SUM(b.' . $this->total_column . '), 0)' : '0';
-
-            $stats_sql = 'SELECT
-                COUNT(*) AS total_bookings,
-                SUM(CASE WHEN b.status = "confirmed" THEN 1 ELSE 0 END) AS confirmed,
-                SUM(CASE WHEN b.status = "pending" THEN 1 ELSE 0 END) AS pending,
-                SUM(CASE WHEN b.status = "cancelled" THEN 1 ELSE 0 END) AS cancelled,
-                ' . $guest_expression . ' AS total_guests,
-                ' . $revenue_expression . ' AS revenue
-            FROM ' . $this->table_name . ' b ' . $where_sql;
-
-            $row = $wpdb->get_row( $stats_sql, ARRAY_A );
-
-            if ( ! $row ) {
-                $row = array();
-            }
-
-            $stats = array_merge(
-                $this->empty_stats(),
-                array(
-                    'total_bookings' => isset( $row['total_bookings'] ) ? (int) $row['total_bookings'] : 0,
-                    'confirmed'      => isset( $row['confirmed'] ) ? (int) $row['confirmed'] : 0,
-                    'pending'        => isset( $row['pending'] ) ? (int) $row['pending'] : 0,
-                    'cancelled'      => isset( $row['cancelled'] ) ? (int) $row['cancelled'] : 0,
-                    'total_guests'   => isset( $row['total_guests'] ) ? (int) $row['total_guests'] : 0,
-                    'revenue'        => isset( $row['revenue'] ) ? (float) $row['revenue'] : 0.0,
-                )
-            );
-
-            $capacity           = $this->get_location_capacity( $location_id );
-            $stats['occupancy_rate'] = $capacity > 0 ? round( min( 1, $stats['total_guests'] / $capacity ) * 100, 1 ) : 0.0;
-            $stats['currency']       = self::get_currency_symbol();
-
-            return $stats;
-        }
-
-        /**
-         * Return the default empty stats payload.
-         *
-         * @return array
-         */
-        protected function empty_stats() {
-            return array(
-                'total_bookings' => 0,
-                'confirmed'      => 0,
-                'pending'        => 0,
-                'cancelled'      => 0,
-                'total_guests'   => 0,
-                'revenue'        => 0.0,
-                'currency'       => self::get_currency_symbol(),
-                'occupancy_rate' => 0.0,
-            );
-        }
-
-        /**
-         * Calculate overall seating capacity for a location.
-         *
-         * @param int $location_id Location identifier.
-         *
-         * @return int
-         */
-        protected function get_location_capacity( $location_id ) {
-            if ( ! $location_id || ! $this->tables_table || ! $this->table_exists( $this->tables_table ) ) {
-                return 0;
-            }
-
-            if ( ! $this->column_exists( $this->tables_table, 'capacity' ) ) {
-                return 0;
-            }
-
-            global $wpdb;
-
-            $sql = $wpdb->prepare( 'SELECT COALESCE(SUM(capacity), 0) FROM ' . $this->tables_table . ' WHERE location_id = %d', $location_id );
-
-            return (int) $wpdb->get_var( $sql );
-        }
-
-        /**
-         * Create a new booking record.
-         *
-         * @param array $data Booking data.
-         *
-         * @return int|WP_Error
-         */
-        public function create_booking( $data ) {
-            if ( ! $this->table_exists( $this->table_name ) ) {
-                return new WP_Error( 'rb_table_missing', __( 'Booking table not installed.', 'restaurant-booking' ) );
-            }
-
-            global $wpdb;
-
-            $payload = $this->sanitize_booking_input( $data );
-            if ( is_wp_error( $payload ) ) {
-                return $payload;
-            }
-
-            $payload['created_at'] = current_time( 'mysql', true );
-            $payload['updated_at'] = current_time( 'mysql', true );
-
-            $inserted = $wpdb->insert( $this->table_name, $payload );
-            if ( false === $inserted ) {
-                return new WP_Error( 'rb_insert_failed', __( 'Unable to create booking.', 'restaurant-booking' ) );
-            }
-
-            return (int) $wpdb->insert_id;
-        }
-
-        /**
-         * Update an existing booking record.
-         *
-         * @param int   $booking_id Booking identifier.
-         * @param array $data       Updated data.
-         *
-         * @return bool|WP_Error
-         */
-        public function update_booking( $booking_id, $data ) {
-            if ( ! $this->table_exists( $this->table_name ) ) {
-                return new WP_Error( 'rb_table_missing', __( 'Booking table not installed.', 'restaurant-booking' ) );
-            }
-
-            global $wpdb;
-
-            $payload = $this->sanitize_booking_input( $data, true );
-            if ( is_wp_error( $payload ) ) {
-                return $payload;
-            }
-
-            $payload['updated_at'] = current_time( 'mysql', true );
-
-            $updated = $wpdb->update( $this->table_name, $payload, array( 'id' => absint( $booking_id ) ) );
-            if ( false === $updated ) {
-                return new WP_Error( 'rb_update_failed', __( 'Unable to update booking.', 'restaurant-booking' ) );
-            }
-
-            return true;
-        }
-
-        /**
-         * Instance helper to update booking status.
-         *
-         * @param string $status New status slug.
-         *
-         * @return bool
-         */
-        public function update_status( $status ) {
-            if ( ! $this->id ) {
-                return false;
-            }
-
-            $result = $this->update_booking( $this->id, array( 'status' => sanitize_key( $status ) ) );
-            if ( is_wp_error( $result ) ) {
-                return false;
-            }
-
-            $this->record = $this->normalize_booking_row( $this->fetch_booking_row( $this->id ) ?: array() );
-
-            return true;
-        }
-
-        /**
-         * Delete (soft delete) a booking record.
-         *
-         * @param int $booking_id Booking identifier.
-         *
-         * @return bool
-         */
-        public function delete_booking( $booking_id ) {
-            if ( ! $this->table_exists( $this->table_name ) ) {
-                return false;
-            }
-
-            global $wpdb;
-            $booking_id = absint( $booking_id );
-
-            if ( $this->column_exists( $this->table_name, 'status' ) && $this->column_exists( $this->table_name, 'updated_at' ) ) {
-                $updated = $wpdb->update(
-                    $this->table_name,
-                    array(
-                        'status'     => 'deleted',
-                        'updated_at' => current_time( 'mysql', true ),
-                    ),
-                    array( 'id' => $booking_id )
-                );
-
-                return false !== $updated;
-            }
-
-            $deleted = $wpdb->delete( $this->table_name, array( 'id' => $booking_id ) );
-
-            return false !== $deleted;
-        }
-
-        /**
-         * Instance deletion helper used by controllers.
-         *
-         * @return bool
-         */
-        public function delete() {
-            if ( ! $this->id ) {
-                return false;
-            }
-
-            $deleted = $this->delete_booking( $this->id );
-            if ( $deleted ) {
-                $this->record = array();
-            }
-
-            return $deleted;
-        }
-
-        /**
-         * Sanitize booking input payload before persistence.
-         *
-         * @param array $data       Raw data.
-         * @param bool  $for_update Flag indicating update context.
-         *
-         * @return array|WP_Error
-         */
-        protected function sanitize_booking_input( $data, $for_update = false ) {
-            if ( empty( $data ) || ! is_array( $data ) ) {
-                return new WP_Error( 'rb_invalid_data', __( 'No booking data supplied.', 'restaurant-booking' ) );
-            }
-
-            $allowed = array();
-
-            $map = array(
-                'customer_name'    => 'sanitize_text_field',
-                'customer_email'   => 'sanitize_email',
-                'customer_phone'   => 'sanitize_text_field',
-                'status'           => 'sanitize_key',
-                'special_requests' => 'wp_kses_post',
-            );
-
-            foreach ( $map as $field => $callback ) {
-                if ( isset( $data[ $field ] ) && $this->column_exists( $this->table_name, $field ) ) {
-                    $allowed[ $field ] = call_user_func( $callback, $data[ $field ] );
-                }
-            }
-
-            if ( isset( $data['party_size'] ) && $this->column_exists( $this->table_name, 'party_size' ) ) {
-                $allowed['party_size'] = max( 1, (int) $data['party_size'] );
-            }
-
-            if ( isset( $data['table_id'] ) && $this->column_exists( $this->table_name, 'table_id' ) ) {
-                $allowed['table_id'] = absint( $data['table_id'] );
-            }
-
-            if ( isset( $data['location_id'] ) && $this->column_exists( $this->table_name, 'location_id' ) ) {
-                $allowed['location_id'] = absint( $data['location_id'] );
-            }
-
-            if ( isset( $data['booking_date'] ) && $this->column_exists( $this->table_name, 'booking_date' ) ) {
-                $allowed['booking_date'] = $this->normalize_date( $data['booking_date'] );
-            }
-
-            if ( isset( $data['booking_time'] ) && $this->column_exists( $this->table_name, 'booking_time' ) ) {
-                $allowed['booking_time'] = sanitize_text_field( $data['booking_time'] );
-            }
-
-            if ( isset( $data['booking_datetime'] ) && $this->column_exists( $this->table_name, 'booking_datetime' ) ) {
-                $allowed['booking_datetime'] = gmdate( 'Y-m-d H:i:s', strtotime( $data['booking_datetime'] ) );
-            }
-
-            if ( $this->total_column && isset( $data[ $this->total_column ] ) ) {
-                $allowed[ $this->total_column ] = floatval( $data[ $this->total_column ] );
-            }
-
-            if ( ! $for_update && empty( $allowed ) ) {
-                return new WP_Error( 'rb_invalid_data', __( 'No valid booking fields supplied.', 'restaurant-booking' ) );
-            }
-
-            return $allowed;
-        }
-
-        /**
-         * Static convenience wrapper for admin booking lists.
-         *
-         * @param int|string $location Location identifier.
-         * @param string     $status   Status filter.
-         * @param int        $page     Page number.
-         *
-         * @return array
-         */
-        public static function get_admin_bookings( $location = '', $status = '', $page = 1 ) {
-            $model = self::instance();
-
-            $results = $model->get_bookings(
-                array(
-                    'location_id' => absint( $location ),
-                    'status'      => $status,
-                    'page'        => max( 1, (int) $page ),
-                )
-            );
-
-            return array(
-                'items'      => $results['bookings'],
-                'pagination' => array(
-                    'current_page' => $results['page'],
-                    'total_pages'  => $results['pages'],
-                    'total_items'  => $results['total'],
-                ),
-            );
-        }
-
-        /**
-         * Count bookings by date and location.
-         *
-         * @param string $date        Date string.
-         * @param int    $location_id Location identifier.
-         *
-         * @return int
-         */
-        public static function count_by_date_and_location( $date, $location_id ) {
-            $stats = self::instance()->get_location_stats( $location_id, $date );
-
-            return isset( $stats['total_bookings'] ) ? (int) $stats['total_bookings'] : 0;
-        }
-
-        /**
-         * Sum revenue by date and location.
-         *
-         * @param string $date        Date string.
-         * @param int    $location_id Location identifier.
-         *
-         * @return float
-         */
-        public static function sum_revenue_by_date_and_location( $date, $location_id ) {
-            $stats = self::instance()->get_location_stats( $location_id, $date );
-
-            return isset( $stats['revenue'] ) ? (float) $stats['revenue'] : 0.0;
-        }
-
-        /**
-         * Retrieve recent bookings for the portal dashboard.
-         *
-         * @param int $location_id Location identifier.
-         * @param int $limit       Result limit.
-         *
-         * @return array<int,object>
-         */
-        public static function get_recent_for_portal( $location_id, $limit = 5 ) {
-            $results = self::instance()->get_bookings(
-                array(
-                    'location_id' => absint( $location_id ),
-                    'per_page'    => max( 1, (int) $limit ),
-                    'page'        => 1,
-                    'orderby'     => 'created_at',
-                    'order'       => 'DESC',
-                )
-            );
-
-            return $results['bookings'];
-        }
-
-        /**
-         * Generic query wrapper used by legacy components.
-         *
-         * @param array $args Query arguments.
-         *
-         * @return array
-         */
-        public static function query( $args = array() ) {
-            $results = self::instance()->get_bookings( $args );
-
-            return array(
-                'items' => $results['bookings'],
-                'total' => $results['total'],
-            );
-        }
-
-        /**
-         * Fetch bookings for export routines.
-         *
-         * @param array $filters Export filters.
-         *
-         * @return array<int,array>
-         */
-        public static function get_bookings_for_export( $filters = array() ) {
-            $results = self::instance()->get_bookings(
-                array_merge(
-                    $filters,
-                    array(
-                        'per_page' => 5000,
-                        'page'     => 1,
-                        'order'    => 'DESC',
-                    )
-                )
-            );
-
-            $export = array();
-            foreach ( $results['bookings'] as $booking ) {
-                $export[] = (array) $booking;
-            }
-
-            return $export;
-        }
-
-        /**
-         * Provide a filtered booking dataset tailored for paginated listings.
-         *
-         * @param array  $filters   Filters.
-         * @param int    $page      Page number.
-         * @param int    $page_size Page size.
-         * @param string $sort_by   Sort column.
-         * @param string $sort_order Sort direction.
-         *
-         * @return array
-         */
-        public static function get_bookings_with_filters( $filters = array(), $page = 1, $page_size = 20, $sort_by = 'booking_date', $sort_order = 'DESC' ) {
-            $filters = is_array( $filters ) ? $filters : array();
-
-            $args = array_merge(
-                $filters,
-                array(
-                    'page'     => max( 1, (int) $page ),
-                    'per_page' => max( 1, (int) $page_size ),
-                    'orderby'  => $sort_by,
-                    'order'    => $sort_order,
-                )
-            );
-
-            $results = self::instance()->get_bookings( $args );
-
-            return array(
-                'items'    => $results['bookings'],
-                'total'    => $results['total'],
-                'page'     => $results['page'],
-                'pages'    => $results['pages'],
-                'per_page' => $results['per_page'],
-            );
-        }
-
-        /**
-         * Provide calendar-style booking data grouped by day.
-         *
-         * @param int    $month  Month number.
-         * @param int    $year   Year.
-         * @param string $view   View key (month/week).
-         * @param array  $filters Additional filters.
-         *
-         * @return array
-         */
-        public static function get_calendar_data( $month, $year, $view = 'month', $filters = array() ) {
-            $month = max( 1, min( 12, (int) $month ) );
-            $year  = max( 1970, (int) $year );
-
-            $start = gmdate( 'Y-m-01', strtotime( sprintf( '%04d-%02d-01', $year, $month ) ) );
-            $end   = gmdate( 'Y-m-t', strtotime( $start ) );
-
-            $args = array_merge(
-                $filters,
-                array(
-                    'date_from' => $start,
-                    'date_to'   => $end,
-                    'per_page'  => 5000,
-                    'page'      => 1,
-                    'orderby'   => 'booking_date',
-                    'order'     => 'ASC',
-                )
-            );
-
-            $results  = self::instance()->get_bookings( $args );
-            $calendar = array();
-
-            foreach ( $results['bookings'] as $booking ) {
-                $date_key = isset( $booking->booking_date ) && $booking->booking_date ? $booking->booking_date : $start;
-                if ( ! isset( $calendar[ $date_key ] ) ) {
-                    $calendar[ $date_key ] = array();
-                }
-                $calendar[ $date_key ][] = $booking;
-            }
-
-            $days = array();
-            foreach ( $calendar as $date => $items ) {
-                $days[] = array(
-                    'date'     => $date,
-                    'bookings' => $items,
-                );
-            }
-
-            return array(
-                'month' => $month,
-                'year'  => $year,
-                'view'  => $view,
-                'days'  => $days,
-            );
-        }
-
-        /**
-         * Static helper to expose bookings by date for other components.
-         *
-         * @param int    $location_id Location identifier.
-         * @param string $date        Date string.
-         *
-         * @return array<int,object>
-         */
-        public static function get_bookings_by_date( $location_id, $date ) {
-            return self::instance()->get_todays_bookings( $location_id, $date );
-        }
-
-        /**
-         * Expose today's bookings for convenience.
-         *
-         * @param int    $location_id Location identifier.
-         * @param string $date        Date string.
-         *
-         * @return array<int,object>
-         */
-        public static function get_todays_bookings_for_location( $location_id, $date ) {
-            return self::instance()->get_todays_bookings( $location_id, $date );
-        }
-
-        /**
-         * Retrieve the currency symbol used for revenue totals.
-         *
-         * @return string
-         */
-        public static function get_currency_symbol() {
-            if ( null !== self::$currency_symbol ) {
-                return self::$currency_symbol;
-            }
-
-            $symbol = get_option( 'restaurant_booking_currency_symbol' );
-            if ( empty( $symbol ) && function_exists( 'get_woocommerce_currency_symbol' ) ) {
-                $symbol = get_woocommerce_currency_symbol();
-            }
-
-            if ( empty( $symbol ) ) {
-                $currency = get_option( 'restaurant_booking_currency', get_option( 'woocommerce_currency', 'USD' ) );
-                $symbol   = apply_filters( 'restaurant_booking_currency_symbol', $currency, $currency );
-            }
-
-            if ( empty( $symbol ) ) {
-                $symbol = '$';
-            }
-
-            self::$currency_symbol = $symbol;
-
-            return self::$currency_symbol;
         }
     }
 }

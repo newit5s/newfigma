@@ -124,7 +124,8 @@ modern-restaurant-booking/
 │   │   ├── booking-management.css         # Back-office booking styles
 │   │   ├── portal-dashboard.css           # Portal dashboard styles
 │   │   ├── table-management.css           # Floor plan styles
-│   │   └── components.css                 # Shared component styles
+│   │   ├── components.css                 # Shared component styles
+│   │   └── modern-admin.css               # WordPress admin panel styles (NEW)
 │   ├── js/
 │   │   ├── theme-manager.js               # ✓ Theme persistence (Updated)
 │   │   ├── booking-widget.js              # Booking widget logic
