@@ -535,6 +535,11 @@ function restaurant_booking_show_manage_capability_notice() {
         return;
     }
 
+    $diagnostics = restaurant_booking_get_manage_access_diagnostics( get_current_user_id() );
+    $issues      = isset( $diagnostics['issues'] ) && is_array( $diagnostics['issues'] )
+        ? array_filter( array_map( 'wp_strip_all_tags', $diagnostics['issues'] ) )
+        : array();
+
     $command = sprintf(
         'wp restaurant-booking doctor --user=%d',
         get_current_user_id()
@@ -550,7 +555,20 @@ function restaurant_booking_show_manage_capability_notice() {
         esc_html( $capability ),
         '<code>' . esc_html( $command ) . '</code>'
     );
-    echo '</p></div>';
+    echo '</p>';
+
+    if ( ! empty( $issues ) ) {
+        echo '<p>' . esc_html__( 'Diagnostic summary:', 'restaurant-booking' ) . '</p>';
+        echo '<ul>';
+
+        foreach ( $issues as $issue ) {
+            echo '<li>' . esc_html( $issue ) . '</li>';
+        }
+
+        echo '</ul>';
+    }
+
+    echo '</div>';
 }
 add_action( 'admin_notices', 'restaurant_booking_show_manage_capability_notice' );
 
@@ -611,6 +629,163 @@ function restaurant_booking_user_can_manage() {
     }
 
     return false;
+}
+
+/**
+ * Build diagnostic data explaining why access to the settings may be missing.
+ *
+ * @param int|null $user_id Optional user identifier. Defaults to the current user when available.
+ *
+ * @return array {
+ *     @type string     $capability                       Required capability for managing bookings.
+ *     @type string     $fallback                         Fallback capability granted to administrators.
+ *     @type bool       $has_filter                       Whether a customization filter is registered.
+ *     @type array      $roles                            Role-level capability information.
+ *     @type array      $roles_with_capability            Role slugs that explicitly grant the capability.
+ *     @type array      $roles_with_capability_labels     Human friendly labels for roles that grant the capability.
+ *     @type array      $roles_with_fallback              Roles that inherit access via the fallback capability.
+ *     @type array      $roles_with_fallback_labels       Human friendly labels for fallback roles.
+ *     @type array      $roles_missing_capability         Roles missing both the capability and fallback.
+ *     @type array      $roles_missing_capability_labels  Human friendly labels for missing roles.
+ *     @type array|null $user                             Current or inspected user diagnostic details.
+ *     @type array      $issues                           Human readable list of detected issues.
+ * }
+ */
+function restaurant_booking_get_manage_access_diagnostics( $user_id = null ) {
+    $capability = restaurant_booking_get_manage_capability();
+    $fallback   = 'manage_options';
+
+    $roles_data                    = array();
+    $roles_with_capability         = array();
+    $roles_with_fallback           = array();
+    $roles_missing_capability      = array();
+    $issues                        = array();
+    $role_labels_map               = array();
+    $has_custom_capability_filter  = false;
+
+    if ( function_exists( 'has_filter' ) ) {
+        $has_custom_capability_filter = has_filter( 'restaurant_booking_manage_capability' );
+    }
+
+    $wp_roles = wp_roles();
+
+    if ( $wp_roles instanceof WP_Roles ) {
+        $role_labels_map = is_array( $wp_roles->role_names ) ? $wp_roles->role_names : array();
+
+        foreach ( $wp_roles->role_objects as $role_slug => $role ) {
+            if ( ! $role instanceof WP_Role ) {
+                continue;
+            }
+
+            $role_has_capability = $role->has_cap( $capability );
+            $role_has_fallback   = ( 'manage_options' !== $capability ) ? $role->has_cap( $fallback ) : $role_has_capability;
+
+            $roles_data[ $role_slug ] = array(
+                'label'          => isset( $role_labels_map[ $role_slug ] ) ? $role_labels_map[ $role_slug ] : $role_slug,
+                'has_capability' => $role_has_capability,
+                'has_fallback'   => $role_has_fallback,
+            );
+
+            if ( $role_has_capability ) {
+                $roles_with_capability[] = $role_slug;
+            } elseif ( $role_has_fallback ) {
+                $roles_with_fallback[] = $role_slug;
+            } else {
+                $roles_missing_capability[] = $role_slug;
+            }
+        }
+
+        if ( empty( $roles_with_capability ) && 'manage_options' !== $capability ) {
+            $issues[] = sprintf(
+                /* translators: %s capability slug. */
+                __( 'No roles currently grant the "%s" capability.', 'restaurant-booking' ),
+                $capability
+            );
+        }
+    }
+
+    if ( $has_custom_capability_filter && 'manage_bookings' !== $capability ) {
+        $issues[] = sprintf(
+            /* translators: %s capability slug. */
+            __( 'The required capability has been changed to "%s" via a filter. Ensure roles grant this capability.', 'restaurant-booking' ),
+            $capability
+        );
+    }
+
+    $format_role_label = function( $role_slug ) use ( $role_labels_map ) {
+        return isset( $role_labels_map[ $role_slug ] ) ? $role_labels_map[ $role_slug ] : $role_slug;
+    };
+
+    $user_info = null;
+    $resolved_user_id = null === $user_id ? get_current_user_id() : (int) $user_id;
+
+    if ( $resolved_user_id > 0 ) {
+        $user = get_user_by( 'id', $resolved_user_id );
+
+        if ( $user instanceof WP_User ) {
+            $user_has_capability = user_can( $user, $capability );
+            $user_has_fallback   = ( 'manage_options' !== $capability ) ? user_can( $user, $fallback ) : $user_has_capability;
+
+            $role_labels = array_map( $format_role_label, $user->roles );
+
+            $user_info = array(
+                'id'             => $user->ID,
+                'login'          => $user->user_login,
+                'roles'          => $user->roles,
+                'role_labels'    => $role_labels,
+                'has_capability' => $user_has_capability,
+                'has_fallback'   => $user_has_fallback,
+            );
+
+            if ( ! $user_has_capability && ! $user_has_fallback ) {
+                if ( empty( $user->roles ) ) {
+                    $issues[] = __( 'This account does not have any roles assigned.', 'restaurant-booking' );
+                } else {
+                    $issues[] = sprintf(
+                        /* translators: 1: comma separated roles, 2: capability slug. */
+                        __( 'The assigned roles (%1$s) do not grant the "%2$s" capability.', 'restaurant-booking' ),
+                        implode( ', ', $role_labels ),
+                        $capability
+                    );
+
+                    if ( ! empty( $roles_with_capability ) ) {
+                        $issues[] = sprintf(
+                            /* translators: 1: capability slug, 2: comma separated roles. */
+                            __( 'Roles that currently provide access: %2$s. Assign one of these roles or add the "%1$s" capability manually.', 'restaurant-booking' ),
+                            $capability,
+                            implode( ', ', array_map( $format_role_label, $roles_with_capability ) )
+                        );
+                    }
+                }
+            }
+        } else {
+            $issues[] = __( 'The specified user could not be located for diagnostics.', 'restaurant-booking' );
+
+            $user_info = array(
+                'id'             => $resolved_user_id,
+                'login'          => '',
+                'roles'          => array(),
+                'role_labels'    => array(),
+                'has_capability' => false,
+                'has_fallback'   => false,
+            );
+        }
+    }
+
+    return array(
+        'capability'                      => $capability,
+        'fallback'                        => $fallback,
+        'has_filter'                      => $has_custom_capability_filter,
+        'roles'                           => $roles_data,
+        'roles_with_capability'           => $roles_with_capability,
+        'roles_with_capability_labels'    => array_map( $format_role_label, $roles_with_capability ),
+        'roles_with_fallback'             => $roles_with_fallback,
+        'roles_with_fallback_labels'      => array_map( $format_role_label, $roles_with_fallback ),
+        'roles_missing_capability'        => $roles_missing_capability,
+        'roles_missing_capability_labels' => array_map( $format_role_label, $roles_missing_capability ),
+        'user'                            => $user_info,
+        'issues'                          => array_values( array_unique( $issues ) ),
+    );
 }
 
 /**
@@ -836,8 +1011,26 @@ if ( defined( 'WP_CLI' ) && WP_CLI && class_exists( 'WP_CLI_Command' ) ) {
              * @param array $assoc_args Associative arguments.
              */
             public function doctor( $args, $assoc_args ) {
-                $capability = restaurant_booking_get_manage_capability();
-                $fallback   = 'manage_options';
+                if ( ! function_exists( 'restaurant_booking_get_manage_access_diagnostics' ) ) {
+                    WP_CLI::error( 'Capability diagnostics are unavailable. Ensure the plugin is loaded.' );
+                }
+
+                $target_user = null;
+
+                if ( isset( $assoc_args['user'] ) ) {
+                    $target_user = $this->locate_user_for_doctor( $assoc_args['user'] );
+
+                    if ( ! $target_user instanceof WP_User ) {
+                        WP_CLI::error( 'Unable to locate the requested user.' );
+                    }
+
+                    $diagnostics = restaurant_booking_get_manage_access_diagnostics( $target_user->ID );
+                } else {
+                    $diagnostics = restaurant_booking_get_manage_access_diagnostics();
+                }
+
+                $capability = isset( $diagnostics['capability'] ) ? $diagnostics['capability'] : restaurant_booking_get_manage_capability();
+                $fallback   = isset( $diagnostics['fallback'] ) ? $diagnostics['fallback'] : 'manage_options';
 
                 WP_CLI::log( sprintf( 'Configured manage capability: %s', $capability ) );
 
@@ -847,25 +1040,20 @@ if ( defined( 'WP_CLI' ) && WP_CLI && class_exists( 'WP_CLI_Command' ) ) {
                     WP_CLI::log( 'Configured capability already matches manage_options.' );
                 }
 
-                $wp_roles = wp_roles();
-
-                if ( $wp_roles instanceof WP_Roles && ! empty( $wp_roles->role_objects ) ) {
+                if ( ! empty( $diagnostics['roles'] ) && is_array( $diagnostics['roles'] ) ) {
                     WP_CLI::log( 'Role capability assignments:' );
 
-                    foreach ( $wp_roles->role_objects as $role_slug => $role ) {
-                        if ( ! $role instanceof WP_Role ) {
+                    foreach ( $diagnostics['roles'] as $role_slug => $role_info ) {
+                        if ( ! is_array( $role_info ) ) {
                             continue;
                         }
 
-                        $has_configured = $role->has_cap( $capability );
-                        $has_fallback   = $capability !== $fallback && $role->has_cap( $fallback );
+                        $status = sprintf( 'missing %s', $capability );
 
-                        if ( $has_configured ) {
+                        if ( ! empty( $role_info['has_capability'] ) ) {
                             $status = sprintf( 'has %s', $capability );
-                        } elseif ( $has_fallback ) {
+                        } elseif ( $capability !== $fallback && ! empty( $role_info['has_fallback'] ) ) {
                             $status = sprintf( 'falls back via %s', $fallback );
-                        } else {
-                            $status = sprintf( 'missing %s', $capability );
                         }
 
                         WP_CLI::line( sprintf( '  - %s: %s', $role_slug, $status ) );
@@ -874,28 +1062,41 @@ if ( defined( 'WP_CLI' ) && WP_CLI && class_exists( 'WP_CLI_Command' ) ) {
                     WP_CLI::warning( 'No roles were detected. Ensure WordPress is fully loaded.' );
                 }
 
-                if ( isset( $assoc_args['user'] ) ) {
-                    $user = $this->locate_user_for_doctor( $assoc_args['user'] );
+                $user_info = isset( $diagnostics['user'] ) && is_array( $diagnostics['user'] )
+                    ? $diagnostics['user']
+                    : null;
 
-                    if ( ! $user instanceof WP_User ) {
-                        WP_CLI::error( 'Unable to locate the requested user.' );
-                    }
+                if ( $user_info ) {
+                    $user_login = ! empty( $user_info['login'] ) ? $user_info['login'] : 'unknown';
+                    $user_id    = isset( $user_info['id'] ) ? (int) $user_info['id'] : 0;
 
-                    $has_user_cap       = user_can( $user, $capability );
-                    $has_user_fallback  = $capability !== $fallback && user_can( $user, $fallback );
-                    $user_identifier    = $user->user_login;
+                    WP_CLI::log( sprintf( 'User %s (%d):', $user_login, $user_id ) );
 
-                    WP_CLI::log( sprintf( 'User %s (%d):', $user_identifier, $user->ID ) );
-
-                    if ( $has_user_cap ) {
+                    if ( ! empty( $user_info['has_capability'] ) ) {
                         WP_CLI::success( sprintf( 'User already has %s.', $capability ) );
-                    } elseif ( $has_user_fallback ) {
+                    } elseif ( $capability !== $fallback && ! empty( $user_info['has_fallback'] ) ) {
                         WP_CLI::warning( sprintf( 'User lacks %1$s but inherits access through %2$s.', $capability, $fallback ) );
                     } else {
                         WP_CLI::warning( sprintf( 'User is missing both %1$s and %2$s.', $capability, $fallback ) );
+
+                        if ( isset( $user_info['role_labels'] ) ) {
+                            if ( ! empty( $user_info['role_labels'] ) ) {
+                                WP_CLI::log( sprintf( 'Assigned roles: %s', implode( ', ', $user_info['role_labels'] ) ) );
+                            } else {
+                                WP_CLI::log( 'Assigned roles: (none)' );
+                            }
+                        }
                     }
                 } else {
                     WP_CLI::log( 'Provide --user=<id|login|email> to inspect a specific account.' );
+                }
+
+                if ( ! empty( $diagnostics['issues'] ) && is_array( $diagnostics['issues'] ) ) {
+                    WP_CLI::log( 'Potential issues detected:' );
+
+                    foreach ( $diagnostics['issues'] as $issue ) {
+                        WP_CLI::line( '  - ' . $issue );
+                    }
                 }
 
                 WP_CLI::log( sprintf( 'Add the capability to a role with: wp cap add <role> %s', $capability ) );
