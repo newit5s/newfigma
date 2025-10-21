@@ -239,3 +239,30 @@
 - [x] `php -l includes/models/class-booking.php`
 - [x] Reviewed `assets/js/modern-admin.js` expectations to confirm summary keys (`total_revenue`, `status_counts`, `average_party_size`) match the updated PHP responses.
 - [x] Manually inspected guard clauses for `RB_Table` and bookings table availability to ensure empty datasets do not trigger errors.
+
+## Test Phrase 8
+- Logged the eighth verification phrase to confirm the mobile optimisation and PWA enhancements requested for Phase 8.
+- Summarised the new mobile navigation shell, pull-to-refresh gestures, offline banner, and install prompt shipped with this iteration.
+- Recorded that **PHRASE 8** ("Mobile optimization và PWA enhancement hoàn thành...") now applies to the manager portal experience.
+
+## Phase 8 Checklist Verification
+- Audited `public/partials/portal-dashboard.php`, `assets/css/portal-dashboard-mobile.css`, and `assets/js/mobile-dashboard.js` to confirm the responsive layout, touch interactions, and offline affordances match the prompt guidance.
+- Verified that `public/class-modern-dashboard.php` enqueues the new mobile bundles and localises service worker + manifest URLs so the dashboard registers the PWA assets when rendered.
+- Confirmed that the new `manifest.json` and root-level `sw.js` files provide a lightweight offline fallback and installable metadata aligned with the mobile enhancements brief.
+
+### Acceptance Criteria
+1. **Mobile Navigation & Layout**
+   - [x] Mobile header, navigation drawer, and bottom navigation rendered in `portal-dashboard.php` with dedicated styles in `portal-dashboard-mobile.css`.
+2. **Touch Interactions & Gestures**
+   - [x] `mobile-dashboard.js` wires swipe actions for booking cards, quick action buttons, and haptic feedback helpers.
+3. **Pull-to-Refresh & Offline Messaging**
+   - [x] Pull-to-refresh indicator, success toast, and offline banner implemented for the mobile content container.
+4. **Progressive Web App Support**
+   - [x] Service worker registered via the mobile script with offline fallback while `manifest.json` exposes install metadata.
+5. **Responsive Dashboard Metrics**
+   - [x] Mobile stat cards reuse initial dashboard data and surface trend percentages with appropriate formatting.
+
+### Testing Checklist
+- [x] `php -l public/class-modern-dashboard.php`
+- [x] `php -l public/partials/portal-dashboard.php`
+- [x] Manually reviewed `assets/js/mobile-dashboard.js` and `sw.js` to confirm registration paths and caching strategy align with the plugin directory scope.

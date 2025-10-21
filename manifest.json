@@ -1,0 +1,11 @@
+{
+  "name": "Restaurant Booking Manager",
+  "short_name": "RB Manager",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "description": "Mobile optimised restaurant manager portal.",
+  "icons": []
+}

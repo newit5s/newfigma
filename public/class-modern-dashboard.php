@@ -104,6 +104,13 @@ if ( ! class_exists( 'RB_Modern_Dashboard' ) ) {
                 $version
             );
 
+            wp_enqueue_style(
+                'rb-portal-dashboard-mobile',
+                $base_url . 'assets/css/portal-dashboard-mobile.css',
+                array( 'rb-portal-dashboard' ),
+                $version
+            );
+
             wp_enqueue_script(
                 'chart-js',
                 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js',
@@ -136,6 +143,14 @@ if ( ! class_exists( 'RB_Modern_Dashboard' ) ) {
                 true
             );
 
+            wp_enqueue_script(
+                'rb-mobile-dashboard',
+                $base_url . 'assets/js/mobile-dashboard.js',
+                array( 'rb-portal-dashboard' ),
+                $version,
+                true
+            );
+
             wp_localize_script(
                 'rb-portal-dashboard',
                 'rbDashboard',
@@ -152,6 +167,32 @@ if ( ! class_exists( 'RB_Modern_Dashboard' ) ) {
                         'error'       => __( 'Unable to load data.', 'restaurant-booking' ),
                         'no_data'     => __( 'No bookings', 'restaurant-booking' ),
                         'add_booking' => __( 'Add Booking', 'restaurant-booking' ),
+                    ),
+                )
+            );
+
+            wp_localize_script(
+                'rb-mobile-dashboard',
+                'rbMobileConfig',
+                array(
+                    'ajaxUrl'      => admin_url( 'admin-ajax.php' ),
+                    'nonce'        => wp_create_nonce( 'rb_dashboard_nonce' ),
+                    'serviceWorker'=> plugins_url( 'sw.js', RB_PLUGIN_FILE ),
+                    'manifestUrl'  => plugins_url( 'manifest.json', RB_PLUGIN_FILE ),
+                    'homeUrl'      => home_url( '/' ),
+                    'strings'      => array(
+                        'pullToRefresh' => __( 'Pull to refresh', 'restaurant-booking' ),
+                        'refreshing'    => __( 'Refreshing dashboard…', 'restaurant-booking' ),
+                        'refreshed'     => __( 'Dashboard updated', 'restaurant-booking' ),
+                        'offline'       => __( 'You are offline. Some features may be limited.', 'restaurant-booking' ),
+                        'online'        => __( 'Back online', 'restaurant-booking' ),
+                        'installTitle'  => __( 'Install Restaurant Booking', 'restaurant-booking' ),
+                        'installMessage'=> __( 'Add the manager portal to your home screen for quick access.', 'restaurant-booking' ),
+                        'installAction' => __( 'Install', 'restaurant-booking' ),
+                        'dismissAction' => __( 'Dismiss', 'restaurant-booking' ),
+                        'confirmSuccess'=> __( 'Booking confirmed', 'restaurant-booking' ),
+                        'cancelSuccess' => __( 'Booking cancelled', 'restaurant-booking' ),
+                        'actionError'   => __( 'Unable to complete the action. Please try again.', 'restaurant-booking' ),
                     ),
                 )
             );
