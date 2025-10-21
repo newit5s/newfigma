@@ -196,6 +196,26 @@ function restaurant_booking_get_settings_page_url() {
 }
 
 /**
+ * Retrieve the slug used for the access diagnostics screen.
+ *
+ * @return string
+ */
+function restaurant_booking_get_access_diagnostics_page_slug() {
+    return 'restaurant-booking-access-diagnostics';
+}
+
+/**
+ * Retrieve the admin URL for the access diagnostics screen.
+ *
+ * @return string
+ */
+function restaurant_booking_get_access_diagnostics_page_url() {
+    $slug = restaurant_booking_get_access_diagnostics_page_slug();
+
+    return admin_url( 'tools.php?page=' . $slug );
+}
+
+/**
  * Retrieve the default plugin settings.
  *
  * @return array
@@ -535,10 +555,11 @@ function restaurant_booking_show_manage_capability_notice() {
         return;
     }
 
-    $diagnostics = restaurant_booking_get_manage_access_diagnostics( get_current_user_id() );
-    $issues      = isset( $diagnostics['issues'] ) && is_array( $diagnostics['issues'] )
+    $diagnostics     = restaurant_booking_get_manage_access_diagnostics( get_current_user_id() );
+    $issues          = isset( $diagnostics['issues'] ) && is_array( $diagnostics['issues'] )
         ? array_filter( array_map( 'wp_strip_all_tags', $diagnostics['issues'] ) )
         : array();
+    $diagnostics_url = restaurant_booking_get_access_diagnostics_page_url();
 
     $command = sprintf(
         'wp restaurant-booking doctor --user=%d',
@@ -546,14 +567,23 @@ function restaurant_booking_show_manage_capability_notice() {
     );
 
     echo '<div class="notice notice-warning"><p>';
-    printf(
-        /* translators: %1$s capability slug, %2$s WP-CLI command. */
-        esc_html__(
-            'Restaurant Booking Manager detected that your account is missing the "%1$s" capability required to access the booking settings. Run %2$s to inspect role assignments or re-add the capability for your role.',
-            'restaurant-booking'
+    echo wp_kses(
+        sprintf(
+            /* translators: 1: capability slug, 2: WP-CLI command, 3: diagnostics page link. */
+            __(
+                'Restaurant Booking Manager detected that your account is missing the "%1$s" capability required to access the booking settings. Run %2$s or review the %3$s to inspect role assignments or re-add the capability for your role.',
+                'restaurant-booking'
+            ),
+            esc_html( $capability ),
+            '<code>' . esc_html( $command ) . '</code>',
+            '<a href="' . esc_url( $diagnostics_url ) . '">' . esc_html__( 'access diagnostics page', 'restaurant-booking' ) . '</a>'
         ),
-        esc_html( $capability ),
-        '<code>' . esc_html( $command ) . '</code>'
+        array(
+            'a'    => array(
+                'href' => array(),
+            ),
+            'code' => array(),
+        )
     );
     echo '</p>';
 
@@ -571,6 +601,275 @@ function restaurant_booking_show_manage_capability_notice() {
     echo '</div>';
 }
 add_action( 'admin_notices', 'restaurant_booking_show_manage_capability_notice' );
+
+/**
+ * Locate a user record for diagnostics using an identifier.
+ *
+ * @param string|int $identifier User ID, login, or email address.
+ *
+ * @return WP_User|null
+ */
+function restaurant_booking_locate_user_for_diagnostics( $identifier ) {
+    if ( '' === $identifier || null === $identifier ) {
+        return null;
+    }
+
+    if ( is_numeric( $identifier ) ) {
+        $user = get_user_by( 'id', (int) $identifier );
+
+        if ( $user instanceof WP_User ) {
+            return $user;
+        }
+    }
+
+    $user = get_user_by( 'login', $identifier );
+    if ( $user instanceof WP_User ) {
+        return $user;
+    }
+
+    $user = get_user_by( 'email', $identifier );
+    if ( $user instanceof WP_User ) {
+        return $user;
+    }
+
+    return null;
+}
+
+/**
+ * Register the Tools > Booking Access Diagnostics page.
+ */
+function restaurant_booking_register_access_diagnostics_page() {
+    add_management_page(
+        __( 'Booking Access Diagnostics', 'restaurant-booking' ),
+        __( 'Booking Access Diagnostics', 'restaurant-booking' ),
+        'manage_options',
+        restaurant_booking_get_access_diagnostics_page_slug(),
+        'restaurant_booking_render_access_diagnostics_page'
+    );
+}
+add_action( 'admin_menu', 'restaurant_booking_register_access_diagnostics_page' );
+
+/**
+ * Render the access diagnostics admin screen.
+ */
+function restaurant_booking_render_access_diagnostics_page() {
+    if ( ! current_user_can( 'manage_options' ) ) {
+        wp_die( __( 'You do not have permission to access this page.', 'restaurant-booking' ) );
+    }
+
+    $user_param      = 'rb_diag_user';
+    $user_identifier = '';
+    $inspected_user  = null;
+
+    if ( isset( $_GET[ $user_param ] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+        $user_identifier = sanitize_text_field( wp_unslash( $_GET[ $user_param ] ) );
+
+        if ( '' !== $user_identifier ) {
+            $inspected_user = restaurant_booking_locate_user_for_diagnostics( $user_identifier );
+        }
+    }
+
+    $diagnostic_user_id = null;
+
+    if ( $inspected_user instanceof WP_User ) {
+        $diagnostic_user_id = $inspected_user->ID;
+    } elseif ( '' !== $user_identifier && is_numeric( $user_identifier ) ) {
+        $diagnostic_user_id = (int) $user_identifier;
+    }
+
+    $diagnostics = restaurant_booking_get_manage_access_diagnostics( $diagnostic_user_id );
+
+    $capability = isset( $diagnostics['capability'] ) ? $diagnostics['capability'] : restaurant_booking_get_manage_capability();
+    $fallback   = isset( $diagnostics['fallback'] ) ? $diagnostics['fallback'] : 'manage_options';
+    $roles      = isset( $diagnostics['roles'] ) && is_array( $diagnostics['roles'] ) ? $diagnostics['roles'] : array();
+    $user_info  = isset( $diagnostics['user'] ) && is_array( $diagnostics['user'] ) ? $diagnostics['user'] : null;
+    $issues     = isset( $diagnostics['issues'] ) && is_array( $diagnostics['issues'] ) ? $diagnostics['issues'] : array();
+
+    if ( '' !== $user_identifier && ! $inspected_user instanceof WP_User && ! is_numeric( $user_identifier ) ) {
+        $issues[] = __( 'No user could be found with that identifier.', 'restaurant-booking' );
+    }
+
+    $issues = array_values( array_unique( array_filter( array_map( 'wp_strip_all_tags', $issues ) ) ) );
+
+    $form_action = admin_url( 'tools.php' );
+    $reset_url   = restaurant_booking_get_access_diagnostics_page_url();
+
+    echo '<div class="wrap">';
+    echo '<h1>' . esc_html__( 'Booking Access Diagnostics', 'restaurant-booking' ) . '</h1>';
+    echo '<p>' . esc_html__( 'Use this tool to review role assignments and troubleshoot access to the Restaurant Booking Manager settings.', 'restaurant-booking' ) . '</p>';
+
+    echo '<form method="get" action="' . esc_url( $form_action ) . '">';
+    echo '<input type="hidden" name="page" value="' . esc_attr( restaurant_booking_get_access_diagnostics_page_slug() ) . '" />';
+    echo '<table class="form-table"><tbody><tr>';
+    echo '<th scope="row"><label for="rb_diag_user">' . esc_html__( 'Inspect user', 'restaurant-booking' ) . '</label></th>';
+    echo '<td>';
+    echo '<input type="text" id="rb_diag_user" name="' . esc_attr( $user_param ) . '" value="' . esc_attr( $user_identifier ) . '" class="regular-text" />';
+    echo '<p class="description">' . esc_html__( 'Enter a user ID, login, or email to inspect a specific account.', 'restaurant-booking' ) . '</p>';
+    echo '</td>';
+    echo '</tr></tbody></table>';
+    submit_button( __( 'Inspect user', 'restaurant-booking' ), 'secondary', 'submit', false );
+
+    if ( '' !== $user_identifier ) {
+        echo ' <a class="button" href="' . esc_url( $reset_url ) . '">' . esc_html__( 'Clear selection', 'restaurant-booking' ) . '</a>';
+    }
+
+    echo '</form>';
+
+    echo '<h2>' . esc_html__( 'Capability overview', 'restaurant-booking' ) . '</h2>';
+    echo '<p>' . sprintf(
+        /* translators: %s capability slug. */
+        esc_html__( 'Required capability: %s', 'restaurant-booking' ),
+        '<code>' . esc_html( $capability ) . '</code>'
+    ) . '</p>';
+
+    if ( $capability !== $fallback ) {
+        echo '<p>' . sprintf(
+            /* translators: %s capability slug. */
+            esc_html__( 'Administrators fall back to: %s', 'restaurant-booking' ),
+            '<code>' . esc_html( $fallback ) . '</code>'
+        ) . '</p>';
+    } else {
+        echo '<p>' . esc_html__( 'The required capability currently matches manage_options.', 'restaurant-booking' ) . '</p>';
+    }
+
+    if ( ! empty( $roles ) ) {
+        echo '<h2>' . esc_html__( 'Role assignments', 'restaurant-booking' ) . '</h2>';
+        echo '<table class="widefat striped">';
+        echo '<thead><tr>';
+        echo '<th>' . esc_html__( 'Role', 'restaurant-booking' ) . '</th>';
+        echo '<th>' . esc_html__( 'Role slug', 'restaurant-booking' ) . '</th>';
+        echo '<th>' . esc_html__( 'Status', 'restaurant-booking' ) . '</th>';
+        echo '</tr></thead><tbody>';
+
+        foreach ( $roles as $role_slug => $role_info ) {
+            if ( ! is_array( $role_info ) ) {
+                continue;
+            }
+
+            $label        = isset( $role_info['label'] ) ? $role_info['label'] : $role_slug;
+            $has_cap      = ! empty( $role_info['has_capability'] );
+            $has_fallback = ! empty( $role_info['has_fallback'] );
+
+            if ( $has_cap ) {
+                $status = sprintf(
+                    /* translators: %s capability slug. */
+                    esc_html__( 'Grants %s', 'restaurant-booking' ),
+                    '<code>' . esc_html( $capability ) . '</code>'
+                );
+            } elseif ( $capability !== $fallback && $has_fallback ) {
+                $status = sprintf(
+                    /* translators: %s capability slug. */
+                    esc_html__( 'Falls back through %s', 'restaurant-booking' ),
+                    '<code>' . esc_html( $fallback ) . '</code>'
+                );
+            } else {
+                $status = esc_html__( 'Missing required access', 'restaurant-booking' );
+            }
+
+            echo '<tr>';
+            echo '<td>' . esc_html( $label ) . '</td>';
+            echo '<td><code>' . esc_html( $role_slug ) . '</code></td>';
+            echo '<td>' . wp_kses(
+                $status,
+                array(
+                    'code' => array(),
+                )
+            ) . '</td>';
+            echo '</tr>';
+        }
+
+        echo '</tbody></table>';
+    } else {
+        echo '<p>' . esc_html__( 'No roles were detected. Ensure WordPress finished loading before viewing this screen.', 'restaurant-booking' ) . '</p>';
+    }
+
+    echo '<h2>' . esc_html__( 'User inspection', 'restaurant-booking' ) . '</h2>';
+
+    if ( $user_info ) {
+        $user_label = ! empty( $user_info['login'] )
+            ? sprintf(
+                /* translators: 1: user login, 2: user ID. */
+                esc_html__( 'User %1$s (#%2$d)', 'restaurant-booking' ),
+                $user_info['login'],
+                isset( $user_info['id'] ) ? (int) $user_info['id'] : 0
+            )
+            : esc_html__( 'Inspected user', 'restaurant-booking' );
+
+        echo '<p><strong>' . esc_html( $user_label ) . '</strong></p>';
+
+        if ( ! empty( $user_info['has_capability'] ) ) {
+            echo '<p>' . sprintf(
+                /* translators: %s capability slug. */
+                esc_html__( 'This user already has %s.', 'restaurant-booking' ),
+                '<code>' . esc_html( $capability ) . '</code>'
+            ) . '</p>';
+        } elseif ( $capability !== $fallback && ! empty( $user_info['has_fallback'] ) ) {
+            echo '<p>' . sprintf(
+                /* translators: %s fallback capability slug. */
+                esc_html__( 'This user inherits access through %s.', 'restaurant-booking' ),
+                '<code>' . esc_html( $fallback ) . '</code>'
+            ) . '</p>';
+        } else {
+            echo '<p>' . sprintf(
+                /* translators: 1: capability slug, 2: fallback capability slug. */
+                esc_html__( 'This user is missing both %1$s and %2$s.', 'restaurant-booking' ),
+                '<code>' . esc_html( $capability ) . '</code>',
+                '<code>' . esc_html( $fallback ) . '</code>'
+            ) . '</p>';
+        }
+
+        if ( isset( $user_info['role_labels'] ) && is_array( $user_info['role_labels'] ) ) {
+            $role_labels = array_filter( array_map( 'wp_strip_all_tags', $user_info['role_labels'] ) );
+
+            if ( ! empty( $role_labels ) ) {
+                echo '<p>' . sprintf(
+                    /* translators: %s comma separated role labels. */
+                    esc_html__( 'Assigned roles: %s', 'restaurant-booking' ),
+                    esc_html( implode( ', ', $role_labels ) )
+                ) . '</p>';
+            } else {
+                echo '<p>' . esc_html__( 'Assigned roles: (none)', 'restaurant-booking' ) . '</p>';
+            }
+        }
+    } else {
+        echo '<p>' . esc_html__( 'Provide a user above to inspect an account.', 'restaurant-booking' ) . '</p>';
+    }
+
+    if ( ! empty( $issues ) ) {
+        echo '<h2>' . esc_html__( 'Detected issues', 'restaurant-booking' ) . '</h2>';
+        echo '<ul class="ul-disc">';
+
+        foreach ( $issues as $issue ) {
+            echo '<li>' . esc_html( $issue ) . '</li>';
+        }
+
+        echo '</ul>';
+    }
+
+    echo '<p>' . wp_kses(
+        sprintf(
+            /* translators: %s capability slug. */
+            __( 'Grant access by running: <code>wp cap add &lt;role&gt; %s</code>', 'restaurant-booking' ),
+            esc_html( $capability )
+        ),
+        array(
+            'code' => array(),
+        )
+    ) . '</p>';
+
+    echo '<p>' . wp_kses(
+        sprintf(
+            /* translators: %s WP-CLI command. */
+            __( 'You can also run the command: <code>%s</code>', 'restaurant-booking' ),
+            'wp restaurant-booking doctor'
+        ),
+        array(
+            'code' => array(),
+        )
+    ) . '</p>';
+
+    echo '</div>';
+}
 
 /**
  * Resolve the preferred portal login URL.
@@ -1110,24 +1409,7 @@ if ( defined( 'WP_CLI' ) && WP_CLI && class_exists( 'WP_CLI_Command' ) ) {
              * @return WP_User|null
              */
             private function locate_user_for_doctor( $identifier ) {
-                if ( is_numeric( $identifier ) ) {
-                    $user = get_user_by( 'id', (int) $identifier );
-                    if ( $user instanceof WP_User ) {
-                        return $user;
-                    }
-                }
-
-                $user = get_user_by( 'login', $identifier );
-                if ( $user instanceof WP_User ) {
-                    return $user;
-                }
-
-                $user = get_user_by( 'email', $identifier );
-                if ( $user instanceof WP_User ) {
-                    return $user;
-                }
-
-                return null;
+                return restaurant_booking_locate_user_for_diagnostics( $identifier );
             }
         }
     }
