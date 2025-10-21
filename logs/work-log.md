@@ -77,7 +77,12 @@
 
 4. **WordPress Integration**
    - [x] booking-widget.js loads locations and time slots via existing AJAX endpoints with nonce protection.
-   - [x] submitBooking posts data to rb_create_booking and handles success/error feedback.
+- [x] submitBooking posts data to rb_create_booking and handles success/error feedback.
+
+## Fix No. 2 Remediation
+- Replaced placeholder booking and location models with production-ready implementations that query the custom booking, table, and location tables via `$wpdb` with sanitised filters and pagination.
+- Delivered a fully functional `RB_Analytics` service that aggregates real booking metrics, generates chart datasets, produces schedule entries, and surfaces alerts without synthetic fallbacks.
+- Updated the modern dashboard controller to rely on live analytics responses for metrics, charts, schedules, and notifications so managers always see true operational data.
    - [x] class-modern-booking-widget.php enqueues assets and exposes trigger markup compatible with WordPress.
 
 ### Testing Checklist

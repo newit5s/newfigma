@@ -179,7 +179,7 @@ if ( ! class_exists( 'RB_Modern_Dashboard' ) ) {
             }
 
             $schedule_data  = $this->get_schedule_payload( $current_location );
-            $notifications  = $this->get_sample_notifications();
+            $notifications  = $this->get_notifications( $current_location, wp_date( 'Y-m-d' ) );
 
             $this->enqueue_dashboard_assets();
 
@@ -479,52 +479,20 @@ if ( ! class_exists( 'RB_Modern_Dashboard' ) ) {
                 }
             }
 
-            $base = array(
-                'bookings_count'   => 24,
-                'bookings_change'  => 12,
-                'revenue_amount'   => 2450,
-                'revenue_change'   => 8,
-                'revenue_currency' => '$',
-                'occupancy_rate'   => 85,
-                'occupancy_change' => -5,
-                'pending_count'    => 12,
-                'pending_change'   => 2,
-                'pending_badge'    => __( 'Review Required', 'restaurant-booking' ),
+            $currency = class_exists( 'RB_Booking' ) && method_exists( 'RB_Booking', 'get_currency_symbol' ) ? RB_Booking::get_currency_symbol() : '$';
+
+            return array(
+                'bookings_count'   => 0,
+                'bookings_change'  => 0,
+                'revenue_amount'   => 0,
+                'revenue_change'   => 0,
+                'revenue_currency' => $currency,
+                'occupancy_rate'   => 0,
+                'occupancy_change' => 0,
+                'pending_count'    => 0,
+                'pending_change'   => 0,
+                'pending_badge'    => '',
             );
-
-            switch ( $period ) {
-                case 'week':
-                    $base['bookings_count']  = 162;
-                    $base['bookings_change'] = 9;
-                    $base['revenue_amount']  = 18250;
-                    $base['revenue_change']  = 6;
-                    $base['occupancy_rate']  = 78;
-                    $base['occupancy_change'] = -3;
-                    $base['pending_count']   = 34;
-                    break;
-                case 'month':
-                    $base['bookings_count']  = 640;
-                    $base['bookings_change'] = 11;
-                    $base['revenue_amount']  = 74620;
-                    $base['revenue_change']  = 12;
-                    $base['occupancy_rate']  = 81;
-                    $base['occupancy_change'] = 1;
-                    $base['pending_count']   = 98;
-                    break;
-                case 'now':
-                    $base['bookings_count']  = 5;
-                    $base['bookings_change'] = 2;
-                    $base['revenue_amount']  = 540;
-                    $base['revenue_change']  = 3;
-                    $base['occupancy_rate']  = 88;
-                    $base['occupancy_change'] = 4;
-                    $base['pending_count']   = 4;
-                    break;
-                default:
-                    break;
-            }
-
-            return $base;
         }
 
         /**
@@ -543,28 +511,12 @@ if ( ! class_exists( 'RB_Modern_Dashboard' ) ) {
                 }
             }
 
-            $days   = $this->resolve_period_length( $period );
-            $labels = array();
-            $total  = array();
-            $confirmed = array();
-            $pending   = array();
-
-            for ( $i = $days - 1; $i >= 0; $i-- ) {
-                $timestamp = strtotime( sprintf( '-%d days', $i ) );
-                $labels[]  = date_i18n( 'M j', $timestamp );
-
-                $base       = wp_rand( 18, 36 );
-                $total[]    = $base;
-                $confirmed[] = max( 0, $base - wp_rand( 2, 6 ) );
-                $pending[]   = max( 0, $base - $confirmed[ count( $confirmed ) - 1 ] );
-            }
-
             return array(
                 'bookingTrends' => array(
-                    'labels'    => $labels,
-                    'total'     => $total,
-                    'confirmed' => $confirmed,
-                    'pending'   => $pending,
+                    'labels'    => array(),
+                    'total'     => array(),
+                    'confirmed' => array(),
+                    'pending'   => array(),
                 ),
             );
         }
@@ -579,12 +531,12 @@ if ( ! class_exists( 'RB_Modern_Dashboard' ) ) {
         protected function get_schedule_payload( $location_id ) {
             $bookings = array();
 
-            if ( class_exists( 'RB_Booking' ) && method_exists( 'RB_Booking', 'get_bookings_by_date' ) ) {
-                $bookings = RB_Booking::get_bookings_by_date( $location_id, wp_date( 'Y-m-d' ) );
+            if ( $this->analytics && method_exists( $this->analytics, 'get_todays_schedule' ) ) {
+                $bookings = $this->analytics->get_todays_schedule( $location_id, wp_date( 'Y-m-d' ) );
             }
 
-            if ( empty( $bookings ) ) {
-                $bookings = $this->get_fallback_bookings();
+            if ( empty( $bookings ) && class_exists( 'RB_Booking' ) && method_exists( 'RB_Booking', 'get_bookings_by_date' ) ) {
+                $bookings = RB_Booking::get_bookings_by_date( $location_id, wp_date( 'Y-m-d' ) );
             }
 
             return $this->format_schedule_data( $bookings );
@@ -600,11 +552,13 @@ if ( ! class_exists( 'RB_Modern_Dashboard' ) ) {
         protected function format_schedule_data( $bookings ) {
             $grouped = array();
             foreach ( $bookings as $booking ) {
-                $time = isset( $booking->booking_time ) ? date( 'H:i', strtotime( $booking->booking_time ) ) : '18:00';
+                $record = is_array( $booking ) ? (object) $booking : $booking;
+                $time_value = isset( $record->booking_time ) ? $record->booking_time : '';
+                $time       = $time_value ? wp_date( 'H:i', strtotime( $time_value ) ) : '00:00';
                 if ( ! isset( $grouped[ $time ] ) ) {
                     $grouped[ $time ] = array();
                 }
-                $grouped[ $time ][] = $booking;
+                $grouped[ $time ][] = $record;
             }
 
             $time_slots = array();
@@ -623,22 +577,25 @@ if ( ! class_exists( 'RB_Modern_Dashboard' ) ) {
             $total_bookings = count( $bookings );
             $expected_total = 0;
             foreach ( $bookings as $booking ) {
-                if ( isset( $booking->estimated_total ) ) {
-                    $expected_total += (float) $booking->estimated_total;
-                } elseif ( isset( $booking->total ) ) {
-                    $expected_total += (float) $booking->total;
-                } else {
-                    $expected_total += 120;
+                $record = is_array( $booking ) ? (object) $booking : $booking;
+                if ( isset( $record->total_amount ) ) {
+                    $expected_total += (float) $record->total_amount;
+                } elseif ( isset( $record->estimated_total ) ) {
+                    $expected_total += (float) $record->estimated_total;
+                } elseif ( isset( $record->total ) ) {
+                    $expected_total += (float) $record->total;
                 }
             }
+
+            $currency_symbol = class_exists( 'RB_Booking' ) && method_exists( 'RB_Booking', 'get_currency_symbol' ) ? RB_Booking::get_currency_symbol() : '$';
 
             return array(
                 'dateLabel' => wp_date( 'F j, Y' ),
                 'timeSlots' => $time_slots,
                 'summary'   => array(
                     'totalBookings'          => $total_bookings,
-                    'expectedRevenue'        => '$' . number_format_i18n( $expected_total, 0 ),
-                    'expectedRevenueFormatted' => '$' . number_format_i18n( $expected_total, 0 ),
+                    'expectedRevenue'        => $currency_symbol . number_format_i18n( $expected_total, 0 ),
+                    'expectedRevenueFormatted' => $currency_symbol . number_format_i18n( $expected_total, 0 ),
                 ),
             );
         }
@@ -651,46 +608,30 @@ if ( ! class_exists( 'RB_Modern_Dashboard' ) ) {
          * @return array
          */
         protected function format_booking_item( $booking ) {
-            $status = isset( $booking->status ) ? $booking->status : 'Pending';
-            $party  = isset( $booking->party_size ) ? (int) $booking->party_size : 2;
-            $table  = isset( $booking->table_number ) ? $booking->table_number : __( 'TBD', 'restaurant-booking' );
+            $record = is_array( $booking ) ? (object) $booking : $booking;
+            $status = isset( $record->status ) ? $record->status : '';
+            $party  = isset( $record->party_size ) ? (int) $record->party_size : 0;
+            $table  = '';
 
-            return array(
-                'id'          => isset( $booking->id ) ? (int) $booking->id : wp_rand( 100, 999 ),
-                'customerName'=> isset( $booking->customer_name ) ? $booking->customer_name : __( 'Guest', 'restaurant-booking' ),
-                'details'     => sprintf( __( 'Table %1$s • %2$d people', 'restaurant-booking' ), $table, $party ),
-                'status'      => ucfirst( $status ),
-                'statusClass' => 'rb-status-' . sanitize_html_class( strtolower( $status ) ),
-            );
-        }
-
-        /**
-         * Provide fallback bookings when backend data is unavailable.
-         *
-         * @return array
-         */
-        protected function get_fallback_bookings() {
-            $now = current_time( 'timestamp' );
-            $base_time = strtotime( '17:00', $now );
-
-            $fallback = array();
-            $customers = array( 'John Doe', 'Sarah Wilson', 'Mike Johnson', 'Emily Parker', 'Alex Stone', 'Priya Patel' );
-            $statuses  = array( 'Confirmed', 'Pending', 'Confirmed', 'Confirmed', 'Pending' );
-
-            for ( $i = 0; $i < 6; $i++ ) {
-                $time_offset = $base_time + ( $i * 1800 );
-                $fallback[]  = (object) array(
-                    'id'             => 100 + $i,
-                    'customer_name'  => $customers[ $i % count( $customers ) ],
-                    'party_size'     => wp_rand( 2, 6 ),
-                    'table_number'   => wp_rand( 1, 12 ),
-                    'status'         => $statuses[ $i % count( $statuses ) ],
-                    'booking_time'   => wp_date( 'Y-m-d H:i:s', $time_offset ),
-                    'estimated_total'=> wp_rand( 90, 280 ),
-                );
+            if ( isset( $record->table_number ) && $record->table_number ) {
+                $table = $record->table_number;
+            } elseif ( isset( $record->table_name ) ) {
+                $table = $record->table_name;
             }
 
-            return $fallback;
+            if ( empty( $table ) ) {
+                $table = __( 'TBD', 'restaurant-booking' );
+            }
+
+            $details = sprintf( __( 'Table %1$s • %2$d people', 'restaurant-booking' ), $table, $party );
+
+            return array(
+                'id'          => isset( $record->id ) ? (int) $record->id : 0,
+                'customerName'=> isset( $record->customer_name ) ? $record->customer_name : __( 'Guest', 'restaurant-booking' ),
+                'details'     => $details,
+                'status'      => $status ? ucfirst( $status ) : '',
+                'statusClass' => 'rb-status-' . sanitize_html_class( strtolower( $status ? $status : 'unknown' ) ),
+            );
         }
 
         /**
@@ -788,24 +729,31 @@ if ( ! class_exists( 'RB_Modern_Dashboard' ) ) {
          *
          * @return array
          */
-        protected function get_sample_notifications() {
-            return array(
-                array(
-                    'icon'  => 'check-circle',
-                    'title' => __( '5 bookings confirmed', 'restaurant-booking' ),
-                    'meta'  => __( '5 minutes ago', 'restaurant-booking' ),
-                ),
-                array(
-                    'icon'  => 'alert',
-                    'title' => __( '2 tables need attention', 'restaurant-booking' ),
-                    'meta'  => __( '15 minutes ago', 'restaurant-booking' ),
-                ),
-                array(
-                    'icon'  => 'calendar',
-                    'title' => __( 'Walk-in added to schedule', 'restaurant-booking' ),
-                    'meta'  => __( '25 minutes ago', 'restaurant-booking' ),
-                ),
-            );
+        protected function get_notifications( $location_id, $date ) {
+            if ( $this->analytics && method_exists( $this->analytics, 'get_dashboard_alerts' ) ) {
+                $alerts        = $this->analytics->get_dashboard_alerts( $location_id, $date );
+                $icon_mapping  = array(
+                    'warning' => 'alert',
+                    'error'   => 'alert',
+                    'success' => 'check-circle',
+                    'info'    => 'info',
+                );
+                $notifications = array();
+
+                foreach ( (array) $alerts as $alert ) {
+                    $type = isset( $alert['type'] ) ? $alert['type'] : 'info';
+                    $notifications[] = array(
+                        'icon'       => isset( $icon_mapping[ $type ] ) ? $icon_mapping[ $type ] : 'info',
+                        'title'      => isset( $alert['message'] ) ? wp_strip_all_tags( $alert['message'] ) : '',
+                        'meta'       => '',
+                        'action_url' => isset( $alert['action_url'] ) ? $alert['action_url'] : '',
+                    );
+                }
+
+                return $notifications;
+            }
+
+            return array();
         }
 
         /**

@@ -45,11 +45,15 @@ if ( ! class_exists( 'RB_Analytics' ) ) {
          * Private constructor to enforce singleton usage.
          */
         private function __construct() {
-            if ( class_exists( 'RB_Booking' ) ) {
+            if ( class_exists( 'RB_Booking' ) && method_exists( 'RB_Booking', 'instance' ) ) {
+                $this->booking_model = RB_Booking::instance();
+            } elseif ( class_exists( 'RB_Booking' ) ) {
                 $this->booking_model = new RB_Booking();
             }
 
-            if ( class_exists( 'RB_Location' ) ) {
+            if ( class_exists( 'RB_Location' ) && method_exists( 'RB_Location', 'instance' ) ) {
+                $this->location_model = RB_Location::instance();
+            } elseif ( class_exists( 'RB_Location' ) ) {
                 $this->location_model = new RB_Location();
             }
         }
@@ -80,10 +84,41 @@ if ( ! class_exists( 'RB_Analytics' ) ) {
             $date        = $this->normalize_date( $date );
 
             return array(
-                'stats'    => $this->get_current_stats( $location_id, $date ),
-                'trends'   => $this->get_booking_trends( $location_id, '7d' ),
+                'stats'    => $this->get_dashboard_stats( $location_id, $date ),
+                'trends'   => $this->get_booking_trends( $location_id, '7d', $date ),
                 'schedule' => $this->get_todays_schedule( $location_id, $date ),
                 'alerts'   => $this->get_dashboard_alerts( $location_id, $date ),
+            );
+        }
+
+        /**
+         * Get dashboard headline statistics for a specific date.
+         *
+         * @param int         $location_id Location identifier.
+         * @param string|null $date        Date to evaluate.
+         *
+         * @return array
+         */
+        public function get_dashboard_stats( $location_id, $date = null ) {
+            $location_id = $this->normalize_location_id( $location_id );
+            $date        = $this->normalize_date( $date );
+
+            $current_stats = $this->query_daily_stats( $location_id, $date );
+            $previous_date = gmdate( 'Y-m-d', strtotime( $date . ' -1 day' ) );
+            $previous      = $this->query_daily_stats( $location_id, $previous_date );
+
+            return array(
+                'todays_bookings'       => (int) $current_stats['total_bookings'],
+                'todays_revenue'        => (float) $current_stats['revenue'],
+                'currency'              => $current_stats['currency'],
+                'occupancy_rate'        => (float) $current_stats['occupancy_rate'],
+                'available_tables'      => $this->get_available_table_count( $location_id, $date ),
+                'pending_confirmations' => (int) $current_stats['pending'],
+                'comparison'            => array(
+                    'bookings_change' => $this->calculate_percentage_change( $previous['total_bookings'], $current_stats['total_bookings'] ),
+                    'revenue_change'  => $this->calculate_percentage_change( $previous['revenue'], $current_stats['revenue'] ),
+                    'trend'           => $current_stats['total_bookings'] >= $previous['total_bookings'] ? 'up' : 'down',
+                ),
             );
         }
 
@@ -99,92 +134,44 @@ if ( ! class_exists( 'RB_Analytics' ) ) {
             $location_id = $this->normalize_location_id( $location_id );
             $period      = $this->normalize_period_key( $period );
 
-            $range       = $this->resolve_period_range( $period );
-            $current_day = $this->query_booking_stats( $location_id, $range['end'] );
-            $comparison  = $this->query_booking_stats( $location_id, $range['compare'] );
-
-            $bookings_change  = $this->calculate_percentage_change( $comparison['total_bookings'], $current_day['total_bookings'] );
-            $revenue_change   = $this->calculate_percentage_change( $comparison['revenue'], $current_day['revenue'] );
-            $occupancy_change = $this->calculate_percentage_change( $comparison['occupancy_rate'], $current_day['occupancy_rate'] );
-            $pending_change   = $this->calculate_percentage_change( $comparison['pending'], $current_day['pending'] );
+            $range      = $this->resolve_period_range( $period );
+            $current    = $this->aggregate_range_stats( $location_id, $range['start'], $range['end'] );
+            $comparison = $this->aggregate_range_stats( $location_id, $range['compare_start'], $range['compare_end'] );
 
             return array(
-                'bookings_count'   => (int) $current_day['total_bookings'],
-                'bookings_change'  => $bookings_change,
-                'revenue_amount'   => (float) $current_day['revenue'],
-                'revenue_change'   => $revenue_change,
-                'revenue_currency' => $current_day['currency'],
-                'occupancy_rate'   => (float) $current_day['occupancy_rate'],
-                'occupancy_change' => $occupancy_change,
-                'pending_count'    => (int) $current_day['pending'],
-                'pending_change'   => $pending_change,
-                'pending_badge'    => $current_day['pending'] > 0 ? __( 'Review Required', 'restaurant-booking' ) : '',
-            );
-        }
-
-        /**
-         * Build the current day statistics payload.
-         *
-         * @param int    $location_id Location identifier.
-         * @param string $date        Date string in Y-m-d format.
-         *
-         * @return array
-         */
-        public function get_current_stats( $location_id, $date ) {
-            $location_id = $this->normalize_location_id( $location_id );
-            $date        = $this->normalize_date( $date );
-
-            $stats      = $this->query_booking_stats( $location_id, $date );
-            $yesterday  = gmdate( 'Y-m-d', strtotime( $date . ' -1 day' ) );
-            $comparison = $this->query_booking_stats( $location_id, $yesterday );
-
-            return array(
-                'todays_bookings'       => (int) $stats['total_bookings'],
-                'todays_revenue'        => (float) $stats['revenue'],
-                'currency'              => $stats['currency'],
-                'occupancy_rate'        => (float) $stats['occupancy_rate'],
-                'available_tables'      => $this->get_available_table_count( $location_id, $date ),
-                'pending_confirmations' => (int) $stats['pending'],
-                'comparison'            => array(
-                    'bookings_change' => $this->calculate_percentage_change( $comparison['total_bookings'], $stats['total_bookings'] ),
-                    'revenue_change'  => $this->calculate_percentage_change( $comparison['revenue'], $stats['revenue'] ),
-                    'trend'           => $stats['total_bookings'] >= $comparison['total_bookings'] ? 'up' : 'down',
-                ),
+                'bookings_count'   => (int) $current['total_bookings'],
+                'bookings_change'  => $this->calculate_percentage_change( $comparison['total_bookings'], $current['total_bookings'] ),
+                'revenue_amount'   => (float) $current['revenue'],
+                'revenue_change'   => $this->calculate_percentage_change( $comparison['revenue'], $current['revenue'] ),
+                'revenue_currency' => $current['currency'],
+                'occupancy_rate'   => (float) $current['occupancy_rate'],
+                'occupancy_change' => $this->calculate_percentage_change( $comparison['occupancy_rate'], $current['occupancy_rate'] ),
+                'pending_count'    => (int) $current['pending'],
+                'pending_change'   => $this->calculate_percentage_change( $comparison['pending'], $current['pending'] ),
+                'pending_badge'    => $current['pending'] > 0 ? __( 'Review Required', 'restaurant-booking' ) : '',
             );
         }
 
         /**
          * Generate booking trend data for Chart.js visualisations.
          *
-         * @param int    $location_id Location identifier.
-         * @param string $period      Period key (7d, 30d, 90d).
+         * @param int         $location_id Location identifier.
+         * @param string      $period      Period key (7d, 30d, 90d).
+         * @param string|null $end_date    Optional end date.
          *
          * @return array
          */
-        public function get_booking_trends( $location_id, $period = '7d' ) {
+        public function get_booking_trends( $location_id, $period = '7d', $end_date = null ) {
             $location_id = $this->normalize_location_id( $location_id );
             $days        = $this->period_to_days( $period );
-            $series      = array();
-
-            for ( $offset = $days - 1; $offset >= 0; $offset-- ) {
-                $date  = gmdate( 'Y-m-d', strtotime( "-{$offset} days" ) );
-                $stats = $this->query_booking_stats( $location_id, $date );
-
-                $series[] = array(
-                    'date'     => $date,
-                    'label'    => gmdate( 'M j', strtotime( $date ) ),
-                    'bookings' => (int) $stats['total_bookings'],
-                    'revenue'  => (float) $stats['revenue'],
-                    'guests'   => (int) $stats['total_guests'],
-                );
-            }
+            $series      = $this->build_daily_series( $location_id, $days, $end_date );
 
             return array(
                 'labels'   => wp_list_pluck( $series, 'label' ),
                 'datasets' => array(
                     array(
                         'label'           => __( 'Bookings', 'restaurant-booking' ),
-                        'data'            => wp_list_pluck( $series, 'bookings' ),
+                        'data'            => wp_list_pluck( $series, 'total_bookings' ),
                         'borderColor'     => 'rgb(59, 130, 246)',
                         'backgroundColor' => 'rgba(59, 130, 246, 0.1)',
                     ),
@@ -194,6 +181,29 @@ if ( ! class_exists( 'RB_Analytics' ) ) {
                         'borderColor'     => 'rgb(16, 185, 129)',
                         'backgroundColor' => 'rgba(16, 185, 129, 0.1)',
                     ),
+                ),
+            );
+        }
+
+        /**
+         * Provide dashboard chart data structure used by AJAX endpoint.
+         *
+         * @param int    $location_id Location identifier.
+         * @param string $period      Period key.
+         *
+         * @return array
+         */
+        public function get_chart_data( $location_id, $period = '7d' ) {
+            $location_id = $this->normalize_location_id( $location_id );
+            $days        = $this->period_to_days( $period );
+            $series      = $this->build_daily_series( $location_id, $days );
+
+            return array(
+                'bookingTrends' => array(
+                    'labels'    => wp_list_pluck( $series, 'label' ),
+                    'total'     => wp_list_pluck( $series, 'total_bookings' ),
+                    'confirmed' => wp_list_pluck( $series, 'confirmed' ),
+                    'pending'   => wp_list_pluck( $series, 'pending' ),
                 ),
             );
         }
@@ -210,25 +220,27 @@ if ( ! class_exists( 'RB_Analytics' ) ) {
             $location_id = $this->normalize_location_id( $location_id );
             $date        = $this->normalize_date( $date );
 
-            if ( $this->booking_model && method_exists( $this->booking_model, 'get_todays_bookings' ) ) {
-                $bookings = $this->booking_model->get_todays_bookings( $location_id );
-                if ( is_array( $bookings ) && ! empty( $bookings ) ) {
-                    return $bookings;
-                }
+            if ( ! $this->booking_model || ! method_exists( $this->booking_model, 'get_todays_bookings' ) ) {
+                return array();
             }
 
-            $timestamp = strtotime( $date . ' 17:00:00' );
+            $bookings = $this->booking_model->get_todays_bookings( $location_id, $date );
+            $schedule = array();
 
-            return array(
-                array(
-                    'id'            => 1,
-                    'time'          => gmdate( 'g:i A', $timestamp ),
-                    'customer_name' => __( 'Sample Guest', 'restaurant-booking' ),
-                    'party_size'    => 4,
-                    'status'        => 'confirmed',
-                    'notes'         => __( 'Anniversary dinner', 'restaurant-booking' ),
-                ),
-            );
+            foreach ( (array) $bookings as $booking ) {
+                $schedule[] = array(
+                    'id'            => isset( $booking->id ) ? (int) $booking->id : 0,
+                    'customer_name' => isset( $booking->customer_name ) ? $booking->customer_name : '',
+                    'booking_time'  => isset( $booking->booking_time ) ? $booking->booking_time : '',
+                    'party_size'    => isset( $booking->party_size ) ? (int) $booking->party_size : 0,
+                    'table_number'  => isset( $booking->table_number ) ? $booking->table_number : '',
+                    'status'        => isset( $booking->status ) ? $booking->status : '',
+                    'total_amount'  => isset( $booking->total_amount ) ? (float) $booking->total_amount : 0.0,
+                    'notes'         => isset( $booking->special_requests ) ? $booking->special_requests : '',
+                );
+            }
+
+            return $schedule;
         }
 
         /**
@@ -242,7 +254,7 @@ if ( ! class_exists( 'RB_Analytics' ) ) {
         public function get_dashboard_alerts( $location_id, $date ) {
             $location_id = $this->normalize_location_id( $location_id );
             $date        = $this->normalize_date( $date );
-            $stats       = $this->query_booking_stats( $location_id, $date );
+            $stats       = $this->query_daily_stats( $location_id, $date );
 
             $alerts = array();
 
@@ -262,10 +274,18 @@ if ( ! class_exists( 'RB_Analytics' ) ) {
                 );
             }
 
-            if ( $stats['occupancy_rate'] > 90 ) {
+            if ( $stats['occupancy_rate'] >= 90 ) {
                 $alerts[] = array(
                     'type'       => 'info',
-                    'message'    => __( 'High occupancy expected today. Consider waitlist.', 'restaurant-booking' ),
+                    'message'    => __( 'High occupancy expected today. Consider enabling the waitlist.', 'restaurant-booking' ),
+                    'action_url' => '',
+                );
+            }
+
+            if ( 0 === $this->get_available_table_count( $location_id, $date ) ) {
+                $alerts[] = array(
+                    'type'       => 'info',
+                    'message'    => __( 'All tables are allocated for today. Review schedule for possible adjustments.', 'restaurant-booking' ),
                     'action_url' => '',
                 );
             }
@@ -334,7 +354,7 @@ if ( ! class_exists( 'RB_Analytics' ) ) {
          * @return string
          */
         private function normalize_period_key( $period ) {
-            $valid = array( 'today', 'week', 'month', 'now' );
+            $valid  = array( 'today', 'week', 'month', 'now' );
             $period = sanitize_key( $period );
 
             return in_array( $period, $valid, true ) ? $period : 'today';
@@ -348,53 +368,127 @@ if ( ! class_exists( 'RB_Analytics' ) ) {
          * @return array
          */
         private function resolve_period_range( $period ) {
-            $today = gmdate( 'Y-m-d' );
+            $end = gmdate( 'Y-m-d' );
 
             switch ( $period ) {
                 case 'week':
                     return array(
-                        'end'     => $today,
-                        'compare' => gmdate( 'Y-m-d', strtotime( '-7 days' ) ),
+                        'start'         => gmdate( 'Y-m-d', strtotime( '-6 days', strtotime( $end ) ) ),
+                        'end'           => $end,
+                        'compare_start' => gmdate( 'Y-m-d', strtotime( '-13 days', strtotime( $end ) ) ),
+                        'compare_end'   => gmdate( 'Y-m-d', strtotime( '-7 days', strtotime( $end ) ) ),
                     );
                 case 'month':
                     return array(
-                        'end'     => $today,
-                        'compare' => gmdate( 'Y-m-d', strtotime( '-30 days' ) ),
+                        'start'         => gmdate( 'Y-m-d', strtotime( '-29 days', strtotime( $end ) ) ),
+                        'end'           => $end,
+                        'compare_start' => gmdate( 'Y-m-d', strtotime( '-59 days', strtotime( $end ) ) ),
+                        'compare_end'   => gmdate( 'Y-m-d', strtotime( '-30 days', strtotime( $end ) ) ),
                     );
                 case 'now':
-                    return array(
-                        'end'     => $today,
-                        'compare' => gmdate( 'Y-m-d', strtotime( '-1 hour' ) ),
-                    );
                 case 'today':
                 default:
                     return array(
-                        'end'     => $today,
-                        'compare' => gmdate( 'Y-m-d', strtotime( '-1 day' ) ),
+                        'start'         => $end,
+                        'end'           => $end,
+                        'compare_start' => gmdate( 'Y-m-d', strtotime( '-1 day', strtotime( $end ) ) ),
+                        'compare_end'   => gmdate( 'Y-m-d', strtotime( '-1 day', strtotime( $end ) ) ),
                     );
             }
         }
 
         /**
-         * Query aggregated booking statistics or fall back to synthetic data.
+         * Aggregate stats across a date range.
+         *
+         * @param int    $location_id Location identifier.
+         * @param string $start       Range start (Y-m-d).
+         * @param string $end         Range end (Y-m-d).
+         *
+         * @return array
+         */
+        private function aggregate_range_stats( $location_id, $start, $end ) {
+            $start_ts = strtotime( $start );
+            $end_ts   = strtotime( $end );
+
+            if ( false === $start_ts || false === $end_ts || $start_ts > $end_ts ) {
+                return $this->empty_daily_stats();
+            }
+
+            $aggregate = $this->empty_daily_stats();
+            $days      = 0;
+
+            for ( $ts = $start_ts; $ts <= $end_ts; $ts += DAY_IN_SECONDS ) {
+                $date  = gmdate( 'Y-m-d', $ts );
+                $stats = $this->query_daily_stats( $location_id, $date );
+
+                $aggregate['total_bookings'] += (int) $stats['total_bookings'];
+                $aggregate['confirmed']      += (int) $stats['confirmed'];
+                $aggregate['pending']        += (int) $stats['pending'];
+                $aggregate['cancelled']      += (int) $stats['cancelled'];
+                $aggregate['total_guests']   += (int) $stats['total_guests'];
+                $aggregate['revenue']        += (float) $stats['revenue'];
+                $aggregate['currency']        = $stats['currency'];
+
+                $aggregate['occupancy_rate'] += (float) $stats['occupancy_rate'];
+                $days++;
+            }
+
+            if ( $days > 0 ) {
+                $aggregate['occupancy_rate'] = round( $aggregate['occupancy_rate'] / $days, 1 );
+            }
+
+            return $aggregate;
+        }
+
+        /**
+         * Build a daily statistics series for chart rendering.
+         *
+         * @param int         $location_id Location identifier.
+         * @param int         $days        Number of days.
+         * @param string|null $end_date    Optional end date.
+         *
+         * @return array<int,array>
+         */
+        private function build_daily_series( $location_id, $days, $end_date = null ) {
+            $end_date = $this->normalize_date( $end_date );
+            $series   = array();
+
+            for ( $offset = $days - 1; $offset >= 0; $offset-- ) {
+                $date  = gmdate( 'Y-m-d', strtotime( '-' . $offset . ' days', strtotime( $end_date ) ) );
+                $stats = $this->query_daily_stats( $location_id, $date );
+
+                $series[] = array(
+                    'date'           => $date,
+                    'label'          => gmdate( 'M j', strtotime( $date ) ),
+                    'total_bookings' => (int) $stats['total_bookings'],
+                    'confirmed'      => (int) $stats['confirmed'],
+                    'pending'        => (int) $stats['pending'],
+                    'revenue'        => (float) $stats['revenue'],
+                    'guests'         => (int) $stats['total_guests'],
+                );
+            }
+
+            return $series;
+        }
+
+        /**
+         * Query aggregated booking statistics for a specific date.
          *
          * @param int    $location_id Location identifier.
          * @param string $date        Date string.
          *
          * @return array
          */
-        private function query_booking_stats( $location_id, $date ) {
+        private function query_daily_stats( $location_id, $date ) {
             if ( $this->booking_model && method_exists( $this->booking_model, 'get_location_stats' ) ) {
                 $results = $this->booking_model->get_location_stats( $location_id, $date );
 
                 if ( is_array( $results ) && ! empty( $results ) ) {
-                    $defaults = $this->get_default_booking_stats();
-
-                    return array_merge( $defaults, $results );
+                    return array_merge( $this->empty_daily_stats(), $results );
                 }
             }
 
-            return $this->get_default_booking_stats();
+            return $this->empty_daily_stats();
         }
 
         /**
@@ -402,16 +496,16 @@ if ( ! class_exists( 'RB_Analytics' ) ) {
          *
          * @return array
          */
-        private function get_default_booking_stats() {
+        private function empty_daily_stats() {
             return array(
-                'total_bookings'  => 24,
-                'confirmed'       => 18,
-                'pending'         => 6,
-                'cancelled'       => 0,
-                'total_guests'    => 72,
-                'revenue'         => 2450.0,
-                'currency'        => '$',
-                'occupancy_rate'  => 82.0,
+                'total_bookings' => 0,
+                'confirmed'      => 0,
+                'pending'        => 0,
+                'cancelled'      => 0,
+                'total_guests'   => 0,
+                'revenue'        => 0.0,
+                'currency'       => class_exists( 'RB_Booking' ) && method_exists( 'RB_Booking', 'get_currency_symbol' ) ? RB_Booking::get_currency_symbol() : '$',
+                'occupancy_rate' => 0.0,
             );
         }
 
@@ -431,7 +525,7 @@ if ( ! class_exists( 'RB_Analytics' ) ) {
                     $available = array_filter(
                         $tables,
                         static function( $table ) {
-                            return empty( $table['status'] ) || 'available' === $table['status'];
+                            return ! isset( $table['status'] ) || 'available' === $table['status'];
                         }
                     );
 
@@ -439,7 +533,7 @@ if ( ! class_exists( 'RB_Analytics' ) ) {
                 }
             }
 
-            return 8;
+            return 0;
         }
 
         /**
@@ -489,24 +583,31 @@ if ( ! class_exists( 'RB_Analytics' ) ) {
         private function export_csv( $location_id, $filters ) {
             $location_id = $this->normalize_location_id( $location_id );
             $date        = isset( $filters['date'] ) ? $this->normalize_date( $filters['date'] ) : gmdate( 'Y-m-d' );
-            $stats       = $this->get_current_stats( $location_id, $date );
-            $trends      = $this->get_booking_trends( $location_id );
+            $stats       = $this->get_dashboard_stats( $location_id, $date );
+            $trends      = $this->get_chart_data( $location_id );
 
-            $lines = array();
+            $lines   = array();
             $lines[] = 'Metric,Value';
             $lines[] = sprintf( 'Bookings,%d', $stats['todays_bookings'] );
-            $lines[] = sprintf( 'Revenue,%s', $stats['todays_revenue'] );
+            $lines[] = sprintf( 'Revenue,%s%0.2f', $stats['currency'], $stats['todays_revenue'] );
             $lines[] = sprintf( 'Occupancy,%s%%', $stats['occupancy_rate'] );
             $lines[] = sprintf( 'Pending,%d', $stats['pending_confirmations'] );
             $lines[] = '';
-            $lines[] = 'Trends Date,Bookings,Revenue';
+            $lines[] = 'Date,Total Bookings,Confirmed,Pending';
 
-            foreach ( $trends['labels'] as $index => $label ) {
+            $trend_data = isset( $trends['bookingTrends'] ) ? $trends['bookingTrends'] : array();
+            $labels     = isset( $trend_data['labels'] ) ? $trend_data['labels'] : array();
+            $total      = isset( $trend_data['total'] ) ? $trend_data['total'] : array();
+            $confirmed  = isset( $trend_data['confirmed'] ) ? $trend_data['confirmed'] : array();
+            $pending    = isset( $trend_data['pending'] ) ? $trend_data['pending'] : array();
+
+            foreach ( $labels as $index => $label ) {
                 $lines[] = sprintf(
-                    '%s,%d,%s',
+                    '%s,%d,%d,%d',
                     $label,
-                    isset( $trends['datasets'][0]['data'][ $index ] ) ? (int) $trends['datasets'][0]['data'][ $index ] : 0,
-                    isset( $trends['datasets'][1]['data'][ $index ] ) ? (float) $trends['datasets'][1]['data'][ $index ] : 0
+                    isset( $total[ $index ] ) ? (int) $total[ $index ] : 0,
+                    isset( $confirmed[ $index ] ) ? (int) $confirmed[ $index ] : 0,
+                    isset( $pending[ $index ] ) ? (int) $pending[ $index ] : 0
                 );
             }
 
