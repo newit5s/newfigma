@@ -278,6 +278,19 @@ wp_send_json_success( [ 'data' => $result ] );
 | `[restaurant_analytics]` | Analytics dashboard | `period="7d/30d/90d"` |
 | `[table_floor_plan]` | Visual table management | `location="id"`, `editable="true/false"` |
 
+### 🔐 Quyền truy cập & thông báo đăng nhập
+
+- Plugin tự động thêm capability `manage_bookings` cho vai trò **Administrator** và **Editor** mỗi khi khởi tạo.
+- Administrator vẫn có thể vào menu và shortcode dù bị mất capability tùy chỉnh nhờ fallback `manage_options` mới (filter `map_meta_cap`).
+- Người dùng không đủ quyền sẽ thấy thông báo kèm liên kết đăng nhập portal (`/portal/` hoặc URL tùy chỉnh qua filter `rb_portal_login_url`).
+- Có thể điều chỉnh trang đăng nhập bằng cách thêm vào theme/plugin:
+
+```php
+add_filter( 'rb_portal_login_url', function( $url ) {
+    return home_url( '/staff-login/' );
+} );
+```
+
 ## 🔧 Cấu hình Design System
 
 ### Theme Customization

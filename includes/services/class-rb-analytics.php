@@ -521,10 +521,26 @@ if ( ! class_exists( 'RB_Analytics' ) ) {
             if ( $this->location_model && method_exists( $this->location_model, 'get_tables' ) ) {
                 $tables = $this->location_model->get_tables( $location_id );
 
-                if ( is_array( $tables ) && ! empty( $tables ) ) {
+                if ( empty( $tables ) ) {
+                    return 0;
+                }
+
+                if ( $tables instanceof Traversable ) {
+                    $tables = iterator_to_array( $tables, false );
+                }
+
+                if ( is_array( $tables ) ) {
                     $available = array_filter(
                         $tables,
                         static function( $table ) {
+                            if ( is_object( $table ) ) {
+                                $table = (array) $table;
+                            }
+
+                            if ( ! is_array( $table ) ) {
+                                return true;
+                            }
+
                             return ! isset( $table['status'] ) || 'available' === $table['status'];
                         }
                     );

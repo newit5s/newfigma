@@ -198,6 +198,9 @@
 ### Issues Resolved
 - Plugin bootstrap and loader stack now exist, allowing WordPress to bootstrap the feature classes through `restaurant-booking-manager.php` and the `includes/class-plugin-manager.php` loader chain.
 - Animation token library has been added in `assets/css/animations.css`, providing shared motion variables and keyframes for the modern UI.
+- Added a `map_meta_cap` fallback so administrators inherit `manage_bookings` permissions via `manage_options`, preventing locked menus.
+- Introduced reusable permission notices with a portal login link, ensuring booking calendar, analytics, và table floor plan shortcodes guide unauthorized viewers to sign in.
+- Updated README with a new access-control section documenting the login notice behavior and `rb_portal_login_url` customization hook.
 - `assets/js/theme-manager.js` is enqueued across admin and portal entry points (including the booking widget, authentication screen, dashboard, and management modules), restoring synchronized light/dark theme behavior outside the style guide demo.
 - Implemented `includes/services/class-rb-analytics.php` and registered it with the plugin loader so the portal dashboard can instantiate `RB_Analytics` without triggering fatal errors.
 

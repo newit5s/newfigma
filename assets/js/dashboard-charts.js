@@ -9,7 +9,7 @@
   class DashboardCharts {
     constructor() {
       this.charts = {};
-      this.currentPeriod = '7d';
+      this.currentPeriod = (typeof rbDashboard !== 'undefined' && rbDashboard.chartDefaults && rbDashboard.chartDefaults.range) ? rbDashboard.chartDefaults.range : '7d';
       this.currentLocation = (typeof rbDashboard !== 'undefined' && rbDashboard.current_location) ? rbDashboard.current_location : '';
       this.ajaxUrl = (typeof rbDashboard !== 'undefined') ? rbDashboard.ajax_url : '';
       this.nonce = (typeof rbDashboard !== 'undefined') ? rbDashboard.nonce : '';
