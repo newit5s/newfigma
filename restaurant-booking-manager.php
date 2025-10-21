@@ -89,6 +89,10 @@ function restaurant_booking_init() {
     // Initialize plugin manager
     $plugin = Restaurant_Booking_Plugin_Manager::instance();
     $plugin->run();
+
+    if ( function_exists( 'restaurant_booking_add_role_capabilities' ) ) {
+        restaurant_booking_add_role_capabilities();
+    }
 }
 
 // Hook into WordPress initialization
@@ -155,6 +159,128 @@ function restaurant_booking_plugin_action_links( $links ) {
     return $links;
 }
 add_filter( 'plugin_action_links_' . RESTAURANT_BOOKING_BASENAME, 'restaurant_booking_plugin_action_links' );
+
+/**
+ * Determine the capability required to manage the plugin.
+ *
+ * @return string
+ */
+function restaurant_booking_get_manage_capability() {
+    $default = 'manage_bookings';
+
+    /**
+     * Filter the capability used for accessing restaurant booking management tools.
+     *
+     * @param string $capability Default capability slug.
+     */
+    $capability = apply_filters( 'restaurant_booking_manage_capability', $default );
+
+    if ( empty( $capability ) || ! is_string( $capability ) ) {
+        $capability = $default;
+    }
+
+    return $capability;
+}
+
+/**
+ * Check whether the current user can manage restaurant bookings.
+ *
+ * @return bool
+ */
+function restaurant_booking_user_can_manage() {
+    $capability = restaurant_booking_get_manage_capability();
+
+    if ( current_user_can( $capability ) ) {
+        return true;
+    }
+
+    if ( 'manage_options' !== $capability && current_user_can( 'manage_options' ) ) {
+        return true;
+    }
+
+    return false;
+}
+
+/**
+ * Assign management capabilities to default roles.
+ */
+function restaurant_booking_add_role_capabilities() {
+    $capability = restaurant_booking_get_manage_capability();
+
+    $roles = apply_filters(
+        'restaurant_booking_manage_capability_roles',
+        array( 'administrator', 'editor' )
+    );
+
+    foreach ( $roles as $role_name ) {
+        $role = get_role( $role_name );
+        if ( $role && ! $role->has_cap( $capability ) ) {
+            $role->add_cap( $capability );
+        }
+    }
+}
+
+/**
+ * Remove management capability from default roles.
+ */
+function restaurant_booking_remove_role_capabilities() {
+    $capability = restaurant_booking_get_manage_capability();
+
+    $roles = apply_filters(
+        'restaurant_booking_manage_capability_roles',
+        array( 'administrator', 'editor' )
+    );
+
+    foreach ( $roles as $role_name ) {
+        $role = get_role( $role_name );
+        if ( $role && $role->has_cap( $capability ) ) {
+            $role->remove_cap( $capability );
+        }
+    }
+}
+
+/**
+ * Register rewrite rules for portal pretty URLs.
+ */
+function restaurant_booking_register_rewrite_rules() {
+    add_rewrite_rule( '^portal/dashboard/?$', 'index.php?rb_portal=dashboard', 'top' );
+    add_rewrite_rule( '^portal/([^/]+)/?$', 'index.php?rb_portal=$matches[1]', 'top' );
+}
+add_action( 'init', 'restaurant_booking_register_rewrite_rules', 5 );
+
+/**
+ * Register custom query vars.
+ *
+ * @param array $vars Existing query vars.
+ *
+ * @return array
+ */
+function restaurant_booking_register_query_vars( $vars ) {
+    if ( ! in_array( 'rb_portal', $vars, true ) ) {
+        $vars[] = 'rb_portal';
+    }
+
+    return $vars;
+}
+add_filter( 'query_vars', 'restaurant_booking_register_query_vars' );
+
+/**
+ * Resolve the requested portal view from either query vars or request parameters.
+ *
+ * @return string
+ */
+function restaurant_booking_get_portal_view() {
+    if ( isset( $_GET['rb_portal'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+        return sanitize_key( wp_unslash( $_GET['rb_portal'] ) );
+    }
+
+    $query_var = get_query_var( 'rb_portal', '' );
+    if ( ! empty( $query_var ) ) {
+        return sanitize_key( $query_var );
+    }
+
+    return '';
+}
 
 /**
  * Display admin notice on successful activation
