@@ -36,7 +36,11 @@ if ( ! function_exists( 'restaurant_booking_get_schema_definitions' ) ) {
             PRIMARY KEY  (id),
             KEY status (status),
             KEY location_id (location_id),
-            KEY booking_date (booking_date)
+            KEY booking_date (booking_date),
+            KEY booking_datetime (booking_datetime),
+            KEY customer_id (customer_id),
+            KEY created_at (created_at),
+            KEY location_date (location_id, booking_date)
         ) {$charset_collate};";
 
         $schemas[] = "CREATE TABLE {$tables_table} (
@@ -54,7 +58,9 @@ if ( ! function_exists( 'restaurant_booking_get_schema_definitions' ) ) {
             created_at datetime NOT NULL,
             updated_at datetime NOT NULL,
             PRIMARY KEY  (id),
-            KEY location_id (location_id)
+            UNIQUE KEY location_table (location_id, table_number),
+            KEY location_id (location_id),
+            KEY status (status)
         ) {$charset_collate};";
 
         $schemas[] = "CREATE TABLE {$customers_table} (
@@ -69,7 +75,10 @@ if ( ! function_exists( 'restaurant_booking_get_schema_definitions' ) ) {
             created_at datetime NOT NULL,
             updated_at datetime NOT NULL,
             PRIMARY KEY  (id),
-            KEY email (email)
+            KEY email (email),
+            KEY phone (phone),
+            KEY status (status),
+            KEY created_at (created_at)
         ) {$charset_collate};";
 
         $schemas[] = "CREATE TABLE {$locations_table} (
@@ -82,7 +91,8 @@ if ( ! function_exists( 'restaurant_booking_get_schema_definitions' ) ) {
             status varchar(20) NOT NULL DEFAULT 'active',
             created_at datetime NOT NULL,
             updated_at datetime NOT NULL,
-            PRIMARY KEY  (id)
+            PRIMARY KEY  (id),
+            KEY status (status)
         ) {$charset_collate};";
 
         return $schemas;
