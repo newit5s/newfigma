@@ -8,17 +8,20 @@ class ThemeManager {
     this.THEME_ATTRIBUTE = 'data-theme';
     this.THEMES = {
       LIGHT: 'light',
-      DARK: 'dark'
+      DARK: 'dark',
+      SYSTEM: 'system',
     };
+    this.preference = this.THEMES.SYSTEM;
+    this.activeTheme = this.THEMES.LIGHT;
 
     this.init();
   }
 
   init() {
-    const savedTheme = this.getSavedTheme();
-    const preferredTheme = savedTheme || this.getSystemPreference();
+    const savedPreference = this.getSavedTheme();
+    const preferredTheme = savedPreference || this.THEMES.SYSTEM;
 
-    this.setTheme(preferredTheme);
+    this.applyPreference(preferredTheme);
     this.setupToggleListener();
     this.watchSystemPreference();
   }
@@ -26,7 +29,13 @@ class ThemeManager {
   getSavedTheme() {
     if (typeof Storage !== 'undefined') {
       try {
-        return localStorage.getItem(this.STORAGE_KEY);
+        const stored = localStorage.getItem(this.STORAGE_KEY);
+        if (!stored) {
+          return null;
+        }
+        if (Object.values(this.THEMES).includes(stored)) {
+          return stored;
+        }
       } catch (error) {
         console.warn('ThemeManager: Unable to access localStorage.', error);
       }
@@ -42,22 +51,48 @@ class ThemeManager {
   }
 
   setTheme(theme) {
-    if (!Object.values(this.THEMES).includes(theme)) {
-      theme = this.THEMES.LIGHT;
+    this.applyPreference(theme);
+  }
+
+  applyPreference(preference) {
+    let resolvedPreference = preference;
+    if (!Object.values(this.THEMES).includes(resolvedPreference)) {
+      resolvedPreference = this.THEMES.LIGHT;
     }
 
+    const theme = this.resolveTheme(resolvedPreference);
+    this.preference = resolvedPreference;
+    this.activeTheme = theme;
+    this.persistPreference(resolvedPreference);
     document.documentElement.setAttribute(this.THEME_ATTRIBUTE, theme);
+    this.dispatchThemeChange(theme, resolvedPreference);
+  }
 
-    if (typeof Storage !== 'undefined') {
-      try {
-        localStorage.setItem(this.STORAGE_KEY, theme);
-      } catch (error) {
-        console.warn('ThemeManager: Unable to persist theme preference.', error);
-      }
+  resolveTheme(preference) {
+    if (preference === this.THEMES.DARK || preference === this.THEMES.LIGHT) {
+      return preference;
     }
+    return this.getSystemPreference();
+  }
 
+  persistPreference(preference) {
+    if (typeof Storage === 'undefined') {
+      return;
+    }
+    try {
+      if (preference) {
+        localStorage.setItem(this.STORAGE_KEY, preference);
+      } else {
+        localStorage.removeItem(this.STORAGE_KEY);
+      }
+    } catch (error) {
+      console.warn('ThemeManager: Unable to persist theme preference.', error);
+    }
+  }
+
+  dispatchThemeChange(theme, preference) {
     document.dispatchEvent(new CustomEvent('themechange', {
-      detail: { theme }
+      detail: { theme, preference }
     }));
   }
 
@@ -68,7 +103,7 @@ class ThemeManager {
   }
 
   getCurrentTheme() {
-    return document.documentElement.getAttribute(this.THEME_ATTRIBUTE) || this.THEMES.LIGHT;
+    return document.documentElement.getAttribute(this.THEME_ATTRIBUTE) || this.activeTheme || this.THEMES.LIGHT;
   }
 
   setupToggleListener() {
@@ -88,8 +123,11 @@ class ThemeManager {
     const darkModeQuery = window.matchMedia('(prefers-color-scheme: dark)');
 
     const listener = (event) => {
-      if (!this.getSavedTheme()) {
-        this.setTheme(event.matches ? this.THEMES.DARK : this.THEMES.LIGHT);
+      if (this.preference === this.THEMES.SYSTEM) {
+        const theme = event.matches ? this.THEMES.DARK : this.THEMES.LIGHT;
+        this.activeTheme = theme;
+        document.documentElement.setAttribute(this.THEME_ATTRIBUTE, theme);
+        this.dispatchThemeChange(theme, this.THEMES.SYSTEM);
       }
     };
 
@@ -102,7 +140,11 @@ class ThemeManager {
 
   onThemeChange(callback) {
     document.addEventListener('themechange', (event) => {
-      callback(event.detail.theme);
+      if (!event || !event.detail) {
+        callback();
+        return;
+      }
+      callback(event.detail.theme, event.detail.preference);
     });
   }
 }

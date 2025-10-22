@@ -164,6 +164,31 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
             );
 
             add_settings_section(
+                'restaurant_booking_settings_theme',
+                __( 'Theme & appearance', 'restaurant-booking' ),
+                array( $this, 'render_theme_settings_intro' ),
+                'restaurant_booking_settings'
+            );
+
+            add_settings_field(
+                'restaurant_booking_settings_theme_preference',
+                __( 'Admin theme', 'restaurant-booking' ),
+                array( $this, 'render_select_field' ),
+                'restaurant_booking_settings',
+                'restaurant_booking_settings_theme',
+                array(
+                    'label_for'  => 'restaurant_booking_settings_theme_preference',
+                    'option_key' => 'theme_preference',
+                    'choices'    => array(
+                        'system' => __( 'Match system preference', 'restaurant-booking' ),
+                        'light'  => __( 'Light mode', 'restaurant-booking' ),
+                        'dark'   => __( 'Dark mode', 'restaurant-booking' ),
+                    ),
+                    'description' => __( 'Controls the default theme used across the Restaurant Booking interfaces.', 'restaurant-booking' ),
+                )
+            );
+
+            add_settings_section(
                 'restaurant_booking_settings_notifications',
                 __( 'Notifications', 'restaurant-booking' ),
                 array( $this, 'render_notifications_intro' ),
@@ -182,20 +207,6 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
                     'min'         => 1,
                     'max'         => 168,
                     'description' => __( 'How many hours before arrival to send reminder messages.', 'restaurant-booking' ),
-                )
-            );
-
-            add_settings_field(
-                'restaurant_booking_settings_confirmation_template',
-                __( 'Confirmation template', 'restaurant-booking' ),
-                array( $this, 'render_textarea_field' ),
-                'restaurant_booking_settings',
-                'restaurant_booking_settings_notifications',
-                array(
-                    'label_for'   => 'restaurant_booking_settings_confirmation_template',
-                    'option_key'  => 'confirmation_template',
-                    'rows'        => 6,
-                    'description' => __( 'Email body sent to guests when a booking is confirmed.', 'restaurant-booking' ),
                 )
             );
 
@@ -228,8 +239,57 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
             );
 
             add_settings_section(
+                'restaurant_booking_settings_emails',
+                __( 'Email templates', 'restaurant-booking' ),
+                array( $this, 'render_email_templates_intro' ),
+                'restaurant_booking_settings'
+            );
+
+            add_settings_field(
+                'restaurant_booking_settings_confirmation_template',
+                __( 'Confirmation template', 'restaurant-booking' ),
+                array( $this, 'render_textarea_field' ),
+                'restaurant_booking_settings',
+                'restaurant_booking_settings_emails',
+                array(
+                    'label_for'   => 'restaurant_booking_settings_confirmation_template',
+                    'option_key'  => 'confirmation_template',
+                    'rows'        => 6,
+                    'description' => __( 'Email body sent to guests when a booking is confirmed.', 'restaurant-booking' ),
+                )
+            );
+
+            add_settings_field(
+                'restaurant_booking_settings_reminder_template',
+                __( 'Reminder template', 'restaurant-booking' ),
+                array( $this, 'render_textarea_field' ),
+                'restaurant_booking_settings',
+                'restaurant_booking_settings_emails',
+                array(
+                    'label_for'   => 'restaurant_booking_settings_reminder_template',
+                    'option_key'  => 'reminder_template',
+                    'rows'        => 6,
+                    'description' => __( 'Use {{reservation_date}} to automatically insert the scheduled date and time.', 'restaurant-booking' ),
+                )
+            );
+
+            add_settings_field(
+                'restaurant_booking_settings_cancellation_template',
+                __( 'Cancellation template', 'restaurant-booking' ),
+                array( $this, 'render_textarea_field' ),
+                'restaurant_booking_settings',
+                'restaurant_booking_settings_emails',
+                array(
+                    'label_for'   => 'restaurant_booking_settings_cancellation_template',
+                    'option_key'  => 'cancellation_template',
+                    'rows'        => 6,
+                    'description' => __( 'Message sent when a reservation is cancelled.', 'restaurant-booking' ),
+                )
+            );
+
+            add_settings_section(
                 'restaurant_booking_settings_advanced',
-                __( 'Advanced options', 'restaurant-booking' ),
+                __( 'System configuration', 'restaurant-booking' ),
                 array( $this, 'render_advanced_intro' ),
                 'restaurant_booking_settings'
             );
@@ -306,12 +366,20 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
             echo '<p>' . esc_html__( 'Configure the restaurant details and booking defaults shown across the manager tools.', 'restaurant-booking' ) . '</p>';
         }
 
+        public function render_theme_settings_intro() {
+            echo '<p>' . esc_html__( 'Pick the default interface theme for the admin area and staff portals.', 'restaurant-booking' ) . '</p>';
+        }
+
         public function render_notifications_intro() {
             echo '<p>' . esc_html__( 'Control when confirmations and reminders are delivered to guests.', 'restaurant-booking' ) . '</p>';
         }
 
+        public function render_email_templates_intro() {
+            echo '<p>' . esc_html__( 'Customize the wording guests see in each automated message.', 'restaurant-booking' ) . '</p>';
+        }
+
         public function render_advanced_intro() {
-            echo '<p>' . esc_html__( 'Fine-tune automation rules and integration hooks for complex workflows.', 'restaurant-booking' ) . '</p>';
+            echo '<p>' . esc_html__( 'Manage automation rules and connected integrations that power your operations.', 'restaurant-booking' ) . '</p>';
         }
 
         protected function get_settings_cache() {
@@ -500,6 +568,14 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
                 $capability = 'manage_options';
             }
 
+            if ( empty( $capability ) || ! is_string( $capability ) ) {
+                $capability = 'manage_options';
+            }
+
+            if ( ! current_user_can( $capability ) ) {
+                return;
+            }
+
             $settings_slug = function_exists( 'restaurant_booking_get_settings_page_slug' )
                 ? restaurant_booking_get_settings_page_slug()
                 : 'restaurant-booking-settings';
@@ -591,6 +667,17 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
                 )
             );
 
+            $default_settings = function_exists( 'restaurant_booking_get_default_settings' )
+                ? restaurant_booking_get_default_settings()
+                : array();
+
+            $settings_defaults = array(
+                'theme_preference'      => isset( $default_settings['theme_preference'] ) ? $default_settings['theme_preference'] : 'system',
+                'confirmation_template' => isset( $default_settings['confirmation_template'] ) ? $default_settings['confirmation_template'] : '',
+                'reminder_template'     => isset( $default_settings['reminder_template'] ) ? $default_settings['reminder_template'] : '',
+                'cancellation_template' => isset( $default_settings['cancellation_template'] ) ? $default_settings['cancellation_template'] : '',
+            );
+
             $this->localize_ajax_data(
                 'rb-modern-admin',
                 'rbAdmin',
@@ -609,6 +696,28 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
                         'locationsEmpty'  => __( 'No locations available yet.', 'restaurant-booking' ),
                         'settingsSaved'   => __( 'Settings saved successfully.', 'restaurant-booking' ),
                         'settingsReset'   => __( 'Settings restored to defaults.', 'restaurant-booking' ),
+                        'themeSystem'     => __( 'Matches system preference', 'restaurant-booking' ),
+                        'themeLight'      => __( 'Light mode', 'restaurant-booking' ),
+                        'themeDark'       => __( 'Dark mode', 'restaurant-booking' ),
+                        'templatesDefault'    => __( 'Using default templates', 'restaurant-booking' ),
+                        'templatesCustomized' => __( 'Custom templates: %s', 'restaurant-booking' ),
+                        'templateConfirmation' => __( 'Confirmation', 'restaurant-booking' ),
+                        'templateReminder'     => __( 'Reminder', 'restaurant-booking' ),
+                        'templateCancellation' => __( 'Cancellation', 'restaurant-booking' ),
+                        'walkinsEnabledHoldSingular' => __( 'Walk-ins enabled (hold %s minute)', 'restaurant-booking' ),
+                        'walkinsEnabledHoldPlural'   => __( 'Walk-ins enabled (hold %s minutes)', 'restaurant-booking' ),
+                        'walkinsEnabledNoHold'       => __( 'Walk-ins enabled (no hold buffer)', 'restaurant-booking' ),
+                        'walkinsDisabled'            => __( 'Walk-ins disabled by default', 'restaurant-booking' ),
+                        'autoCancelDisabled'         => __( 'Auto-cancel disabled', 'restaurant-booking' ),
+                        'autoCancelSingular'         => __( 'Auto-cancel after %s minute', 'restaurant-booking' ),
+                        'autoCancelPlural'           => __( 'Auto-cancel after %s minutes', 'restaurant-booking' ),
+                        'integrationsNone'           => __( 'No integrations enabled', 'restaurant-booking' ),
+                        'integrationSingle'          => __( '%s integration active', 'restaurant-booking' ),
+                        'integrationPlural'          => __( '%s integrations active', 'restaurant-booking' ),
+                        'maintenanceEnabled'         => __( 'Maintenance mode is active', 'restaurant-booking' ),
+                        'maintenanceDisabled'        => __( 'Maintenance mode is turned off', 'restaurant-booking' ),
+                        'followupEnabled'            => __( 'Post-visit follow-ups enabled', 'restaurant-booking' ),
+                        'followupDisabled'           => __( 'Follow-up emails disabled', 'restaurant-booking' ),
                         'bufferSingular'  => __( '%s minute buffer', 'restaurant-booking' ),
                         'bufferPlural'    => __( '%s minutes buffer', 'restaurant-booking' ),
                         'guestSingular'   => __( '%s guest', 'restaurant-booking' ),
@@ -634,6 +743,9 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
                         'symbol' => $currency_symbol,
                     ),
                     'badges'  => array_map( 'intval', $badge_counts ),
+                    'settings' => array(
+                        'defaults' => $settings_defaults,
+                    ),
                     'reports' => array(
                         'defaultRange' => 30,
                     ),
