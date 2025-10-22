@@ -237,6 +237,63 @@ if ( ! class_exists( 'RB_Booking' ) ) {
         }
 
         /**
+         * Retrieve bookings using the legacy public signature.
+         *
+         * Provides backwards compatibility for code that expected the
+         * previous `get_bookings` method while returning the richer
+         * payload required by the modern admin screens.
+         *
+         * @param string|int $location Location identifier or slug.
+         * @param string     $status   Optional status filter.
+         * @param int        $page     Page number.
+         * @param array      $args     Additional query arguments.
+         *
+         * @return array
+         */
+        public static function get_bookings( $location = '', $status = '', $page = 1, $args = array() ) {
+            $results = self::get_admin_bookings( $location, $status, $page, $args );
+
+            $pagination = isset( $results['pagination'] ) && is_array( $results['pagination'] )
+                ? $results['pagination']
+                : array();
+
+            $default_per_page = isset( $args['per_page'] ) ? (int) $args['per_page'] : 20;
+            $default_per_page = max( 1, $default_per_page );
+
+            $current_page = isset( $pagination['current_page'] ) ? (int) $pagination['current_page'] : (int) $page;
+            $total_pages  = isset( $pagination['total_pages'] ) ? (int) $pagination['total_pages'] : 1;
+            $total_items  = isset( $pagination['total_items'] ) ? (int) $pagination['total_items'] : 0;
+            $per_page     = isset( $pagination['per_page'] ) ? (int) $pagination['per_page'] : $default_per_page;
+
+            $current_page = max( 1, $current_page );
+            $total_pages  = max( 1, $total_pages );
+            $total_items  = max( 0, $total_items );
+            $per_page     = max( 1, $per_page );
+
+            $results['pagination'] = array(
+                'current_page' => $current_page,
+                'total_pages'  => $total_pages,
+                'total_items'  => $total_items,
+                'per_page'     => $per_page,
+            );
+
+            $results['total']       = $total_items;
+            $results['total_pages'] = $total_pages;
+            $results['page']        = $current_page;
+            $results['per_page']    = $per_page;
+
+            if ( ! isset( $results['summary'] ) || ! is_array( $results['summary'] ) ) {
+                $results['summary'] = array();
+            }
+
+            if ( ! isset( $results['items'] ) || ! is_array( $results['items'] ) ) {
+                $results['items'] = array();
+            }
+
+            return $results;
+        }
+
+        /**
          * Count bookings for a given date and location.
          *
          * @param string $date        Target date (Y-m-d).
