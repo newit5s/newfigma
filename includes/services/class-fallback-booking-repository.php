@@ -429,7 +429,7 @@ if ( ! class_exists( 'RB_Fallback_Booking_Repository' ) ) {
 
             foreach ( $records as $booking ) {
                 $totals['total_bookings']++;
-                $totals['total_guests'] += (int) $booking['party_size'];
+                $totals['total_guests'] += isset( $booking['party_size'] ) ? (int) $booking['party_size'] : 0;
                 $totals['revenue']      += isset( $booking['total_amount'] ) ? (float) $booking['total_amount'] : 0.0;
 
                 $status = isset( $booking['status'] ) ? $booking['status'] : 'pending';
@@ -437,6 +437,8 @@ if ( ! class_exists( 'RB_Fallback_Booking_Repository' ) ) {
                     $totals[ $status ]++;
                 }
             }
+
+            list( $available_tables, $used_tables, $occupancy ) = $this->calculate_table_metrics( $records, $location_id );
 
             return array(
                 'total_bookings'  => $totals['total_bookings'],
@@ -446,9 +448,9 @@ if ( ! class_exists( 'RB_Fallback_Booking_Repository' ) ) {
                 'total_guests'    => $totals['total_guests'],
                 'revenue'         => $totals['revenue'],
                 'currency'        => $currency,
-                'occupancy_rate'  => 0.0,
-                'available_tables'=> 0,
-                'used_tables'     => 0,
+                'occupancy_rate'  => $occupancy,
+                'available_tables'=> $available_tables,
+                'used_tables'     => $used_tables,
             );
         }
 
@@ -466,6 +468,10 @@ if ( ! class_exists( 'RB_Fallback_Booking_Repository' ) ) {
 
             if ( ! is_array( $stored ) ) {
                 $stored = array();
+            }
+
+            if ( empty( $stored ) ) {
+                $stored = $this->seed_demo_data();
             }
 
             $this->cache = $stored;
@@ -753,6 +759,290 @@ if ( ! class_exists( 'RB_Fallback_Booking_Repository' ) ) {
             }
 
             return 48;
+        }
+
+        /**
+         * Seed demo bookings when persistent storage is empty.
+         *
+         * @return array
+         */
+        protected function seed_demo_data() {
+            $locations = $this->get_seed_location_names();
+            $today     = gmdate( 'Y-m-d' );
+
+            $dataset = array();
+
+            $dataset[1] = $this->build_seed_booking( 1, array(
+                'status'        => 'confirmed',
+                'date'          => $today,
+                'time'          => '18:00',
+                'location_id'   => 1,
+                'table_id'      => 101,
+                'table_number'  => 'T1',
+                'party_size'    => 4,
+                'total_amount'  => 220.00,
+                'first_name'    => 'Ava',
+                'last_name'     => 'Carter',
+                'email'         => 'ava.carter@example.com',
+                'phone'         => '+1 555-0101',
+                'special_requests' => __( 'Celebrating anniversary – add candles to dessert.', 'restaurant-booking' ),
+            ), $locations );
+
+            $dataset[2] = $this->build_seed_booking( 2, array(
+                'status'        => 'pending',
+                'date'          => $today,
+                'time'          => '20:15',
+                'location_id'   => 1,
+                'table_id'      => 102,
+                'table_number'  => 'T2',
+                'party_size'    => 2,
+                'total_amount'  => 120.00,
+                'first_name'    => 'Sarah',
+                'last_name'     => 'Wilson',
+                'email'         => 'sarah.wilson@example.com',
+                'phone'         => '+1 555-0102',
+            ), $locations );
+
+            $dataset[3] = $this->build_seed_booking( 3, array(
+                'status'        => 'completed',
+                'date'          => gmdate( 'Y-m-d', strtotime( '-1 day', strtotime( $today ) ) ),
+                'time'          => '19:30',
+                'location_id'   => 1,
+                'table_id'      => 103,
+                'table_number'  => 'T3',
+                'party_size'    => 5,
+                'total_amount'  => 310.00,
+                'first_name'    => 'Daniel',
+                'last_name'     => 'Lee',
+                'email'         => 'daniel.lee@example.com',
+                'phone'         => '+1 555-0106',
+            ), $locations );
+
+            $dataset[4] = $this->build_seed_booking( 4, array(
+                'status'        => 'cancelled',
+                'date'          => gmdate( 'Y-m-d', strtotime( '-2 days', strtotime( $today ) ) ),
+                'time'          => '21:00',
+                'location_id'   => 1,
+                'table_id'      => 104,
+                'table_number'  => 'T4',
+                'party_size'    => 6,
+                'total_amount'  => 0.0,
+                'first_name'    => 'Emily',
+                'last_name'     => 'Stone',
+                'email'         => 'emily.stone@example.com',
+                'phone'         => '+1 555-0105',
+            ), $locations );
+
+            $dataset[5] = $this->build_seed_booking( 5, array(
+                'status'        => 'confirmed',
+                'date'          => $today,
+                'time'          => '19:00',
+                'location_id'   => 2,
+                'table_id'      => 201,
+                'table_number'  => 'R1',
+                'party_size'    => 3,
+                'total_amount'  => 180.00,
+                'first_name'    => 'Liam',
+                'last_name'     => 'Nguyen',
+                'email'         => 'liam.nguyen@example.com',
+                'phone'         => '+1 555-0103',
+            ), $locations );
+
+            $dataset[6] = $this->build_seed_booking( 6, array(
+                'status'        => 'confirmed',
+                'date'          => gmdate( 'Y-m-d', strtotime( '+1 day', strtotime( $today ) ) ),
+                'time'          => '18:30',
+                'location_id'   => 2,
+                'table_id'      => 202,
+                'table_number'  => 'R2',
+                'party_size'    => 2,
+                'total_amount'  => 140.00,
+                'first_name'    => 'Maya',
+                'last_name'     => 'Cole',
+                'email'         => 'maya.cole@example.com',
+                'phone'         => '+1 555-0107',
+            ), $locations );
+
+            $dataset[7] = $this->build_seed_booking( 7, array(
+                'status'        => 'cancelled',
+                'date'          => gmdate( 'Y-m-d', strtotime( '-3 days', strtotime( $today ) ) ),
+                'time'          => '20:45',
+                'location_id'   => 2,
+                'table_id'      => 203,
+                'table_number'  => 'Lounge',
+                'party_size'    => 4,
+                'total_amount'  => 0.0,
+                'first_name'    => 'Olivia',
+                'last_name'     => 'Martin',
+                'email'         => 'olivia.martin@example.com',
+                'phone'         => '+1 555-0108',
+            ), $locations );
+
+            $dataset[8] = $this->build_seed_booking( 8, array(
+                'status'        => 'confirmed',
+                'date'          => gmdate( 'Y-m-d', strtotime( '+3 days', strtotime( $today ) ) ),
+                'time'          => '19:15',
+                'location_id'   => 3,
+                'table_id'      => 301,
+                'table_number'  => 'Loft A',
+                'party_size'    => 10,
+                'total_amount'  => 650.00,
+                'first_name'    => 'Noah',
+                'last_name'     => 'Garcia',
+                'email'         => 'noah.garcia@example.com',
+                'phone'         => '+1 555-0104',
+                'special_requests' => __( 'Corporate tasting menu with projector setup.', 'restaurant-booking' ),
+            ), $locations );
+
+            $dataset[9] = $this->build_seed_booking( 9, array(
+                'status'        => 'completed',
+                'date'          => gmdate( 'Y-m-d', strtotime( '-6 days', strtotime( $today ) ) ),
+                'time'          => '18:45',
+                'location_id'   => 3,
+                'table_id'      => 302,
+                'table_number'  => 'Loft B',
+                'party_size'    => 8,
+                'total_amount'  => 520.00,
+                'first_name'    => 'Priya',
+                'last_name'     => 'Sharma',
+                'email'         => 'priya.sharma@example.com',
+                'phone'         => '+1 555-0109',
+            ), $locations );
+
+            $dataset[10] = $this->build_seed_booking( 10, array(
+                'status'        => 'confirmed',
+                'date'          => gmdate( 'Y-m-d', strtotime( '+5 days', strtotime( $today ) ) ),
+                'time'          => '17:30',
+                'location_id'   => 1,
+                'table_id'      => 101,
+                'table_number'  => 'T1',
+                'party_size'    => 3,
+                'total_amount'  => 165.00,
+                'first_name'    => 'Grace',
+                'last_name'     => 'Bennett',
+                'email'         => 'grace.bennett@example.com',
+                'phone'         => '+1 555-0110',
+            ), $locations );
+
+            $this->save_bookings( $dataset );
+
+            $next_index = max( array_keys( $dataset ) ) + 1;
+            update_option( self::INDEX_OPTION_KEY, $next_index, false );
+
+            return $dataset;
+        }
+
+        /**
+         * Build a seed booking record merging defaults with overrides.
+         *
+         * @param int   $id         Booking identifier.
+         * @param array $overrides  Booking data overrides.
+         * @param array $locations  Map of location names keyed by identifier.
+         *
+         * @return array
+         */
+        protected function build_seed_booking( $id, $overrides, $locations ) {
+            $date = isset( $overrides['date'] ) ? $this->sanitize_date( $overrides['date'] ) : gmdate( 'Y-m-d' );
+            $time = isset( $overrides['time'] ) ? $this->sanitize_time( $overrides['time'] ) : '18:00';
+
+            $datetime = $date . ' ' . $time . ':00';
+            $location_id = isset( $overrides['location_id'] ) ? absint( $overrides['location_id'] ) : 1;
+            $location_name = isset( $overrides['location_name'] )
+                ? $overrides['location_name']
+                : ( isset( $locations[ $location_id ] ) ? $locations[ $location_id ] : __( 'Main Dining Room', 'restaurant-booking' ) );
+
+            $first_name = isset( $overrides['first_name'] ) ? sanitize_text_field( $overrides['first_name'] ) : '';
+            $last_name  = isset( $overrides['last_name'] ) ? sanitize_text_field( $overrides['last_name'] ) : '';
+            $full_name  = trim( $first_name . ' ' . $last_name );
+
+            return array(
+                'id'              => (int) $id,
+                'status'          => isset( $overrides['status'] ) ? sanitize_key( $overrides['status'] ) : 'confirmed',
+                'booking_date'    => $date,
+                'booking_time'    => $time,
+                'booking_datetime'=> $datetime,
+                'party_size'      => isset( $overrides['party_size'] ) ? (int) $overrides['party_size'] : 2,
+                'location_id'     => $location_id,
+                'location_name'   => $location_name,
+                'customer_name'   => $full_name ? $full_name : __( 'Guest', 'restaurant-booking' ),
+                'first_name'      => $first_name,
+                'last_name'       => $last_name,
+                'customer_email'  => isset( $overrides['email'] ) ? sanitize_email( $overrides['email'] ) : '',
+                'customer_phone'  => isset( $overrides['phone'] ) ? sanitize_text_field( $overrides['phone'] ) : '',
+                'special_requests'=> isset( $overrides['special_requests'] ) ? wp_kses_post( $overrides['special_requests'] ) : '',
+                'table_id'        => isset( $overrides['table_id'] ) ? (int) $overrides['table_id'] : 0,
+                'table_number'    => isset( $overrides['table_number'] ) ? $overrides['table_number'] : '',
+                'created_at'      => gmdate( 'Y-m-d H:i:s', strtotime( $datetime . ' -6 hours' ) ),
+                'updated_at'      => gmdate( 'Y-m-d H:i:s' ),
+                'total_amount'    => isset( $overrides['total_amount'] ) ? (float) $overrides['total_amount'] : 0.0,
+                'source'          => isset( $overrides['source'] ) ? sanitize_key( $overrides['source'] ) : 'demo',
+            );
+        }
+
+        /**
+         * Resolve location names for seed data.
+         *
+         * @return array
+         */
+        protected function get_seed_location_names() {
+            $names = array();
+
+            if ( class_exists( 'RB_Location' ) && method_exists( 'RB_Location', 'get_all_locations' ) ) {
+                $locations = RB_Location::get_all_locations();
+                foreach ( (array) $locations as $location ) {
+                    if ( isset( $location->id ) && isset( $location->name ) ) {
+                        $names[ (int) $location->id ] = $location->name;
+                    }
+                }
+            }
+
+            if ( empty( $names ) ) {
+                $names[1] = __( 'Main Dining Room', 'restaurant-booking' );
+            }
+
+            return $names;
+        }
+
+        /**
+         * Calculate table metrics for occupancy and availability.
+         *
+         * @param array $records     Booking dataset.
+         * @param int   $location_id Location identifier.
+         *
+         * @return array Array containing available tables, used tables, and occupancy percentage.
+         */
+        protected function calculate_table_metrics( $records, $location_id ) {
+            $available_tables = 0;
+            $used_tables      = array();
+
+            if ( class_exists( 'RB_Table' ) ) {
+                $tables = RB_Table::get_tables_by_location( $location_id );
+
+                if ( $tables instanceof Traversable ) {
+                    $tables = iterator_to_array( $tables, false );
+                }
+
+                if ( is_array( $tables ) ) {
+                    $available_tables = count( $tables );
+                }
+            }
+
+            foreach ( $records as $booking ) {
+                if ( isset( $booking['status'] ) && 'cancelled' === $booking['status'] ) {
+                    continue;
+                }
+
+                if ( isset( $booking['table_id'] ) && $booking['table_id'] ) {
+                    $used_tables[ $booking['table_id'] ] = true;
+                } elseif ( ! empty( $booking['table_number'] ) ) {
+                    $used_tables[ $booking['table_number'] ] = true;
+                }
+            }
+
+            $used_count = count( $used_tables );
+            $occupancy  = $available_tables > 0 ? min( 100.0, round( ( $used_count / $available_tables ) * 100, 1 ) ) : 0.0;
+
+            return array( $available_tables, $used_count, $occupancy );
         }
 
         /**
