@@ -32,6 +32,7 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
             add_action( 'admin_menu', array( $this, 'remove_restricted_settings_menu' ), 99 );
             add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ) );
             add_action( 'admin_init', array( $this, 'maybe_block_settings_access' ), 5 );
+            add_filter( 'user_has_cap', array( $this, 'maybe_grant_testing_manage_capability' ), 20, 4 );
 
             add_action( 'wp_ajax_rb_admin_get_dashboard', array( $this, 'ajax_get_dashboard' ) );
             add_action( 'wp_ajax_rb_admin_get_bookings', array( $this, 'ajax_get_bookings' ) );
@@ -732,15 +733,145 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
 
             $restricted = $is_super_admin;
 
-            if ( ! $restricted && ! empty( $blocked_roles ) && is_array( $user->roles ) ) {
-                $restricted = (bool) array_intersect( $blocked_roles, $user->roles );
+            $testing_overrides = $this->get_testing_access_overrides();
+
+            $is_testing_override = false;
+
+            if ( ! empty( $testing_overrides['roles'] ) && is_array( $user->roles ) ) {
+                $sanitized_roles = array_map( 'sanitize_key', $user->roles );
+
+                if ( array_intersect( $testing_overrides['roles'], $sanitized_roles ) ) {
+                    $is_testing_override = true;
+                }
             }
 
-            if ( ! $restricted && ! empty( $blocked_user_ids ) ) {
-                $restricted = in_array( $user->ID, array_map( 'intval', $blocked_user_ids ), true );
+            if ( ! $is_testing_override && ! empty( $testing_overrides['user_ids'] ) ) {
+                if ( in_array( $user->ID, $testing_overrides['user_ids'], true ) ) {
+                    $is_testing_override = true;
+                }
+            }
+
+            if ( $is_testing_override ) {
+                $restricted = false;
+            } else {
+                if ( ! $restricted && ! empty( $blocked_roles ) && is_array( $user->roles ) ) {
+                    $restricted = (bool) array_intersect( $blocked_roles, $user->roles );
+                }
+
+                if ( ! $restricted && ! empty( $blocked_user_ids ) ) {
+                    $restricted = in_array( $user->ID, array_map( 'intval', $blocked_user_ids ), true );
+                }
             }
 
             return (bool) apply_filters( 'restaurant_booking_is_settings_access_restricted', $restricted, $user );
+        }
+
+        /**
+         * Grant the manage capability to testing accounts while administrators are blocked.
+         *
+         * Ensures that QA users defined via the restaurant_booking_testing_allowed_* filters
+         * keep access to the settings screen even if their role normally lacks the
+         * `manage_bookings` capability.
+         *
+         * @param array   $allcaps All the capabilities of the user.
+         * @param array   $caps    Required primitive capabilities for the requested capability.
+         * @param array   $args    Arguments that accompany the capability check.
+         * @param WP_User $user    User object being evaluated.
+         *
+         * @return array
+         */
+        public function maybe_grant_testing_manage_capability( $allcaps, $caps, $args, $user ) {
+            if ( empty( $args ) || ! isset( $args[0] ) ) {
+                return $allcaps;
+            }
+
+            $requested_cap = $args[0];
+            if ( ! $user instanceof WP_User ) {
+                return $allcaps;
+            }
+
+            $user_id = (int) $user->ID;
+
+            if ( $user_id <= 0 ) {
+                return $allcaps;
+            }
+
+            $testing_overrides = $this->get_testing_access_overrides();
+
+            if ( empty( $testing_overrides['roles'] ) && empty( $testing_overrides['user_ids'] ) ) {
+                return $allcaps;
+            }
+
+            $target_capabilities = array( 'manage_bookings' );
+
+            if ( function_exists( 'restaurant_booking_get_manage_capability' ) ) {
+                $manage_capability = restaurant_booking_get_manage_capability();
+
+                if (
+                    ! empty( $manage_capability )
+                    && 'manage_options' !== $manage_capability
+                    && ! in_array( $manage_capability, $target_capabilities, true )
+                ) {
+                    $target_capabilities[] = $manage_capability;
+                }
+            }
+
+            if ( ! in_array( $requested_cap, $target_capabilities, true ) ) {
+                return $allcaps;
+            }
+
+            if ( in_array( $user_id, $testing_overrides['user_ids'], true ) ) {
+                foreach ( $target_capabilities as $capability ) {
+                    $allcaps[ $capability ] = true;
+                }
+
+                return $allcaps;
+            }
+
+            if ( empty( $testing_overrides['roles'] ) || ! is_array( $user->roles ) ) {
+                return $allcaps;
+            }
+
+            $sanitized_roles = array_map( 'sanitize_key', $user->roles );
+
+            if ( empty( array_intersect( $testing_overrides['roles'], $sanitized_roles ) ) ) {
+                return $allcaps;
+            }
+
+            foreach ( $target_capabilities as $capability ) {
+                $allcaps[ $capability ] = true;
+            }
+
+            return $allcaps;
+        }
+
+        /**
+         * Retrieve sanitized testing override configuration.
+         *
+         * @return array{
+         *     roles: string[],
+         *     user_ids: int[],
+         * }
+         */
+        protected function get_testing_access_overrides() {
+            $roles = apply_filters( 'restaurant_booking_testing_allowed_roles', array() );
+            if ( ! is_array( $roles ) ) {
+                $roles = array();
+            }
+
+            $roles = array_values( array_filter( array_map( 'sanitize_key', $roles ) ) );
+
+            $user_ids = apply_filters( 'restaurant_booking_testing_allowed_user_ids', array() );
+            if ( ! is_array( $user_ids ) ) {
+                $user_ids = array();
+            }
+
+            $user_ids = array_values( array_filter( array_map( 'intval', $user_ids ) ) );
+
+            return array(
+                'roles'    => $roles,
+                'user_ids' => $user_ids,
+            );
         }
 
         public function render_reports() {
