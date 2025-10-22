@@ -165,6 +165,10 @@ if ( ! function_exists( 'restaurant_booking_init_plugin' ) ) {
         $plugin = Restaurant_Booking_Plugin_Manager::instance();
         $plugin->run();
 
+        if ( method_exists( $plugin, 'bootstrap_admin_components' ) ) {
+            $plugin->bootstrap_admin_components();
+        }
+
         if ( function_exists( 'restaurant_booking_add_role_capabilities' ) ) {
             restaurant_booking_add_role_capabilities();
         }
@@ -274,6 +278,30 @@ function restaurant_booking_get_settings_page_slug() {
 }
 
 /**
+ * Build an admin URL for a given plugin page slug.
+ *
+ * @param string $slug        Menu slug registered via add_menu_page / add_submenu_page.
+ * @param array  $query_args  Optional query arguments to append.
+ *
+ * @return string
+ */
+function restaurant_booking_get_admin_page_url( $slug, $query_args = array() ) {
+    $slug = sanitize_key( $slug );
+
+    $base = is_network_admin() ? network_admin_url( 'admin.php' ) : admin_url( 'admin.php' );
+
+    $args = array( 'page' => $slug );
+
+    if ( ! empty( $query_args ) && is_array( $query_args ) ) {
+        $args = array_merge( $args, $query_args );
+    }
+
+    $url = add_query_arg( $args, $base );
+
+    return esc_url_raw( $url );
+}
+
+/**
  * Retrieve the admin URL for the plugin settings screen.
  *
  * @return string
@@ -281,7 +309,15 @@ function restaurant_booking_get_settings_page_slug() {
 function restaurant_booking_get_settings_page_url() {
     $slug = restaurant_booking_get_settings_page_slug();
 
-    return admin_url( 'admin.php?page=' . $slug );
+    if ( function_exists( 'menu_page_url' ) ) {
+        $url = menu_page_url( $slug, false );
+
+        if ( ! empty( $url ) ) {
+            return esc_url_raw( $url );
+        }
+    }
+
+    return restaurant_booking_get_admin_page_url( $slug );
 }
 
 /**
@@ -969,7 +1005,11 @@ function restaurant_booking_get_portal_login_url() {
     $login_url = apply_filters( 'rb_portal_login_url', home_url( '/portal/' ) );
 
     if ( empty( $login_url ) ) {
-        $login_url = wp_login_url( admin_url( 'admin.php?page=rb-dashboard' ) );
+        $dashboard_url = function_exists( 'restaurant_booking_get_admin_page_url' )
+            ? restaurant_booking_get_admin_page_url( 'rb-dashboard' )
+            : admin_url( 'admin.php?page=rb-dashboard' );
+
+        $login_url = wp_login_url( $dashboard_url );
     }
 
     return esc_url_raw( $login_url );
