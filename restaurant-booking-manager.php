@@ -357,7 +357,10 @@ function restaurant_booking_get_default_settings() {
         'buffer_time'           => 30,
         'allow_walkins'         => false,
         'reminder_hours'        => 24,
+        'theme_preference'      => 'system',
         'confirmation_template' => __( 'Thank you for your reservation! We look forward to welcoming you.', 'restaurant-booking' ),
+        'reminder_template'     => __( 'This is a friendly reminder about your upcoming reservation on {{reservation_date}}.', 'restaurant-booking' ),
+        'cancellation_template' => __( 'We are sorry to see you go. Your reservation has been cancelled as requested.', 'restaurant-booking' ),
         'send_sms'              => false,
         'send_followup'         => false,
         'auto_cancel_minutes'   => 15,
@@ -458,6 +461,13 @@ function restaurant_booking_sanitize_settings( $settings ) {
 
     $clean['allow_walkins'] = ! empty( $settings['allow_walkins'] );
 
+    $allowed_themes = array( 'system', 'light', 'dark' );
+    $theme           = isset( $settings['theme_preference'] ) ? sanitize_key( $settings['theme_preference'] ) : $defaults['theme_preference'];
+    if ( ! in_array( $theme, $allowed_themes, true ) ) {
+        $theme = $defaults['theme_preference'];
+    }
+    $clean['theme_preference'] = $theme;
+
     $clean['reminder_hours'] = isset( $settings['reminder_hours'] )
         ? max( 1, min( 168, (int) $settings['reminder_hours'] ) )
         : $defaults['reminder_hours'];
@@ -465,6 +475,14 @@ function restaurant_booking_sanitize_settings( $settings ) {
     $clean['confirmation_template'] = isset( $settings['confirmation_template'] )
         ? wp_kses_post( $settings['confirmation_template'] )
         : $defaults['confirmation_template'];
+
+    $clean['reminder_template'] = isset( $settings['reminder_template'] )
+        ? wp_kses_post( $settings['reminder_template'] )
+        : $defaults['reminder_template'];
+
+    $clean['cancellation_template'] = isset( $settings['cancellation_template'] )
+        ? wp_kses_post( $settings['cancellation_template'] )
+        : $defaults['cancellation_template'];
 
     $clean['send_sms'] = ! empty( $settings['send_sms'] );
 

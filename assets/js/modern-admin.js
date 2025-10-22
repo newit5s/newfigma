@@ -75,6 +75,28 @@
         locationsEmpty: 'No locations available yet.',
         settingsSaved: 'Settings saved successfully.',
         settingsReset: 'Settings restored to defaults.',
+        themeSystem: 'Matches system preference',
+        themeLight: 'Light mode',
+        themeDark: 'Dark mode',
+        templatesDefault: 'Using default templates',
+        templatesCustomized: 'Custom templates: %s',
+        templateConfirmation: 'Confirmation',
+        templateReminder: 'Reminder',
+        templateCancellation: 'Cancellation',
+        walkinsEnabledHoldSingular: 'Walk-ins enabled (hold %s minute)',
+        walkinsEnabledHoldPlural: 'Walk-ins enabled (hold %s minutes)',
+        walkinsEnabledNoHold: 'Walk-ins enabled (no hold buffer)',
+        walkinsDisabled: 'Walk-ins disabled by default',
+        autoCancelDisabled: 'Auto-cancel disabled',
+        autoCancelSingular: 'Auto-cancel after %s minute',
+        autoCancelPlural: 'Auto-cancel after %s minutes',
+        integrationsNone: 'No integrations enabled',
+        integrationSingle: '%s integration active',
+        integrationPlural: '%s integrations active',
+        maintenanceEnabled: 'Maintenance mode is active',
+        maintenanceDisabled: 'Maintenance mode is turned off',
+        followupEnabled: 'Post-visit follow-ups enabled',
+        followupDisabled: 'Follow-up emails disabled',
         locationSaved: 'Location details saved.',
         locationReset: 'Location form reset.',
         peakTime: 'Peak dining time',
@@ -97,6 +119,7 @@
       }, localized.currency || {});
 
       this.badges = Object.assign({}, localized.badges || {});
+      this.settingsDefaults = localized.settings && localized.settings.defaults ? localized.settings.defaults : {};
 
       this.dashboardData = null;
       this.locationsDirectory = null;
@@ -1101,6 +1124,14 @@
         this.updateSettingsSummary();
       });
 
+      this.$themePreference = this.$settingsForm.find('#restaurant_booking_settings_theme_preference');
+      if (this.$themePreference && this.$themePreference.length && this.themeManager && typeof this.themeManager.setTheme === 'function') {
+        this.$themePreference.on('change', () => {
+          const preference = this.$themePreference.val();
+          this.themeManager.setTheme(preference);
+        });
+      }
+
       if (this.$settingsReset && this.$settingsReset.length) {
         this.$settingsReset.on('click', (event) => {
           event.preventDefault();
@@ -1175,6 +1206,13 @@
       const leadTimeField = this.$settingsForm.find('#restaurant_booking_settings_buffer_time');
       const maxPartyField = this.$settingsForm.find('#restaurant_booking_settings_max_party_size');
       const remindersField = this.$settingsForm.find('#restaurant_booking_settings_reminder_hours');
+      const walkinsField = this.$settingsForm.find('#restaurant_booking_settings_allow_walkins');
+      const holdField = this.$settingsForm.find('#restaurant_booking_settings_hold_time_minutes');
+      const autoCancelField = this.$settingsForm.find('#restaurant_booking_settings_auto_cancel_minutes');
+      const maintenanceField = this.$settingsForm.find('#restaurant_booking_settings_maintenance_mode');
+      const integrationsField = this.$settingsForm.find('#restaurant_booking_settings_integrations');
+      const themeField = this.$settingsForm.find('#restaurant_booking_settings_theme_preference');
+      const followupField = this.$settingsForm.find('#restaurant_booking_settings_send_followup');
 
       const buildLabel = (field, singularKey, pluralKey) => {
         if (!field || !field.length) {
@@ -1204,6 +1242,134 @@
       }
       if ($reminders.length && remindersText) {
         $reminders.text(remindersText);
+      }
+
+      const $themeSummary = $('#rb-theme-summary');
+      if ($themeSummary.length) {
+        const preference = themeField && themeField.length
+          ? themeField.val()
+          : (this.settingsDefaults && this.settingsDefaults.theme_preference) || 'system';
+        let themeLabel;
+        switch (preference) {
+          case 'dark':
+            themeLabel = this.strings.themeDark;
+            break;
+          case 'light':
+            themeLabel = this.strings.themeLight;
+            break;
+          default:
+            themeLabel = this.strings.themeSystem;
+            break;
+        }
+        $themeSummary.text(themeLabel);
+      }
+
+      const $walkins = $('#rb-system-walkins');
+      if ($walkins.length && walkinsField && walkinsField.length) {
+        const enabled = walkinsField.is(':checked');
+        const holdMinutes = holdField && holdField.length ? toNumber(holdField.val(), 0) : 0;
+        let walkinsLabel;
+        if (enabled) {
+          if (holdMinutes > 0) {
+            const template = holdMinutes === 1
+              ? this.strings.walkinsEnabledHoldSingular
+              : this.strings.walkinsEnabledHoldPlural;
+            walkinsLabel = template.replace('%s', formatNumber(holdMinutes));
+          } else {
+            walkinsLabel = this.strings.walkinsEnabledNoHold;
+          }
+        } else {
+          walkinsLabel = this.strings.walkinsDisabled;
+        }
+        $walkins.text(walkinsLabel);
+      }
+
+      const $autoCancelSummary = $('#rb-system-auto-cancel');
+      if ($autoCancelSummary.length && autoCancelField && autoCancelField.length) {
+        const minutes = toNumber(autoCancelField.val(), 0);
+        let label;
+        if (minutes > 0) {
+          const template = minutes === 1 ? this.strings.autoCancelSingular : this.strings.autoCancelPlural;
+          label = template.replace('%s', formatNumber(minutes));
+        } else {
+          label = this.strings.autoCancelDisabled;
+        }
+        $autoCancelSummary.text(label);
+      }
+
+      const $maintenanceSummary = $('#rb-system-maintenance');
+      if ($maintenanceSummary.length && maintenanceField && maintenanceField.length) {
+        const label = maintenanceField.is(':checked')
+          ? this.strings.maintenanceEnabled
+          : this.strings.maintenanceDisabled;
+        $maintenanceSummary.text(label);
+      }
+
+      const $integrationSummary = $('#rb-system-integrations');
+      if ($integrationSummary.length && integrationsField && integrationsField.length) {
+        let selected = integrationsField.val();
+        if (!Array.isArray(selected)) {
+          selected = selected ? [selected] : [];
+        }
+        const count = selected.filter((value) => value && value.length).length;
+        let label;
+        if (count === 0) {
+          label = this.strings.integrationsNone;
+        } else if (count === 1) {
+          label = this.strings.integrationSingle.replace('%s', formatNumber(count));
+        } else {
+          label = this.strings.integrationPlural.replace('%s', formatNumber(count));
+        }
+        $integrationSummary.text(label);
+      }
+
+      const $followupSummary = $('#rb-email-followup-summary');
+      if ($followupSummary.length && followupField && followupField.length) {
+        const label = followupField.is(':checked')
+          ? this.strings.followupEnabled
+          : this.strings.followupDisabled;
+        $followupSummary.text(label);
+      }
+
+      const $templateSummary = $('#rb-email-templates-summary');
+      if ($templateSummary.length) {
+        const defaults = this.settingsDefaults || {};
+        const templates = [
+          {
+            field: this.$settingsForm.find('#restaurant_booking_settings_confirmation_template'),
+            key: 'confirmation_template',
+            label: this.strings.templateConfirmation,
+          },
+          {
+            field: this.$settingsForm.find('#restaurant_booking_settings_reminder_template'),
+            key: 'reminder_template',
+            label: this.strings.templateReminder,
+          },
+          {
+            field: this.$settingsForm.find('#restaurant_booking_settings_cancellation_template'),
+            key: 'cancellation_template',
+            label: this.strings.templateCancellation,
+          },
+        ];
+
+        const customized = [];
+        templates.forEach((template) => {
+          if (!template.field || !template.field.length) {
+            return;
+          }
+          const currentValue = (template.field.val() || '').trim();
+          const defaultValue = (defaults && defaults[template.key] ? defaults[template.key] : '').trim();
+          if (currentValue !== defaultValue) {
+            customized.push(template.label);
+          }
+        });
+
+        if (customized.length) {
+          const format = this.strings.templatesCustomized || '%s';
+          $templateSummary.text(format.replace('%s', customized.join(', ')));
+        } else {
+          $templateSummary.text(this.strings.templatesDefault);
+        }
       }
     }
 

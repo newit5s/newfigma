@@ -117,11 +117,7 @@ if ( ! class_exists( 'RB_Notification_Service' ) ) {
             $body = $this->render_email_template(
                 array(
                     'heading'      => __( 'See you soon!', 'restaurant-booking' ),
-                    'intro'        => sprintf(
-                        /* translators: %s: Formatted reservation date. */
-                        __( 'This is a friendly reminder about your upcoming reservation on %s.', 'restaurant-booking' ),
-                        $this->format_booking_datetime( $data )
-                    ),
+                    'intro'        => $this->get_reminder_intro( $data ),
                     'booking'      => $data,
                     'footer'       => $this->get_footer_text(),
                     'type'         => 'reminder',
@@ -173,7 +169,7 @@ if ( ! class_exists( 'RB_Notification_Service' ) ) {
             $body = $this->render_email_template(
                 array(
                     'heading'      => __( 'Reservation Cancelled', 'restaurant-booking' ),
-                    'intro'        => __( 'We are sorry to see you go. Your reservation has been cancelled as requested.', 'restaurant-booking' ),
+                    'intro'        => $this->get_cancellation_intro( $data ),
                     'booking'      => $data,
                     'footer'       => $this->get_footer_text(),
                     'type'         => 'cancellation',
@@ -405,6 +401,62 @@ if ( ! class_exists( 'RB_Notification_Service' ) ) {
             }
 
             return __( 'Thank you for choosing us. We look forward to hosting you!', 'restaurant-booking' );
+        }
+
+        /**
+         * Retrieve the reminder email intro text.
+         *
+         * @param array $booking Booking payload.
+         *
+         * @return string
+         */
+        protected function get_reminder_intro( $booking ) {
+            $template = '';
+
+            if ( function_exists( 'restaurant_booking_get_setting' ) ) {
+                $template = restaurant_booking_get_setting( 'reminder_template', '' );
+            }
+
+            if ( ! $template ) {
+                $template = __( 'This is a friendly reminder about your upcoming reservation on {{reservation_date}}.', 'restaurant-booking' );
+            }
+
+            $template  = wp_kses_post( $template );
+            $formatted = $this->format_booking_datetime( $booking );
+
+            if ( $formatted ) {
+                $template = str_replace( '{{reservation_date}}', esc_html( $formatted ), $template );
+            }
+
+            return $template;
+        }
+
+        /**
+         * Retrieve the cancellation email intro text.
+         *
+         * @param array $booking Booking payload.
+         *
+         * @return string
+         */
+        protected function get_cancellation_intro( $booking ) {
+            $template = '';
+
+            if ( function_exists( 'restaurant_booking_get_setting' ) ) {
+                $template = restaurant_booking_get_setting( 'cancellation_template', '' );
+            }
+
+            if ( ! $template ) {
+                $template = __( 'We are sorry to see you go. Your reservation has been cancelled as requested.', 'restaurant-booking' );
+            }
+
+            $template  = wp_kses_post( $template );
+            $formatted = $this->format_booking_datetime( $booking );
+
+            if ( $formatted ) {
+                $template = str_replace( '{{reservation_date}}', esc_html( $formatted ), $template );
+            }
+
+            return $template;
         }
 
         /**
