@@ -152,6 +152,9 @@
         locationReset: 'Location form reset.',
         peakTime: 'Peak dining time',
         sentiment: 'Guest sentiment',
+        statusUpdated: 'Booking status updated.',
+        statusUpdateFailed: 'Unable to update booking status.',
+        unknownSource: 'Unknown source',
       }, localized.strings || {});
 
       this.bookingsConfig = Object.assign({
@@ -162,6 +165,7 @@
           completed: 'Completed',
           cancelled: 'Cancelled',
         },
+        sourceLabels: {},
       }, localized.bookings || {});
 
       this.currency = Object.assign({
@@ -496,6 +500,7 @@
       this.$bookingsLoading = $('#rb-admin-bookings-loading');
       this.$bookingsPagination = $('#rb-admin-bookings-pagination');
       this.$bookingsSummary = $('#rb-bookings-summary');
+      this.$statusCards = $('#rb-admin-booking-status-cards .rb-admin-stat-card');
 
       this.bookingsState = {
         status: '',
@@ -503,11 +508,19 @@
         date_from: '',
         date_to: '',
         search: '',
+        source: '',
         per_page: this.bookingsConfig.perPage,
         page: 1,
       };
 
+      this.bookingsDragBound = false;
+      this.draggedBookingId = null;
+      this.draggedBookingStatus = '';
+      this.isUpdatingBookingStatus = false;
+
       this.bindBookingFilters();
+      this.bindBookingDragAndDrop();
+      this.populateSourceFilter();
       this.loadLocationsDirectory().always(() => {
         this.populateLocationFilter();
         this.loadBookings();
@@ -523,6 +536,12 @@
 
       $('#rb-bookings-location-filter').on('change', (event) => {
         this.bookingsState.location = event.target.value;
+        this.bookingsState.page = 1;
+        this.loadBookings();
+      });
+
+      $('#rb-bookings-source-filter').on('change', (event) => {
+        this.bookingsState.source = event.target.value;
         this.bookingsState.page = 1;
         this.loadBookings();
       });
@@ -608,12 +627,18 @@
     }
 
     resetBookingFilters() {
+      const defaultPerPage = Math.max(
+        1,
+        parseInt(this.bookingsConfig.perPage, 10) || this.bookingsConfig.perPage || 20
+      );
       this.bookingsState = Object.assign({}, this.bookingsState, {
         status: '',
         location: '',
         date_from: '',
         date_to: '',
         search: '',
+        source: '',
+        per_page: defaultPerPage,
         page: 1,
       });
       $('#rb-bookings-status-filter').val('');
@@ -621,6 +646,8 @@
       $('#rb-bookings-date-from').val('');
       $('#rb-bookings-date-to').val('');
       $('#rb-bookings-search-filter').val('');
+      $('#rb-bookings-source-filter').val('');
+      $('#rb-bookings-per-page').val(String(defaultPerPage));
     }
 
     loadBookings(force = false) {
@@ -632,6 +659,7 @@
       const payload = Object.assign({}, this.bookingsState);
       payload.per_page = Math.max(1, Math.min(100, parseInt(payload.per_page, 10) || this.bookingsConfig.perPage));
       payload.page = Math.max(1, parseInt(payload.page, 10) || 1);
+      payload.source = payload.source || '';
 
       this.bookingsRequest = this.request('rb_admin_get_bookings', payload);
       this.bookingsRequest
@@ -669,6 +697,8 @@
 
       this.updateBookingsPagination(pagination, items.length);
       this.updateStatusCards(summary.status_counts || {});
+      this.populateSourceFilter(summary.source_counts || {});
+      this.registerDraggableBookings();
 
       if (summary.status_counts && typeof summary.status_counts.pending !== 'undefined') {
         this.updateMenuBadge('rb-bookings', summary.status_counts.pending);
@@ -677,7 +707,7 @@
 
     renderBookingsError() {
       this.$bookingsTableBody.html(
-        `<tr><td colspan="7"><div class="rb-admin-alert is-error">${this.escape(this.strings.error)}</div></td></tr>`
+        `<tr><td colspan="8"><div class="rb-admin-alert is-error">${this.escape(this.strings.error)}</div></td></tr>`
       );
       this.$bookingsEmpty.attr('hidden', 'hidden');
     }
@@ -688,6 +718,7 @@
       const statusClass = `is-${status.replace(/[^a-z0-9_-]/gi, '').toLowerCase()}`;
       const tableLabel = item.table_number || (item.table_id ? `#${item.table_id}` : '—');
       const dateLabel = formatDateTime(item.booking_date, item.booking_time);
+      const sourceLabel = this.getSourceLabel(item.source);
       const actions = `
         <div class="rb-admin-table-actions">
           <button type="button" data-action="view" data-id="${this.escape(item.id)}">View</button>
@@ -696,7 +727,7 @@
       `;
 
       return `
-        <tr>
+        <tr class="rb-admin-booking-row" data-booking-id="${this.escape(item.id)}" data-booking-status="${this.escape(status)}" data-booking-source="${this.escape(item.source || '')}" draggable="true">
           <td>
             <div>${this.escape(item.customer_name || '—')}</div>
             <small class="rb-text-muted">${this.escape(item.customer_phone || item.customer_email || '')}</small>
@@ -705,10 +736,204 @@
           <td>${formatNumber(item.party_size || 0)}</td>
           <td>${this.escape(tableLabel)}</td>
           <td>${this.escape(item.location_name || '—')}</td>
+          <td>${this.escape(sourceLabel || '—')}</td>
           <td><span class="rb-admin-status-badge ${statusClass}">${this.escape(statusLabel)}</span></td>
           <td class="rb-admin-column-actions">${actions}</td>
         </tr>
       `;
+    }
+
+    getSourceLabel(source) {
+      if (!source) {
+        return this.strings.unknownSource || '—';
+      }
+      const labels = this.bookingsConfig.sourceLabels || {};
+      if (labels && labels[source]) {
+        return labels[source];
+      }
+      const humanized = String(source)
+        .replace(/[_-]+/g, ' ')
+        .replace(/\b\w/g, (char) => char.toUpperCase());
+      return humanized;
+    }
+
+    populateSourceFilter(sourceCounts = {}) {
+      const $select = $('#rb-bookings-source-filter');
+      if (!$select.length) {
+        return;
+      }
+      const currentValue = this.bookingsState.source || '';
+      const providedLabels = this.bookingsConfig.sourceLabels || {};
+      const options = [];
+      const seen = new Set();
+
+      Object.keys(providedLabels).forEach((value) => {
+        if (!value || seen.has(value)) {
+          return;
+        }
+        const label = providedLabels[value];
+        if (label) {
+          options.push({ value, label });
+          seen.add(value);
+        }
+      });
+
+      if (sourceCounts && typeof sourceCounts === 'object') {
+        Object.keys(sourceCounts).forEach((value) => {
+          if (!value || seen.has(value)) {
+            return;
+          }
+          options.push({ value, label: this.getSourceLabel(value) });
+          seen.add(value);
+        });
+      }
+
+      $select.find('option:not(:first-child)').remove();
+
+      options.forEach((option) => {
+        $select.append(`<option value="${this.escape(option.value)}">${this.escape(option.label)}</option>`);
+      });
+
+      if (currentValue) {
+        $select.val(currentValue);
+        if ($select.val() !== currentValue) {
+          $select.val('');
+          this.bookingsState.source = '';
+        }
+      }
+    }
+
+    bindBookingDragAndDrop() {
+      if (this.bookingsDragBound || !this.$bookingsTableBody || !this.$bookingsTableBody.length) {
+        return;
+      }
+
+      this.bookingsDragBound = true;
+
+      this.$bookingsTableBody.on('dragstart', 'tr[data-booking-id]', (event) => {
+        const $row = $(event.currentTarget);
+        this.draggedBookingId = $row.data('booking-id') || '';
+        this.draggedBookingStatus = $row.data('booking-status') || '';
+        $row.addClass('is-dragging');
+
+        const dataTransfer = event.originalEvent && event.originalEvent.dataTransfer;
+        if (dataTransfer) {
+          dataTransfer.effectAllowed = 'move';
+          dataTransfer.setData('text/plain', String(this.draggedBookingId));
+        }
+      });
+
+      this.$bookingsTableBody.on('dragend', 'tr[data-booking-id]', (event) => {
+        $(event.currentTarget).removeClass('is-dragging');
+        this.draggedBookingId = null;
+        this.draggedBookingStatus = '';
+        if (this.$statusCards && this.$statusCards.length) {
+          this.$statusCards.removeClass('is-drop-target');
+        }
+      });
+
+      if (this.$statusCards && this.$statusCards.length) {
+        this.$statusCards.on('dragenter dragover', (event) => {
+          if (!this.draggedBookingId) {
+            return;
+          }
+          event.preventDefault();
+          const dataTransfer = event.originalEvent && event.originalEvent.dataTransfer;
+          if (dataTransfer) {
+            dataTransfer.dropEffect = 'move';
+          }
+          $(event.currentTarget).addClass('is-drop-target');
+        });
+
+        this.$statusCards.on('dragleave', (event) => {
+          if (event.currentTarget === event.target) {
+            $(event.currentTarget).removeClass('is-drop-target');
+          }
+        });
+
+        this.$statusCards.on('drop', (event) => {
+          event.preventDefault();
+          const $target = $(event.currentTarget);
+          this.$statusCards.removeClass('is-drop-target');
+
+          const dataTransfer = event.originalEvent && event.originalEvent.dataTransfer;
+          const transferredId = dataTransfer ? dataTransfer.getData('text/plain') : '';
+          const bookingId = transferredId || this.draggedBookingId;
+          const status = $target.data('status');
+
+          if (!bookingId || !status || status === this.draggedBookingStatus) {
+            return;
+          }
+
+          this.handleBookingStatusDrop(bookingId, status);
+        });
+      }
+    }
+
+    registerDraggableBookings() {
+      if (!this.$bookingsTableBody || !this.$bookingsTableBody.length) {
+        return;
+      }
+
+      this.$bookingsTableBody.find('tr[data-booking-id]').attr('draggable', 'true');
+    }
+
+    handleBookingStatusDrop(bookingId, status) {
+      if (!bookingId || !status || this.isUpdatingBookingStatus) {
+        return;
+      }
+
+      this.isUpdatingBookingStatus = true;
+
+      this.request('rb_admin_update_booking_status', {
+        booking_id: bookingId,
+        status,
+      })
+        .done((response) => {
+          if (response && response.success) {
+            const message = (response.data && response.data.message) || this.strings.statusUpdated || 'Booking status updated.';
+            this.announce(message);
+            this.loadBookings(true);
+          } else {
+            const errorMessage =
+              (response && response.data && response.data.message) ||
+              this.strings.statusUpdateFailed ||
+              this.strings.error;
+            this.showBookingStatusError(errorMessage);
+          }
+        })
+        .fail((jqXHR) => {
+          const errorMessage =
+            jqXHR &&
+            jqXHR.responseJSON &&
+            jqXHR.responseJSON.data &&
+            jqXHR.responseJSON.data.message
+              ? jqXHR.responseJSON.data.message
+              : this.strings.statusUpdateFailed || this.strings.error;
+          this.showBookingStatusError(errorMessage);
+        })
+        .always(() => {
+          this.isUpdatingBookingStatus = false;
+          this.draggedBookingId = null;
+          this.draggedBookingStatus = '';
+        });
+    }
+
+    showBookingStatusError(message) {
+      const errorMessage = message || this.strings.statusUpdateFailed || this.strings.error;
+      if (window.console && window.console.error) {
+        window.console.error(errorMessage);
+      }
+      this.announce(errorMessage);
+      if (typeof window.alert === 'function') {
+        window.alert(errorMessage);
+      }
+    }
+
+    announce(message) {
+      if (window.wp && window.wp.a11y && typeof window.wp.a11y.speak === 'function') {
+        window.wp.a11y.speak(message);
+      }
     }
 
     updateBookingsPagination(pagination, pageItems) {

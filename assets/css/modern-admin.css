@@ -385,6 +385,24 @@ button.rb-admin-activity-item {
   background: var(--rb-bg-secondary);
 }
 
+.rb-admin-table tbody tr[data-booking-id] {
+  cursor: grab;
+}
+
+.rb-admin-table tbody tr[data-booking-id]:active {
+  cursor: grabbing;
+}
+
+.rb-admin-booking-row.is-dragging {
+  opacity: 0.75;
+  background: rgba(59, 130, 246, 0.12);
+}
+
+.rb-admin-stat-card.is-drop-target {
+  outline: 2px dashed rgba(59, 130, 246, 0.5);
+  outline-offset: 4px;
+}
+
 .rb-admin-column-actions {
   text-align: right;
 }

@@ -226,11 +226,15 @@ if ( ! class_exists( 'RB_Booking' ) ) {
                 return false;
             }
 
+            $previous_status = $this->get_status();
+
             if ( ! $this->bookings_table_exists() ) {
                 $repository = $this->get_fallback_repository();
 
                 if ( $repository && $repository->update_status( $this->id, $status ) ) {
                     $this->data = $repository->get_booking( $this->id );
+
+                    $this->trigger_status_hooks( $previous_status, $status );
 
                     return true;
                 }
@@ -258,9 +262,47 @@ if ( ! class_exists( 'RB_Booking' ) ) {
 
             if ( false !== $updated ) {
                 $this->load( true );
+                $this->trigger_status_hooks( $previous_status, $status );
             }
 
             return false !== $updated;
+        }
+
+        /**
+         * Trigger hooks after a status change.
+         *
+         * @param string $previous_status Previous status value.
+         * @param string $new_status      New status value.
+         */
+        protected function trigger_status_hooks( $previous_status, $new_status ) {
+            $previous_status = sanitize_key( $previous_status );
+            $new_status      = sanitize_key( $new_status );
+
+            if ( '' === $new_status || $previous_status === $new_status ) {
+                return;
+            }
+
+            $data = $this->get_data();
+
+            /**
+             * Fires when a booking status changes.
+             *
+             * @param int    $booking_id      Booking identifier.
+             * @param string $previous_status Previous status slug.
+             * @param string $new_status      New status slug.
+             * @param array  $booking         Booking data.
+             */
+            do_action( 'rb_booking_status_changed', $this->id, $previous_status, $new_status, $data );
+
+            /**
+             * Fires when a booking is moved into a specific status.
+             *
+             * @param int    $booking_id      Booking identifier.
+             * @param string $previous_status Previous status slug.
+             * @param string $new_status      New status slug.
+             * @param array  $booking         Booking data.
+             */
+            do_action( 'rb_booking_status_changed_' . $new_status, $this->id, $previous_status, $new_status, $data );
         }
 
         /**
@@ -311,6 +353,7 @@ if ( ! class_exists( 'RB_Booking' ) ) {
                     'page'            => max( 1, (int) $page ),
                     'per_page'        => 20,
                     'include_summary' => true,
+                    'source'          => '',
                 ),
                 (array) $args
             );
@@ -325,6 +368,12 @@ if ( ! class_exists( 'RB_Booking' ) ) {
                 $filters['status'] = sanitize_key( $filters['status'] );
             } else {
                 $filters['status'] = '';
+            }
+
+            if ( isset( $filters['source'] ) && '' !== $filters['source'] ) {
+                $filters['source'] = sanitize_key( $filters['source'] );
+            } else {
+                $filters['source'] = '';
             }
 
             $results = $model->query_bookings( $filters );
@@ -884,6 +933,7 @@ if ( ! class_exists( 'RB_Booking' ) ) {
                         'date_from' => isset( $args['date_from'] ) ? $args['date_from'] : '',
                         'date_to'   => isset( $args['date_to'] ) ? $args['date_to'] : '',
                         'search'    => isset( $args['search'] ) ? $args['search'] : '',
+                        'source'    => isset( $args['source'] ) ? $args['source'] : '',
                     );
 
                     $results = $repository->get_bookings( $filters, $page, $per_page, $sort_by, $sort_order );
@@ -914,6 +964,7 @@ if ( ! class_exists( 'RB_Booking' ) ) {
                 'date_from'   => '',
                 'date_to'     => '',
                 'search'      => '',
+                'source'      => '',
                 'page'        => 1,
                 'per_page'    => 25,
                 'sort_by'     => 'booking_datetime',
@@ -970,6 +1021,12 @@ if ( ! class_exists( 'RB_Booking' ) ) {
                 $select_fields[] = 'COALESCE(b.created_at, NOW()) AS updated_at';
             }
 
+            if ( $this->has_column( 'source' ) ) {
+                $select_fields[] = 'COALESCE(b.source, "") AS source';
+            } else {
+                $select_fields[] = '"" AS source';
+            }
+
             // Customer fields.
             if ( $this->has_column( 'customer_name' ) ) {
                 $select_fields[] = 'COALESCE(b.customer_name, "") AS customer_name';
@@ -1014,6 +1071,11 @@ if ( ! class_exists( 'RB_Booking' ) ) {
             if ( $location_id > 0 ) {
                 $where[]  = 'b.location_id = %d';
                 $params[] = $location_id;
+            }
+
+            if ( ! empty( $args['source'] ) && $this->has_column( 'source' ) ) {
+                $where[]  = 'b.source = %s';
+                $params[] = sanitize_key( $args['source'] );
             }
 
             if ( ! empty( $args['date_from'] ) ) {
@@ -1104,6 +1166,25 @@ if ( ! class_exists( 'RB_Booking' ) ) {
                     }
                 }
 
+                if ( $this->has_column( 'source' ) ) {
+                    $source_sql = 'SELECT b.source, COUNT(*) AS source_count FROM ' . $this->table . ' b' . $join_sql . ' ' . $where_sql . ' GROUP BY b.source';
+                    $source_sql = $this->prepare( $source_sql, $params );
+                    $source_rows = $this->wpdb->get_results( $source_sql );
+
+                    if ( $source_rows ) {
+                        foreach ( $source_rows as $source_row ) {
+                            $source_key = isset( $source_row->source ) ? sanitize_key( $source_row->source ) : '';
+                            $count      = isset( $source_row->source_count ) ? (int) $source_row->source_count : 0;
+
+                            if ( '' === $source_key ) {
+                                continue;
+                            }
+
+                            $summary['source_counts'][ $source_key ] = $count;
+                        }
+                    }
+                }
+
                 $amount_expression = $this->has_column( 'total_amount' ) ? 'COALESCE(b.total_amount, 0)' : '0';
                 $party_expression  = $this->has_column( 'party_size' ) ? 'COALESCE(b.party_size, 0)' : '0';
 
@@ -1165,6 +1246,7 @@ if ( ! class_exists( 'RB_Booking' ) ) {
                 'created_at'      => isset( $row->created_at ) ? $row->created_at : $booking_date,
                 'updated_at'      => isset( $row->updated_at ) ? $row->updated_at : $booking_date,
                 'total_amount'    => isset( $row->total_amount ) ? (float) $row->total_amount : 0.0,
+                'source'          => isset( $row->source ) ? $row->source : '',
             );
         }
 
@@ -1223,6 +1305,7 @@ if ( ! class_exists( 'RB_Booking' ) ) {
                     'completed' => 0,
                     'cancelled' => 0,
                 ),
+                'source_counts'     => array(),
             );
         }
 
@@ -1357,6 +1440,7 @@ if ( ! class_exists( 'RB_Booking' ) ) {
                 'customer_phone'   => '%s',
                 'created_at'       => '%s',
                 'updated_at'       => '%s',
+                'source'           => '%s',
             );
         }
 
@@ -1419,6 +1503,15 @@ if ( ! class_exists( 'RB_Booking' ) ) {
             if ( $this->has_column( 'status' ) && isset( $formats_map['status'] ) ) {
                 $payload['status'] = sanitize_key( $data['status'] ?? 'pending' );
                 $formats[]         = $formats_map['status'];
+            }
+
+            if ( $this->has_column( 'source' ) && isset( $formats_map['source'] ) ) {
+                $source = isset( $data['source'] ) ? sanitize_key( $data['source'] ) : '';
+                if ( '' === $source ) {
+                    $source = 'online';
+                }
+                $payload['source'] = $source;
+                $formats[]         = $formats_map['source'];
             }
 
             if ( $this->has_column( 'total_amount' ) && isset( $formats_map['total_amount'] ) ) {
@@ -1497,6 +1590,7 @@ if ( ! class_exists( 'RB_Booking' ) ) {
                 'party_size'        => isset( $data['party_size'] ) ? (int) $data['party_size'] : ( isset( $data['guests'] ) ? (int) $data['guests'] : 0 ),
                 'date'              => isset( $data['date'] ) ? sanitize_text_field( $data['date'] ) : ( isset( $data['booking_date'] ) ? sanitize_text_field( $data['booking_date'] ) : '' ),
                 'time'              => isset( $data['time'] ) ? sanitize_text_field( $data['time'] ) : ( isset( $data['booking_time'] ) ? sanitize_text_field( $data['booking_time'] ) : '' ),
+                'source'            => sanitize_key( $data['source'] ?? 'fallback' ),
             );
         }
 
