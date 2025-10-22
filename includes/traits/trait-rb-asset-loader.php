@@ -115,11 +115,14 @@ if ( ! trait_exists( 'RB_Asset_Loader' ) ) {
 
             $chartjs_loaded = true;
 
+            $version  = defined( 'RB_PLUGIN_VERSION' ) ? RB_PLUGIN_VERSION : '1.0.0';
+            $base_url = $this->get_plugin_base_url();
+
             wp_enqueue_script(
                 'chart-js',
-                'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js',
+                $base_url . 'assets/js/vendor/chart.min.js',
                 array(),
-                '3.9.1',
+                $version,
                 true
             );
         }

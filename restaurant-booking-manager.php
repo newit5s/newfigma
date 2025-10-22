@@ -208,12 +208,16 @@ function restaurant_booking_check_conflicts() {
     $conflicting_plugins = array(
         'plugin-datban-version1-main/restaurant-booking-manager.php'
     );
-    
+
+    if ( ! function_exists( 'is_plugin_active' ) ) {
+        require_once ABSPATH . 'wp-admin/includes/plugin.php';
+    }
+
     foreach ( $conflicting_plugins as $plugin ) {
         if ( is_plugin_active( $plugin ) ) {
             add_action( 'admin_notices', function() use ( $plugin ) {
                 echo '<div class="notice notice-warning"><p>';
-                printf( 
+                printf(
                     __( 'Restaurant Booking Manager: Potential conflict detected with %s. Please deactivate conflicting plugin.', 'restaurant-booking' ),
                     esc_html( $plugin )
                 );
