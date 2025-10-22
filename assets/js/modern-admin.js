@@ -717,21 +717,43 @@
       this.$locationUnsaved = $('#rb-location-unsaved');
       this.$locationSave = $('#rb-location-save');
       this.$locationReset = $('#rb-location-reset');
+      this.$locationsRefresh = $('#rb-locations-refresh');
+      this.$locationsCreate = $('#rb-locations-create');
       this.activeLocation = null;
+      this.locationNoticeTimeout = null;
+      this.locationFormDirty = false;
+      this.locationNoticeDefault = this.$locationUnsaved && this.$locationUnsaved.length
+        ? this.$locationUnsaved.text()
+        : '';
+
+      if (this.$locationUnsaved && this.$locationUnsaved.length) {
+        this.$locationUnsaved.attr('hidden', 'hidden');
+      }
+
+      if (this.$locationsRefresh && this.$locationsRefresh.length) {
+        this.$locationsRefresh.on('click', (event) => {
+          event.preventDefault();
+          this.loadLocations(true);
+        });
+      }
+
+      if (this.$locationsCreate && this.$locationsCreate.length) {
+        this.$locationsCreate.on('click', (event) => {
+          event.preventDefault();
+          this.startNewLocation();
+        });
+      }
 
       this.bindLocationForm();
       this.loadLocations();
     }
 
-    loadLocations() {
+    loadLocations(force = true) {
       this.toggleOverlay(this.$locationsLoading, true);
 
-      $.when(this.loadLocationsDirectory(true), this.getDashboardData(true))
+      $.when(this.loadLocationsDirectory(force), this.getDashboardData(force))
         .done((directory, dashboard) => {
-          const locations = directory.locations || [];
-          const summary = directory.summary || {};
-          this.renderLocations(locations, dashboard && dashboard.locations ? dashboard.locations : []);
-          this.updateLocationSummary(summary);
+          this.refreshLocationsFromPayload(directory, dashboard);
         })
         .fail(() => {
           this.$locationsRoot.html(
@@ -741,6 +763,49 @@
         .always(() => {
           this.toggleOverlay(this.$locationsLoading, false);
         });
+    }
+
+    refreshLocationsFromPayload(directory, dashboard = null) {
+      if (!directory) {
+        return;
+      }
+
+      const locations = Array.isArray(directory.locations) ? directory.locations : [];
+      const summary = directory.summary || {};
+
+      this.locationsDirectory = { locations, summary };
+
+      let dashboardData = dashboard;
+      if (!dashboardData && directory.dashboard) {
+        dashboardData = directory.dashboard;
+      }
+
+      if (dashboardData) {
+        this.dashboardData = Object.assign({}, this.dashboardData || {}, dashboardData);
+      }
+
+      const effectiveDashboard = dashboardData || this.dashboardData || {};
+      const dashboardLocations = Array.isArray(effectiveDashboard.locations)
+        ? effectiveDashboard.locations
+        : [];
+
+      this.renderLocations(locations, dashboardLocations);
+      this.updateLocationSummary(summary);
+
+      if (!this.locationFormDirty && locations.length) {
+        if (!this.activeLocation || typeof this.activeLocation.id === 'undefined') {
+          this.populateLocationForm(locations[0], false);
+        } else {
+          const current = locations.find((location) => String(location.id) === String(this.activeLocation.id));
+          if (current) {
+            this.populateLocationForm(current, false);
+          } else {
+            this.populateLocationForm(locations[0], false);
+          }
+        }
+      } else if (!this.locationFormDirty && !locations.length) {
+        this.populateLocationForm(this.getEmptyLocation(), false);
+      }
     }
 
     renderLocations(locations, dashboardLocations) {
@@ -810,7 +875,17 @@
         if (location) {
           this.populateLocationForm(location);
         }
+        this.$locationsRoot.find('.rb-admin-location-card').removeClass('is-selected');
+        $(event.currentTarget).addClass('is-selected');
       });
+
+      if (this.activeLocation && typeof this.activeLocation.id !== 'undefined') {
+        const activeId = String(this.activeLocation.id);
+        this.$locationsRoot.find('.rb-admin-location-card').each((index, element) => {
+          const $card = $(element);
+          $card.toggleClass('is-selected', String($card.data('location-id')) === activeId);
+        });
+      }
     }
 
     updateLocationSummary(summary) {
@@ -824,60 +899,183 @@
         return;
       }
 
+      this.$locationForm.on('submit', (event) => {
+        event.preventDefault();
+      });
+
       this.$locationForm.on('input change', 'input, textarea, select', () => {
-        if (!this.activeLocation) {
-          return;
-        }
         this.setLocationFormDirty(true);
       });
 
       this.$locationSave.on('click', (event) => {
         event.preventDefault();
-        this.setLocationFormDirty(false);
-        this.showLocationNotice(this.strings.locationSaved);
+        this.saveActiveLocation();
       });
 
       this.$locationReset.on('click', (event) => {
         event.preventDefault();
-        if (this.activeLocation) {
-          this.populateLocationForm(this.activeLocation, false);
-        }
-        this.showLocationNotice(this.strings.locationReset);
+        this.resetLocationForm();
       });
+
+      this.setLocationFormDirty(false);
     }
 
     populateLocationForm(location, markDirty = false) {
-      this.activeLocation = Object.assign({}, location);
-      this.$locationForm.find('#rb-location-name').val(location.name || '');
-      this.$locationForm.find('#rb-location-email').val(location.email || '');
-      this.$locationForm.find('#rb-location-phone').val(location.phone || '');
-      this.$locationForm.find('#rb-location-address').val(location.address || '');
-      this.$locationForm.find('#rb-location-hours-weekday').val(location.hours_weekday || '');
-      this.$locationForm.find('#rb-location-hours-weekend').val(location.hours_weekend || '');
-      this.$locationForm.find('#rb-location-waitlist').prop('checked', Boolean(location.waitlist_enabled));
-      this.$locationForm.find('#rb-location-private').prop('checked', location.status === 'private');
+      const payload = location || this.getEmptyLocation();
+      this.activeLocation = Object.assign({}, payload);
+      this.$locationForm.find('#rb-location-name').val(payload.name || '');
+      this.$locationForm.find('#rb-location-email').val(payload.email || '');
+      this.$locationForm.find('#rb-location-phone').val(payload.phone || '');
+      this.$locationForm.find('#rb-location-address').val(payload.address || '');
+      this.$locationForm.find('#rb-location-hours-weekday').val(payload.hours_weekday || '');
+      this.$locationForm.find('#rb-location-hours-weekend').val(payload.hours_weekend || '');
+      this.$locationForm.find('#rb-location-waitlist').prop('checked', Boolean(payload.waitlist_enabled));
+      const isPrivate = (payload.status || '') === 'private';
+      this.$locationForm.find('#rb-location-private').prop('checked', isPrivate);
       this.setLocationFormDirty(markDirty);
     }
 
     setLocationFormDirty(isDirty) {
-      this.$locationSave.prop('disabled', !isDirty);
-      this.$locationReset.prop('disabled', !isDirty);
-      if (isDirty) {
-        this.$locationUnsaved.removeAttr('hidden');
+      this.locationFormDirty = Boolean(isDirty);
+      this.$locationSave.prop('disabled', !this.locationFormDirty);
+      this.$locationReset.prop('disabled', !this.locationFormDirty);
+      if (!this.$locationUnsaved || !this.$locationUnsaved.length) {
+        return;
+      }
+
+      if (this.locationFormDirty) {
+        clearTimeout(this.locationNoticeTimeout);
+        this.$locationUnsaved
+          .removeClass('is-error')
+          .text(this.locationNoticeDefault || this.strings.locationReset)
+          .removeAttr('hidden');
       } else {
         this.$locationUnsaved.attr('hidden', 'hidden');
       }
     }
 
-    showLocationNotice(message) {
-      if (!message) {
+    showLocationNotice(message, isError = false) {
+      if (!message || !this.$locationUnsaved || !this.$locationUnsaved.length) {
         return;
       }
-      this.$locationUnsaved.removeClass('is-error');
-      this.$locationUnsaved.text(message).removeAttr('hidden');
-      setTimeout(() => {
-        this.$locationUnsaved.attr('hidden', 'hidden');
-      }, 2500);
+      clearTimeout(this.locationNoticeTimeout);
+      this.$locationUnsaved
+        .toggleClass('is-error', Boolean(isError))
+        .text(message)
+        .removeAttr('hidden');
+
+      this.locationNoticeTimeout = setTimeout(() => {
+        if (this.locationFormDirty) {
+          this.$locationUnsaved
+            .removeClass('is-error')
+            .text(this.locationNoticeDefault || this.strings.locationReset)
+            .removeAttr('hidden');
+        } else {
+          this.$locationUnsaved.attr('hidden', 'hidden');
+        }
+      }, isError ? 5000 : 2500);
+    }
+
+    getEmptyLocation() {
+      return {
+        id: 0,
+        name: '',
+        email: '',
+        phone: '',
+        address: '',
+        hours_weekday: '',
+        hours_weekend: '',
+        waitlist_enabled: false,
+        status: 'active',
+        capacity: 0,
+        declared_capacity: 0,
+      };
+    }
+
+    startNewLocation() {
+      const draft = this.getEmptyLocation();
+      this.populateLocationForm(draft, true);
+      if (this.$locationForm && this.$locationForm.length) {
+        const $name = this.$locationForm.find('#rb-location-name');
+        if ($name.length) {
+          $name.trigger('focus');
+        }
+      }
+      this.showLocationNotice(this.strings.locationReset);
+    }
+
+    collectLocationFormData() {
+      const base = this.activeLocation || this.getEmptyLocation();
+      const $form = this.$locationForm;
+      const status = $form.find('#rb-location-private').is(':checked') ? 'private' : (base.status || 'active');
+
+      return {
+        id: base.id || 0,
+        name: ($form.find('#rb-location-name').val() || '').trim(),
+        email: ($form.find('#rb-location-email').val() || '').trim(),
+        phone: ($form.find('#rb-location-phone').val() || '').trim(),
+        address: ($form.find('#rb-location-address').val() || '').trim(),
+        hours_weekday: ($form.find('#rb-location-hours-weekday').val() || '').trim(),
+        hours_weekend: ($form.find('#rb-location-hours-weekend').val() || '').trim(),
+        waitlist_enabled: $form.find('#rb-location-waitlist').is(':checked') ? 1 : 0,
+        status,
+        capacity: Number(base.capacity || base.declared_capacity || 0),
+      };
+    }
+
+    saveActiveLocation() {
+      if (!this.$locationForm.length) {
+        return;
+      }
+
+      const payload = this.collectLocationFormData();
+
+      if (!payload.name) {
+        this.showLocationNotice(this.strings.error, true);
+        return;
+      }
+
+      this.$locationSave.prop('disabled', true).attr('aria-busy', 'true');
+
+      this.request('rb_admin_save_location', payload)
+        .done((response) => {
+          if (response && response.success && response.data) {
+            const directory = response.data;
+            if (directory.location) {
+              this.populateLocationForm(directory.location, false);
+            } else {
+              this.setLocationFormDirty(false);
+            }
+            this.refreshLocationsFromPayload(directory, directory.dashboard || null);
+            this.showLocationNotice(this.strings.locationSaved);
+          } else {
+            const message = response && response.data && response.data.message
+              ? response.data.message
+              : this.strings.error;
+            this.showLocationNotice(message, true);
+            this.setLocationFormDirty(true);
+          }
+        })
+        .fail((jqXHR) => {
+          const message = jqXHR
+            && jqXHR.responseJSON
+            && jqXHR.responseJSON.data
+            && jqXHR.responseJSON.data.message
+              ? jqXHR.responseJSON.data.message
+              : this.strings.error;
+          this.showLocationNotice(message, true);
+          this.setLocationFormDirty(true);
+        })
+        .always(() => {
+          this.$locationSave.removeAttr('aria-busy');
+          this.$locationSave.prop('disabled', !this.locationFormDirty);
+        });
+    }
+
+    resetLocationForm() {
+      const current = this.activeLocation || this.getEmptyLocation();
+      this.populateLocationForm(current, false);
+      this.showLocationNotice(this.strings.locationReset);
     }
 
     /* --------------------------------------------------------------------- */

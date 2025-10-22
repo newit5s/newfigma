@@ -29,6 +29,13 @@ if ( ! class_exists( 'RB_Modern_Booking_Widget' ) ) {
         protected $booking_repository = null;
 
         /**
+         * Notification service for transactional emails.
+         *
+         * @var RB_Notification_Service|null
+         */
+        protected $notification_service = null;
+
+        /**
          * Register hooks.
          */
         public function __construct() {
@@ -38,6 +45,10 @@ if ( ! class_exists( 'RB_Modern_Booking_Widget' ) ) {
 
             if ( class_exists( 'RB_Fallback_Booking_Repository' ) ) {
                 $this->booking_repository = RB_Fallback_Booking_Repository::instance();
+            }
+
+            if ( class_exists( 'RB_Notification_Service' ) ) {
+                $this->notification_service = new RB_Notification_Service();
             }
 
             add_shortcode( 'modern_restaurant_booking', array( $this, 'render_booking_widget' ) );
@@ -259,12 +270,6 @@ if ( ! class_exists( 'RB_Modern_Booking_Widget' ) ) {
         public function ajax_create_booking() {
             $this->verify_ajax_nonce();
 
-            $repository = $this->get_booking_repository();
-
-            if ( ! $repository ) {
-                $this->send_json_error( __( 'Booking service temporarily unavailable.', 'restaurant-booking' ), 501 );
-            }
-
             $payload = array(
                 'first_name'        => isset( $_POST['first_name'] ) ? sanitize_text_field( wp_unslash( $_POST['first_name'] ) ) : '',
                 'last_name'         => isset( $_POST['last_name'] ) ? sanitize_text_field( wp_unslash( $_POST['last_name'] ) ) : '',
@@ -295,10 +300,38 @@ if ( ! class_exists( 'RB_Modern_Booking_Widget' ) ) {
 
             $payload['party_size'] = max( 1, $payload['party_size'] );
 
-            $booking = $repository->add_booking( $payload );
+            $booking = array();
+
+            if ( class_exists( 'RB_Booking' ) && method_exists( 'RB_Booking', 'create_booking' ) ) {
+                $booking = RB_Booking::create_booking(
+                    array_merge(
+                        $payload,
+                        array(
+                            'status'        => 'pending',
+                            'customer_name' => trim( $payload['first_name'] . ' ' . $payload['last_name'] ),
+                        )
+                    )
+                );
+            }
 
             if ( empty( $booking ) ) {
-                $this->send_json_error( __( 'Unable to complete your reservation. Please try again later.', 'restaurant-booking' ), 500 );
+                $repository = $this->get_booking_repository();
+
+                if ( ! $repository ) {
+                    $this->send_json_error( __( 'Booking service temporarily unavailable.', 'restaurant-booking' ), 501 );
+                }
+
+                $booking = $repository->add_booking( $payload );
+
+                if ( empty( $booking ) ) {
+                    $this->send_json_error( __( 'Unable to complete your reservation. Please try again later.', 'restaurant-booking' ), 500 );
+                }
+            }
+
+            $notification_service = $this->get_notification_service();
+
+            if ( $notification_service ) {
+                $notification_service->send_booking_confirmation( $booking );
             }
 
             $this->send_json_success(
@@ -351,6 +384,25 @@ if ( ! class_exists( 'RB_Modern_Booking_Widget' ) ) {
                 $this->booking_repository = RB_Fallback_Booking_Repository::instance();
 
                 return $this->booking_repository;
+            }
+
+            return null;
+        }
+
+        /**
+         * Retrieve the notification service instance.
+         *
+         * @return RB_Notification_Service|null
+         */
+        protected function get_notification_service() {
+            if ( $this->notification_service instanceof RB_Notification_Service ) {
+                return $this->notification_service;
+            }
+
+            if ( class_exists( 'RB_Notification_Service' ) ) {
+                $this->notification_service = new RB_Notification_Service();
+
+                return $this->notification_service;
             }
 
             return null;

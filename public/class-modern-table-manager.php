@@ -380,7 +380,8 @@ if ( ! class_exists( 'RB_Modern_Table_Manager' ) ) {
                 wp_send_json_error( array( 'message' => __( 'Invalid table data supplied.', 'restaurant-booking' ) ), 400 );
             }
 
-            $persisted = false;
+            $persisted      = false;
+            $updated_tables = array();
 
             if ( class_exists( 'RB_Table' ) ) {
                 if ( method_exists( 'RB_Table', 'update_table_layout' ) ) {
@@ -397,9 +398,14 @@ if ( ! class_exists( 'RB_Modern_Table_Manager' ) ) {
                 }
             }
 
+            if ( $persisted ) {
+                $updated_tables = $this->get_tables_for_location( $location );
+            }
+
             wp_send_json_success(
                 array(
                     'persisted' => $persisted,
+                    'tables'    => $updated_tables,
                 )
             );
         }

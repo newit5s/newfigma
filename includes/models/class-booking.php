@@ -64,6 +64,20 @@ if ( ! class_exists( 'RB_Booking' ) ) {
         protected $columns = null;
 
         /**
+         * Notification service instance cache.
+         *
+         * @var RB_Notification_Service|null
+         */
+        protected $notification_service = null;
+
+        /**
+         * Singleton instance cache.
+         *
+         * @var self|null
+         */
+        protected static $instance = null;
+
+        /**
          * Constructor.
          *
          * @param int $id Optional booking identifier.
@@ -88,6 +102,19 @@ if ( ! class_exists( 'RB_Booking' ) ) {
         }
 
         /**
+         * Retrieve singleton instance.
+         *
+         * @return self
+         */
+        public static function instance() {
+            if ( null === self::$instance ) {
+                self::$instance = new self();
+            }
+
+            return self::$instance;
+        }
+
+        /**
          * Determine whether the booking exists.
          *
          * @return bool
@@ -107,6 +134,84 @@ if ( ! class_exists( 'RB_Booking' ) ) {
             $this->load();
 
             return is_array( $this->data ) ? $this->data : array();
+        }
+
+        /**
+         * Retrieve the current booking status.
+         *
+         * @return string
+         */
+        public function get_status() {
+            $data = $this->get_data();
+
+            return isset( $data['status'] ) ? (string) $data['status'] : '';
+        }
+
+        /**
+         * Retrieve the customer's email address.
+         *
+         * @return string
+         */
+        public function get_customer_email() {
+            $data = $this->get_data();
+
+            return isset( $data['customer_email'] ) ? (string) $data['customer_email'] : '';
+        }
+
+        /**
+         * Retrieve the customer's display name.
+         *
+         * @return string
+         */
+        public function get_customer_name() {
+            $data = $this->get_data();
+
+            return isset( $data['customer_name'] ) ? (string) $data['customer_name'] : '';
+        }
+
+        /**
+         * Trigger confirmation email delivery.
+         *
+         * @return bool
+         */
+        public function send_confirmation_email() {
+            $service = $this->get_notification_service();
+
+            if ( ! $service ) {
+                return false;
+            }
+
+            return $service->send_booking_confirmation( $this->get_data() );
+        }
+
+        /**
+         * Trigger cancellation email delivery.
+         *
+         * @return bool
+         */
+        public function send_cancellation_email() {
+            $service = $this->get_notification_service();
+
+            if ( ! $service ) {
+                return false;
+            }
+
+            return $service->send_booking_cancellation( $this->get_data() );
+        }
+
+        /**
+         * Trigger reminder email delivery.
+         *
+         * @return bool
+         */
+        public function send_reminder_email() {
+            $service = $this->get_notification_service();
+
+            if ( ! $service ) {
+                return false;
+            }
+
+            return $service->send_booking_reminder( $this->get_data() );
         }
 
         /**
@@ -291,6 +396,47 @@ if ( ! class_exists( 'RB_Booking' ) ) {
             }
 
             return $results;
+        }
+
+        /**
+         * Create a booking record.
+         *
+         * @param array $data Booking payload.
+         *
+         * @return array
+         */
+        public static function create_booking( $data ) {
+            $model = new self();
+
+            if ( ! $model->bookings_table_exists() ) {
+                $repository = $model->get_fallback_repository();
+
+                if ( $repository ) {
+                    $payload = $model->prepare_fallback_booking_payload( $data );
+                    $booking = $repository->add_booking( $payload );
+
+                    return $booking ? $model->map_booking_row_from_array( $booking ) : array();
+                }
+
+                return array();
+            }
+
+            list( $insert, $formats ) = $model->prepare_insert_payload( $data );
+
+            if ( empty( $insert ) ) {
+                return array();
+            }
+
+            $result = $model->wpdb->insert( $model->table, $insert, $formats );
+
+            if ( false === $result ) {
+                return array();
+            }
+
+            $booking_id = (int) $model->wpdb->insert_id;
+            $record     = new self( $booking_id );
+
+            return $record->get_data();
         }
 
         /**
@@ -1190,6 +1336,171 @@ if ( ! class_exists( 'RB_Booking' ) ) {
         }
 
         /**
+         * Provide column format mapping for inserts and updates.
+         *
+         * @return array
+         */
+        protected function get_column_formats() {
+            return array(
+                'customer_id'      => '%d',
+                'location_id'      => '%d',
+                'table_id'         => '%d',
+                'booking_date'     => '%s',
+                'booking_time'     => '%s',
+                'booking_datetime' => '%s',
+                'party_size'       => '%d',
+                'status'           => '%s',
+                'total_amount'     => '%f',
+                'special_requests' => '%s',
+                'customer_name'    => '%s',
+                'customer_email'   => '%s',
+                'customer_phone'   => '%s',
+                'created_at'       => '%s',
+                'updated_at'       => '%s',
+            );
+        }
+
+        /**
+         * Prepare insert payload for database persistence.
+         *
+         * @param array $data Booking payload.
+         *
+         * @return array
+         */
+        protected function prepare_insert_payload( $data ) {
+            $formats_map = $this->get_column_formats();
+            $payload     = array();
+            $formats     = array();
+
+            if ( $this->has_column( 'customer_id' ) && isset( $formats_map['customer_id'] ) ) {
+                $customer_id = 0;
+
+                if ( class_exists( 'RB_Customer' ) && method_exists( 'RB_Customer', 'upsert_customer_from_booking' ) ) {
+                    $customer_id = RB_Customer::upsert_customer_from_booking( $data );
+                }
+
+                $payload['customer_id'] = $customer_id;
+                $formats[]              = $formats_map['customer_id'];
+            }
+
+            if ( $this->has_column( 'location_id' ) && isset( $formats_map['location_id'] ) ) {
+                $payload['location_id'] = absint( $data['location_id'] ?? ( $data['location'] ?? 0 ) );
+                $formats[]              = $formats_map['location_id'];
+            }
+
+            if ( $this->has_column( 'table_id' ) && isset( $formats_map['table_id'] ) ) {
+                $payload['table_id'] = absint( $data['table_id'] ?? 0 );
+                $formats[]           = $formats_map['table_id'];
+            }
+
+            if ( $this->has_column( 'booking_date' ) && isset( $formats_map['booking_date'] ) ) {
+                $payload['booking_date'] = $this->normalize_date( $data['date'] ?? ( $data['booking_date'] ?? '' ) );
+                $formats[]               = $formats_map['booking_date'];
+            }
+
+            if ( $this->has_column( 'booking_time' ) && isset( $formats_map['booking_time'] ) ) {
+                $payload['booking_time'] = $this->normalize_time( $data['time'] ?? ( $data['booking_time'] ?? '' ) );
+                $formats[]               = $formats_map['booking_time'];
+            }
+
+            if ( $this->has_column( 'booking_datetime' ) && isset( $formats_map['booking_datetime'] ) ) {
+                $date = isset( $payload['booking_date'] ) ? $payload['booking_date'] : $this->normalize_date( $data['date'] ?? '' );
+                $time = $this->normalize_time( $data['time'] ?? ( $data['booking_time'] ?? '' ) );
+
+                $payload['booking_datetime'] = gmdate( 'Y-m-d H:i:s', strtotime( $date . ' ' . $time ) );
+                $formats[]                   = $formats_map['booking_datetime'];
+            }
+
+            if ( $this->has_column( 'party_size' ) && isset( $formats_map['party_size'] ) ) {
+                $payload['party_size'] = max( 1, (int) ( $data['party_size'] ?? ( $data['guests'] ?? 0 ) ) );
+                $formats[]             = $formats_map['party_size'];
+            }
+
+            if ( $this->has_column( 'status' ) && isset( $formats_map['status'] ) ) {
+                $payload['status'] = sanitize_key( $data['status'] ?? 'pending' );
+                $formats[]         = $formats_map['status'];
+            }
+
+            if ( $this->has_column( 'total_amount' ) && isset( $formats_map['total_amount'] ) ) {
+                $payload['total_amount'] = isset( $data['total_amount'] ) ? (float) $data['total_amount'] : 0.0;
+                $formats[]               = $formats_map['total_amount'];
+            }
+
+            if ( $this->has_column( 'special_requests' ) && isset( $formats_map['special_requests'] ) ) {
+                $payload['special_requests'] = isset( $data['special_requests'] ) ? wp_kses_post( $data['special_requests'] ) : '';
+                $formats[]                   = $formats_map['special_requests'];
+            }
+
+            $first_name = isset( $data['first_name'] ) ? sanitize_text_field( $data['first_name'] ) : '';
+            $last_name  = isset( $data['last_name'] ) ? sanitize_text_field( $data['last_name'] ) : '';
+            $full_name  = isset( $data['customer_name'] ) ? sanitize_text_field( $data['customer_name'] ) : trim( $first_name . ' ' . $last_name );
+
+            if ( '' === $full_name ) {
+                $full_name = __( 'Guest', 'restaurant-booking' );
+            }
+
+            if ( $this->has_column( 'customer_name' ) && isset( $formats_map['customer_name'] ) ) {
+                $payload['customer_name'] = $full_name;
+                $formats[]                = $formats_map['customer_name'];
+            }
+
+            if ( $this->has_column( 'customer_email' ) && isset( $formats_map['customer_email'] ) ) {
+                $payload['customer_email'] = sanitize_email( $data['email'] ?? ( $data['customer_email'] ?? '' ) );
+                $formats[]                 = $formats_map['customer_email'];
+            }
+
+            if ( $this->has_column( 'customer_phone' ) && isset( $formats_map['customer_phone'] ) ) {
+                $payload['customer_phone'] = sanitize_text_field( $data['phone'] ?? ( $data['customer_phone'] ?? '' ) );
+                $formats[]                 = $formats_map['customer_phone'];
+            }
+
+            $timestamp = current_time( 'mysql', true );
+
+            if ( $this->has_column( 'created_at' ) && isset( $formats_map['created_at'] ) ) {
+                $payload['created_at'] = $timestamp;
+                $formats[]             = $formats_map['created_at'];
+            }
+
+            if ( $this->has_column( 'updated_at' ) && isset( $formats_map['updated_at'] ) ) {
+                $payload['updated_at'] = $timestamp;
+                $formats[]             = $formats_map['updated_at'];
+            }
+
+            return array( $payload, $formats );
+        }
+
+        /**
+         * Prepare payload for fallback repository usage.
+         *
+         * @param array $data Booking payload.
+         *
+         * @return array
+         */
+        protected function prepare_fallback_booking_payload( $data ) {
+            $first_name = isset( $data['first_name'] ) ? sanitize_text_field( $data['first_name'] ) : '';
+            $last_name  = isset( $data['last_name'] ) ? sanitize_text_field( $data['last_name'] ) : '';
+            $full_name  = isset( $data['customer_name'] ) ? sanitize_text_field( $data['customer_name'] ) : trim( $first_name . ' ' . $last_name );
+
+            if ( '' === $first_name && '' === $last_name && '' !== $full_name ) {
+                $parts      = preg_split( '/\s+/', $full_name, 2 );
+                $first_name = $parts[0] ?? '';
+                $last_name  = $parts[1] ?? '';
+            }
+
+            return array(
+                'first_name'        => $first_name,
+                'last_name'         => $last_name,
+                'email'             => isset( $data['email'] ) ? sanitize_email( $data['email'] ) : ( isset( $data['customer_email'] ) ? sanitize_email( $data['customer_email'] ) : '' ),
+                'phone'             => isset( $data['phone'] ) ? sanitize_text_field( $data['phone'] ) : ( isset( $data['customer_phone'] ) ? sanitize_text_field( $data['customer_phone'] ) : '' ),
+                'special_requests'  => isset( $data['special_requests'] ) ? wp_kses_post( $data['special_requests'] ) : '',
+                'location_id'       => isset( $data['location_id'] ) ? absint( $data['location_id'] ) : ( isset( $data['location'] ) ? absint( $data['location'] ) : 0 ),
+                'party_size'        => isset( $data['party_size'] ) ? (int) $data['party_size'] : ( isset( $data['guests'] ) ? (int) $data['guests'] : 0 ),
+                'date'              => isset( $data['date'] ) ? sanitize_text_field( $data['date'] ) : ( isset( $data['booking_date'] ) ? sanitize_text_field( $data['booking_date'] ) : '' ),
+                'time'              => isset( $data['time'] ) ? sanitize_text_field( $data['time'] ) : ( isset( $data['booking_time'] ) ? sanitize_text_field( $data['booking_time'] ) : '' ),
+            );
+        }
+
+        /**
          * Prepare an SQL query safely.
          *
          * @param string $sql    SQL statement.
@@ -1212,6 +1523,30 @@ if ( ! class_exists( 'RB_Booking' ) ) {
          *
          * @return string
          */
+        protected function normalize_time( $time ) {
+            $time = trim( (string) $time );
+
+            if ( '' === $time ) {
+                return '00:00:00';
+            }
+
+            if ( preg_match( '/^([01]?\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/', $time, $matches ) ) {
+                $hours   = str_pad( $matches[1], 2, '0', STR_PAD_LEFT );
+                $minutes = str_pad( $matches[2], 2, '0', STR_PAD_LEFT );
+                $seconds = isset( $matches[3] ) && '' !== $matches[3] ? str_pad( $matches[3], 2, '0', STR_PAD_LEFT ) : '00';
+
+                return $hours . ':' . $minutes . ':' . $seconds;
+            }
+
+            $timestamp = strtotime( $time );
+
+            if ( false === $timestamp ) {
+                return '00:00:00';
+            }
+
+            return gmdate( 'H:i:s', $timestamp );
+        }
+
         protected function normalize_date( $date ) {
             if ( empty( $date ) ) {
                 return gmdate( 'Y-m-d' );
@@ -1223,6 +1558,25 @@ if ( ! class_exists( 'RB_Booking' ) ) {
             }
 
             return gmdate( 'Y-m-d', $timestamp );
+        }
+
+        /**
+         * Retrieve the notification service instance.
+         *
+         * @return RB_Notification_Service|null
+         */
+        protected function get_notification_service() {
+            if ( $this->notification_service instanceof RB_Notification_Service ) {
+                return $this->notification_service;
+            }
+
+            if ( class_exists( 'RB_Notification_Service' ) ) {
+                $this->notification_service = new RB_Notification_Service();
+
+                return $this->notification_service;
+            }
+
+            return null;
         }
 
         /**

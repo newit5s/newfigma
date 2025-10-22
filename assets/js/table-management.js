@@ -18,13 +18,13 @@
       this.noticeRegion = root.querySelector('[data-table-notice]');
       this.strings = config.strings || {};
 
-      this.tables = (config.tables || []).map((table) => ({ ...table }));
-      this.originalTables = JSON.parse(JSON.stringify(this.tables));
+      this.tables = [];
+      this.originalTables = [];
       this.selectedTableId = null;
       this.dragState = null;
 
       this.bindEvents();
-      this.renderAll();
+      this.syncTablesFromResponse(Array.isArray(config.tables) ? config.tables : []);
     }
 
     t(key, fallback) {
@@ -382,6 +382,32 @@
       this.notice(this.t('table_added', 'Table added to layout.'));
     }
 
+    syncTablesFromResponse(tables) {
+      const source = Array.isArray(tables) ? tables : [];
+
+      this.tables = source.map((table) => {
+        const id = table.id ?? table.table_id ?? table.identifier ?? Date.now();
+        const label = table.label || table.name || table.table_number || `Table ${id}`;
+
+        return {
+          id: String(id),
+          label,
+          name: table.name || table.table_number || label,
+          capacity: Number(table.capacity ?? table.seats ?? 0),
+          status: table.status || 'available',
+          shape: table.shape || 'rectangle',
+          position_x: Number(table.position_x ?? table.x ?? 0),
+          position_y: Number(table.position_y ?? table.y ?? 0),
+          width: table.width !== undefined && table.width !== null ? Number(table.width) : null,
+          height: table.height !== undefined && table.height !== null ? Number(table.height) : null,
+          rotation: Number(table.rotation ?? 0),
+        };
+      });
+
+      this.originalTables = JSON.parse(JSON.stringify(this.tables));
+      this.renderAll();
+    }
+
     saveLayout() {
       if (!config.ajax_url) {
         this.notice(this.t('missing_ajax', 'AJAX endpoint unavailable.'), true);
@@ -417,7 +443,11 @@
         .then((response) => response.json())
         .then((response) => {
           if (response.success) {
-            this.originalTables = JSON.parse(JSON.stringify(this.tables));
+            if (response.data && Array.isArray(response.data.tables)) {
+              this.syncTablesFromResponse(response.data.tables);
+            } else {
+              this.originalTables = JSON.parse(JSON.stringify(this.tables));
+            }
             this.notice(this.t('layout_saved', 'Layout saved successfully.'));
           } else {
             const message = response && response.data && response.data.message ? response.data.message : this.t('save_failed', 'Unable to save layout.');

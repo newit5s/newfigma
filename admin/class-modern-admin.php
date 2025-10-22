@@ -45,6 +45,8 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
             add_action( 'wp_ajax_rb_admin_get_dashboard', array( $this, 'ajax_get_dashboard' ) );
             add_action( 'wp_ajax_rb_admin_get_bookings', array( $this, 'ajax_get_bookings' ) );
             add_action( 'wp_ajax_rb_admin_get_locations', array( $this, 'ajax_get_locations' ) );
+            add_action( 'wp_ajax_rb_admin_save_location', array( $this, 'ajax_save_location' ) );
+            add_action( 'wp_ajax_rb_admin_delete_location', array( $this, 'ajax_delete_location' ) );
         }
 
         public function register_settings() {
@@ -1306,45 +1308,9 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
             try {
                 $this->verify_admin_ajax_request();
 
-                $locations = RB_Location::get_all_locations();
+                $payload = $this->compile_locations_directory();
 
-                $formatted      = array();
-                $total_tables   = 0;
-                $total_seats    = 0;
-                $open_locations = 0;
-
-                foreach ( $locations as $location ) {
-                    $tables = class_exists( 'RB_Table' ) ? RB_Table::count_by_location( $location->id ) : 0;
-
-                    $formatted[] = array(
-                        'id'       => $location->id,
-                        'name'     => $location->name,
-                        'address'  => isset( $location->address ) ? $location->address : '',
-                        'phone'    => isset( $location->phone ) ? $location->phone : '',
-                        'email'    => isset( $location->email ) ? $location->email : '',
-                        'capacity' => isset( $location->capacity ) ? (int) $location->capacity : 0,
-                        'status'   => isset( $location->status ) ? $location->status : 'active',
-                        'tables'   => $tables,
-                    );
-
-                    $total_tables += $tables;
-                    $total_seats  += isset( $location->capacity ) ? (int) $location->capacity : 0;
-
-                    if ( empty( $location->status ) || 'inactive' !== $location->status ) {
-                        $open_locations++;
-                    }
-                }
-
-                wp_send_json_success(
-                    array(
-                        'locations' => $formatted,
-                        'summary'   => array(
-                            'total_tables'   => $total_tables,
-                            'total_seats'    => $total_seats,
-                            'open_locations' => $open_locations,
-                        ),
-                    )
-                );
+                wp_send_json_success( $payload );
             } catch ( Exception $exception ) {
                 error_log( 'RB Admin AJAX Error [ajax_get_locations]: ' . $exception->getMessage() );
 
@@ -1354,6 +1320,224 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
                     $status
                 );
             }
+        }
+
+        public function ajax_save_location() {
+            try {
+                $this->verify_admin_ajax_request();
+
+                $location_id = absint( $_POST['id'] ?? 0 );
+
+                $name = isset( $_POST['name'] ) ? sanitize_text_field( wp_unslash( $_POST['name'] ) ) : '';
+
+                if ( '' === $name ) {
+                    throw new Exception( __( 'Location name is required.', 'restaurant-booking' ), 400 );
+                }
+
+                $status_raw        = isset( $_POST['status'] ) ? wp_unslash( $_POST['status'] ) : 'active';
+                $waitlist_raw      = isset( $_POST['waitlist_enabled'] ) ? wp_unslash( $_POST['waitlist_enabled'] ) : '';
+                $capacity_provided = isset( $_POST['capacity'] );
+
+                $data = array(
+                    'name'            => $name,
+                    'email'           => isset( $_POST['email'] ) ? sanitize_email( wp_unslash( $_POST['email'] ) ) : '',
+                    'phone'           => isset( $_POST['phone'] ) ? sanitize_text_field( wp_unslash( $_POST['phone'] ) ) : '',
+                    'address'         => isset( $_POST['address'] ) ? sanitize_textarea_field( wp_unslash( $_POST['address'] ) ) : '',
+                    'hours_weekday'   => isset( $_POST['hours_weekday'] ) ? sanitize_text_field( wp_unslash( $_POST['hours_weekday'] ) ) : '',
+                    'hours_weekend'   => isset( $_POST['hours_weekend'] ) ? sanitize_text_field( wp_unslash( $_POST['hours_weekend'] ) ) : '',
+                    'waitlist_enabled'=> in_array( strtolower( (string) $waitlist_raw ), array( '1', 'true', 'yes', 'on' ), true ),
+                    'status'          => sanitize_key( $status_raw ),
+                );
+
+                if ( $capacity_provided ) {
+                    $data['capacity'] = max( 0, (int) wp_unslash( $_POST['capacity'] ) );
+                } elseif ( $location_id > 0 && method_exists( 'RB_Location', 'get_location' ) ) {
+                    $existing = RB_Location::get_location( $location_id );
+                    if ( $existing && isset( $existing->capacity ) ) {
+                        $data['capacity'] = (int) $existing->capacity;
+                    }
+                }
+
+                if ( $location_id > 0 ) {
+                    $location = RB_Location::update_location( $location_id, $data );
+                } else {
+                    $location = RB_Location::create_location( $data );
+                }
+
+                if ( ! $location ) {
+                    throw new Exception( __( 'Unable to save location details.', 'restaurant-booking' ), 500 );
+                }
+
+                $directory = $this->compile_locations_directory( true );
+                $payload   = array_merge(
+                    $directory,
+                    array(
+                        'location' => $this->format_location_response( $location ),
+                    )
+                );
+
+                wp_send_json_success( $payload );
+            } catch ( Exception $exception ) {
+                error_log( 'RB Admin AJAX Error [ajax_save_location]: ' . $exception->getMessage() );
+
+                $status = $exception->getCode() ?: 400;
+                wp_send_json_error(
+                    array( 'message' => $exception->getMessage() ),
+                    $status
+                );
+            }
+        }
+
+        public function ajax_delete_location() {
+            try {
+                $this->verify_admin_ajax_request();
+
+                $location_id = absint( $_POST['id'] ?? 0 );
+
+                if ( $location_id <= 0 ) {
+                    throw new Exception( __( 'Missing location identifier.', 'restaurant-booking' ), 400 );
+                }
+
+                $deleted = RB_Location::delete_location( $location_id );
+
+                if ( ! $deleted ) {
+                    throw new Exception( __( 'Failed to delete the location.', 'restaurant-booking' ), 500 );
+                }
+
+                $payload = $this->compile_locations_directory( true );
+                $payload['deleted'] = $location_id;
+
+                wp_send_json_success( $payload );
+            } catch ( Exception $exception ) {
+                error_log( 'RB Admin AJAX Error [ajax_delete_location]: ' . $exception->getMessage() );
+
+                $status = $exception->getCode() ?: 400;
+                wp_send_json_error(
+                    array( 'message' => $exception->getMessage() ),
+                    $status
+                );
+            }
+        }
+
+        protected function compile_locations_directory( $include_dashboard = false ) {
+            $locations           = RB_Location::get_all_locations();
+            $formatted_locations = array();
+            $dashboard_locations = array();
+
+            if ( ! empty( $locations ) ) {
+                foreach ( $locations as $location ) {
+                    $formatted_locations[] = $this->format_location_response( $location );
+
+                    if ( $include_dashboard ) {
+                        $dashboard_locations[] = $this->format_location_stats( $location );
+                    }
+                }
+            }
+
+            $payload = array(
+                'locations' => $formatted_locations,
+                'summary'   => $this->build_locations_summary( $formatted_locations ),
+            );
+
+            if ( $include_dashboard ) {
+                $payload['dashboard'] = array(
+                    'locations' => $dashboard_locations,
+                    'summary'   => $this->build_dashboard_summary( $dashboard_locations ),
+                );
+            }
+
+            return $payload;
+        }
+
+        protected function format_location_response( $location ) {
+            if ( is_array( $location ) ) {
+                $location = (object) $location;
+            }
+
+            $location_id = isset( $location->id ) ? (int) $location->id : 0;
+            $declared_capacity = isset( $location->capacity ) ? (int) $location->capacity : 0;
+
+            $layout      = array();
+            $table_count = 0;
+            $table_seats = 0;
+
+            if ( $location_id > 0 && class_exists( 'RB_Table' ) ) {
+                if ( method_exists( 'RB_Table', 'get_layout' ) ) {
+                    $layout = RB_Table::get_layout( $location_id );
+                } elseif ( method_exists( 'RB_Table', 'get_tables_by_location' ) ) {
+                    $layout = RB_Table::get_tables_by_location( $location_id );
+                } elseif ( method_exists( 'RB_Table', 'get_tables' ) ) {
+                    $layout = RB_Table::get_tables( $location_id );
+                }
+
+                if ( ! empty( $layout ) && is_array( $layout ) ) {
+                    foreach ( $layout as $table ) {
+                        $table_count++;
+
+                        if ( is_object( $table ) ) {
+                            $table_seats += isset( $table->capacity ) ? (int) $table->capacity : 0;
+                        } elseif ( is_array( $table ) ) {
+                            $table_seats += isset( $table['capacity'] ) ? (int) $table['capacity'] : 0;
+                        }
+                    }
+                }
+            }
+
+            $status = isset( $location->status ) ? sanitize_key( $location->status ) : 'active';
+
+            return array(
+                'id'                 => $location_id,
+                'name'               => isset( $location->name ) ? $location->name : '',
+                'email'              => isset( $location->email ) ? $location->email : '',
+                'phone'              => isset( $location->phone ) ? $location->phone : '',
+                'address'            => isset( $location->address ) ? $location->address : '',
+                'status'             => $status,
+                'hours_weekday'      => isset( $location->hours_weekday ) ? $location->hours_weekday : '',
+                'hours_weekend'      => isset( $location->hours_weekend ) ? $location->hours_weekend : '',
+                'waitlist_enabled'   => ! empty( $location->waitlist_enabled ),
+                'tables'             => $table_count,
+                'capacity'           => $table_seats > 0 ? $table_seats : $declared_capacity,
+                'declared_capacity'  => $declared_capacity,
+                'table_capacity'     => $table_seats,
+            );
+        }
+
+        protected function build_locations_summary( $locations ) {
+            $summary = array(
+                'total_locations'   => 0,
+                'open_locations'    => 0,
+                'closed_locations'  => 0,
+                'total_tables'      => 0,
+                'total_seats'       => 0,
+                'waitlist_enabled'  => 0,
+            );
+
+            if ( empty( $locations ) ) {
+                return apply_filters( 'rb_admin_locations_summary', $summary, $locations );
+            }
+
+            $closed_statuses = apply_filters( 'rb_admin_closed_location_statuses', array( 'closed', 'inactive', 'archived' ) );
+
+            foreach ( $locations as $location ) {
+                $summary['total_locations']++;
+
+                $status = isset( $location['status'] ) ? sanitize_key( $location['status'] ) : 'active';
+
+                if ( in_array( $status, (array) $closed_statuses, true ) ) {
+                    $summary['closed_locations']++;
+                } else {
+                    $summary['open_locations']++;
+                }
+
+                $summary['total_tables'] += isset( $location['tables'] ) ? (int) $location['tables'] : 0;
+                $summary['total_seats']  += isset( $location['capacity'] ) ? (int) $location['capacity'] : 0;
+
+                if ( ! empty( $location['waitlist_enabled'] ) ) {
+                    $summary['waitlist_enabled']++;
+                }
+            }
+
+            return apply_filters( 'rb_admin_locations_summary', $summary, $locations );
         }
 
         /**
