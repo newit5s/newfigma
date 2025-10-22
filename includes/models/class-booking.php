@@ -117,7 +117,19 @@ if ( ! class_exists( 'RB_Booking' ) ) {
          * @return bool
          */
         public function update_status( $status ) {
-            if ( ! $this->id || ! $this->bookings_table_exists() ) {
+            if ( ! $this->id ) {
+                return false;
+            }
+
+            if ( ! $this->bookings_table_exists() ) {
+                $repository = $this->get_fallback_repository();
+
+                if ( $repository && $repository->update_status( $this->id, $status ) ) {
+                    $this->data = $repository->get_booking( $this->id );
+
+                    return true;
+                }
+
                 return false;
             }
 
@@ -152,7 +164,17 @@ if ( ! class_exists( 'RB_Booking' ) ) {
          * @return bool
          */
         public function delete() {
-            if ( ! $this->id || ! $this->bookings_table_exists() ) {
+            if ( ! $this->id ) {
+                return false;
+            }
+
+            if ( ! $this->bookings_table_exists() ) {
+                $repository = $this->get_fallback_repository();
+
+                if ( $repository ) {
+                    return $repository->delete_booking( $this->id );
+                }
+
                 return false;
             }
 
@@ -226,7 +248,9 @@ if ( ! class_exists( 'RB_Booking' ) ) {
             $model = new self();
 
             if ( ! $model->bookings_table_exists() ) {
-                return 0;
+                $repository = $model->get_fallback_repository();
+
+                return $repository ? $repository->count_by_date_and_location( $date, $location_id ) : 0;
             }
 
             $date        = $model->normalize_date( $date );
@@ -260,6 +284,14 @@ if ( ! class_exists( 'RB_Booking' ) ) {
             $model = new self();
 
             if ( ! $model->bookings_table_exists() || ! $model->has_column( 'total_amount' ) ) {
+                $repository = $model->get_fallback_repository();
+
+                if ( $repository ) {
+                    $stats = $repository->get_location_stats( $location_id, $date );
+
+                    return isset( $stats['revenue'] ) ? (float) $stats['revenue'] : 0.0;
+                }
+
                 return 0.0;
             }
 
@@ -294,7 +326,9 @@ if ( ! class_exists( 'RB_Booking' ) ) {
             $model = new self();
 
             if ( ! $model->bookings_table_exists() || ! $model->has_column( 'status' ) ) {
-                return 0;
+                $repository = $model->get_fallback_repository();
+
+                return $repository ? $repository->count_by_status( $status, $location_id ) : 0;
             }
 
             $status = sanitize_key( $status );
@@ -520,6 +554,12 @@ if ( ! class_exists( 'RB_Booking' ) ) {
          */
         public function get_location_stats( $location_id, $date = null ) {
             if ( ! $this->bookings_table_exists() ) {
+                $repository = $this->get_fallback_repository();
+
+                if ( $repository ) {
+                    return $repository->get_location_stats( $location_id, $date );
+                }
+
                 return $this->get_default_stats();
             }
 
@@ -593,8 +633,17 @@ if ( ! class_exists( 'RB_Booking' ) ) {
                 return;
             }
 
-            if ( ! $this->id || ! $this->bookings_table_exists() ) {
+            if ( ! $this->id ) {
                 $this->data = null;
+                return;
+            }
+
+            if ( ! $this->bookings_table_exists() ) {
+                $repository = $this->get_fallback_repository();
+                $record     = $repository ? $repository->get_booking( $this->id ) : null;
+
+                $this->data = $record ? $this->map_booking_row_from_array( $record ) : null;
+
                 return;
             }
 
@@ -618,6 +667,34 @@ if ( ! class_exists( 'RB_Booking' ) ) {
          */
         protected function query_bookings( $args, $allow_unbounded = false ) {
             if ( ! $this->bookings_table_exists() ) {
+                $repository = $this->get_fallback_repository();
+
+                if ( $repository ) {
+                    $page       = isset( $args['page'] ) ? max( 1, (int) $args['page'] ) : 1;
+                    $per_page   = isset( $args['per_page'] ) ? max( 1, (int) $args['per_page'] ) : 25;
+                    $sort_by    = isset( $args['sort_by'] ) ? $args['sort_by'] : 'booking_datetime';
+                    $sort_order = isset( $args['sort_order'] ) ? $args['sort_order'] : 'desc';
+
+                    $filters = array(
+                        'status'    => isset( $args['status'] ) ? $args['status'] : '',
+                        'location'  => isset( $args['location_id'] ) ? $args['location_id'] : 0,
+                        'date_from' => isset( $args['date_from'] ) ? $args['date_from'] : '',
+                        'date_to'   => isset( $args['date_to'] ) ? $args['date_to'] : '',
+                        'search'    => isset( $args['search'] ) ? $args['search'] : '',
+                    );
+
+                    $results = $repository->get_bookings( $filters, $page, $per_page, $sort_by, $sort_order );
+
+                    return array(
+                        'rows'        => isset( $results['bookings'] ) ? array_values( $results['bookings'] ) : array(),
+                        'total'       => isset( $results['total_items'] ) ? (int) $results['total_items'] : 0,
+                        'total_pages' => isset( $results['total_pages'] ) ? (int) $results['total_pages'] : 1,
+                        'page'        => isset( $results['current_page'] ) ? (int) $results['current_page'] : $page,
+                        'per_page'    => isset( $results['page_size'] ) ? (int) $results['page_size'] : $per_page,
+                        'summary'     => isset( $results['summary'] ) ? $results['summary'] : $this->get_empty_summary(),
+                    );
+                }
+
                 return array(
                     'rows'       => array(),
                     'total'      => 0,
@@ -1089,6 +1166,19 @@ if ( ! class_exists( 'RB_Booking' ) ) {
             }
 
             return gmdate( 'Y-m-d', $timestamp );
+        }
+
+        /**
+         * Retrieve the fallback booking repository when database tables are missing.
+         *
+         * @return RB_Fallback_Booking_Repository|null
+         */
+        protected function get_fallback_repository() {
+            if ( class_exists( 'RB_Fallback_Booking_Repository' ) ) {
+                return RB_Fallback_Booking_Repository::instance();
+            }
+
+            return null;
         }
     }
 }

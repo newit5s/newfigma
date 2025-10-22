@@ -144,7 +144,21 @@ if ( ! class_exists( 'RB_Modern_Booking_Manager' ) ) {
 
             $this->current_user = $this->resolve_current_user();
             if ( ! $this->is_user_authenticated() ) {
-                return $content;
+                $login_url = home_url( '/portal/' );
+
+                $message = sprintf(
+                    /* translators: %s: URL to the portal login page. */
+                    __( 'Please <a href="%s">sign in to the restaurant portal</a> to manage bookings.', 'restaurant-booking' ),
+                    esc_url( $login_url )
+                );
+
+                return wp_kses(
+                    '<div class="rb-alert rb-alert-info">' . $message . '</div>',
+                    array(
+                        'div' => array( 'class' => array() ),
+                        'a'   => array( 'href' => array() ),
+                    )
+                );
             }
 
             $this->enqueue_management_assets();
