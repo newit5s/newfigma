@@ -153,6 +153,28 @@ if ( ! function_exists( 'restaurant_booking_load_textdomain' ) ) {
 }
 add_action( 'plugins_loaded', 'restaurant_booking_load_textdomain', 0 );
 
+if ( ! function_exists( 'restaurant_booking_maybe_run_migrations' ) ) {
+    /**
+     * Ensure database migrations run when upgrading from legacy releases.
+     */
+    function restaurant_booking_maybe_run_migrations() {
+        $previous_version = get_option( 'restaurant_booking_version', false );
+
+        if ( false === $previous_version ) {
+            $previous_version = get_option( 'rb_plugin_version', false );
+        }
+
+        if ( false === restaurant_booking_include( 'includes/database/migrations.php' ) ) {
+            return;
+        }
+
+        if ( class_exists( 'Restaurant_Booking_Database_Migrator' ) ) {
+            Restaurant_Booking_Database_Migrator::maybe_run( $previous_version );
+        }
+    }
+}
+add_action( 'plugins_loaded', 'restaurant_booking_maybe_run_migrations', 1 );
+
 if ( ! function_exists( 'restaurant_booking_init_plugin' ) ) {
     /**
      * Bootstrap the plugin once WordPress has loaded.
