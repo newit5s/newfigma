@@ -29,7 +29,9 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
 
         public function __construct() {
             add_action( 'admin_menu', array( $this, 'add_admin_pages' ) );
+            add_action( 'admin_menu', array( $this, 'remove_restricted_settings_menu' ), 99 );
             add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ) );
+            add_action( 'admin_init', array( $this, 'maybe_block_settings_access' ), 5 );
 
             add_action( 'wp_ajax_rb_admin_get_dashboard', array( $this, 'ajax_get_dashboard' ) );
             add_action( 'wp_ajax_rb_admin_get_bookings', array( $this, 'ajax_get_bookings' ) );
@@ -637,6 +639,108 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
 
         public function render_settings() {
             $this->include_partial( 'settings-panel.php' );
+        }
+
+        /**
+         * Remove the settings menu entry for restricted users.
+         */
+        public function remove_restricted_settings_menu() {
+            if ( ! $this->is_settings_access_restricted() ) {
+                return;
+            }
+
+            $settings_slug = function_exists( 'restaurant_booking_get_settings_page_slug' )
+                ? restaurant_booking_get_settings_page_slug()
+                : 'restaurant-booking-settings';
+
+            remove_submenu_page( 'rb-dashboard', $settings_slug );
+            remove_submenu_page( 'options-general.php', $settings_slug );
+        }
+
+        /**
+         * Block direct access to the settings screen when restricted.
+         */
+        public function maybe_block_settings_access() {
+            if ( ! is_admin() ) {
+                return;
+            }
+
+            if ( wp_doing_ajax() ) {
+                return;
+            }
+
+            if ( ! isset( $_GET['page'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+                return;
+            }
+
+            $requested_page = sanitize_key( wp_unslash( $_GET['page'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+
+            $settings_slug = function_exists( 'restaurant_booking_get_settings_page_slug' )
+                ? restaurant_booking_get_settings_page_slug()
+                : 'restaurant-booking-settings';
+
+            if ( $requested_page !== $settings_slug ) {
+                return;
+            }
+
+            if ( ! $this->is_settings_access_restricted() ) {
+                return;
+            }
+
+            $message = apply_filters(
+                'restaurant_booking_restricted_settings_message',
+                __( 'Restaurant Booking settings are temporarily unavailable while internal testing is in progress.', 'restaurant-booking' )
+            );
+
+            wp_die(
+                wp_kses_post( $message ),
+                esc_html__( 'Access restricted', 'restaurant-booking' ),
+                array(
+                    'response'  => 403,
+                    'back_link' => true,
+                )
+            );
+        }
+
+        /**
+         * Determine whether the current user should be blocked from accessing settings.
+         *
+         * @return bool
+         */
+        protected function is_settings_access_restricted() {
+            if ( ! function_exists( 'wp_get_current_user' ) ) {
+                return false;
+            }
+
+            $user = wp_get_current_user();
+
+            if ( ! $user instanceof WP_User || 0 === $user->ID ) {
+                return false;
+            }
+
+            $blocked_roles = apply_filters( 'restaurant_booking_restricted_settings_roles', array( 'administrator' ) );
+            if ( ! is_array( $blocked_roles ) ) {
+                $blocked_roles = array();
+            }
+
+            $blocked_user_ids = apply_filters( 'restaurant_booking_restricted_settings_user_ids', array() );
+            if ( ! is_array( $blocked_user_ids ) ) {
+                $blocked_user_ids = array();
+            }
+
+            $is_super_admin = function_exists( 'is_super_admin' ) && is_super_admin( $user->ID );
+
+            $restricted = $is_super_admin;
+
+            if ( ! $restricted && ! empty( $blocked_roles ) && is_array( $user->roles ) ) {
+                $restricted = (bool) array_intersect( $blocked_roles, $user->roles );
+            }
+
+            if ( ! $restricted && ! empty( $blocked_user_ids ) ) {
+                $restricted = in_array( $user->ID, array_map( 'intval', $blocked_user_ids ), true );
+            }
+
+            return (bool) apply_filters( 'restaurant_booking_is_settings_access_restricted', $restricted, $user );
         }
 
         public function render_reports() {
