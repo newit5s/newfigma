@@ -908,12 +908,12 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
             }
 
             $config = array(
-                'enabled'            => true,
-                'blocked_roles'      => array( 'administrator' ),
+                'enabled'            => false,
+                'blocked_roles'      => array(),
                 'blocked_user_ids'   => array(),
                 'testing_roles'      => array(),
                 'testing_user_ids'   => array(),
-                'block_super_admins' => true,
+                'block_super_admins' => false,
             );
 
             if ( function_exists( 'get_option' ) ) {
