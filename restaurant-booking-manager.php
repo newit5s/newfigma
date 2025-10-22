@@ -18,99 +18,184 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-// Prevent multiple initialization
-if ( defined( 'RESTAURANT_BOOKING_VERSION' ) ) {
+if ( defined( 'RESTAURANT_BOOKING_BOOTSTRAPPED' ) ) {
     return;
 }
 
-// Define plugin constants with protection
-if ( ! defined( 'RESTAURANT_BOOKING_VERSION' ) ) {
-    define( 'RESTAURANT_BOOKING_VERSION', '2.0.0' );
-}
+define( 'RESTAURANT_BOOKING_BOOTSTRAPPED', true );
 
-if ( ! defined( 'RESTAURANT_BOOKING_PATH' ) ) {
-    define( 'RESTAURANT_BOOKING_PATH', plugin_dir_path( __FILE__ ) );
-}
-
-if ( ! defined( 'RESTAURANT_BOOKING_URL' ) ) {
-    define( 'RESTAURANT_BOOKING_URL', plugin_dir_url( __FILE__ ) );
-}
-
-if ( ! defined( 'RESTAURANT_BOOKING_BASENAME' ) ) {
-    define( 'RESTAURANT_BOOKING_BASENAME', plugin_basename( __FILE__ ) );
-}
-
-// Legacy constants with protection (for backward compatibility)
-if ( ! defined( 'RB_PLUGIN_VERSION' ) ) {
-    define( 'RB_PLUGIN_VERSION', RESTAURANT_BOOKING_VERSION );
-}
-
-if ( ! defined( 'RB_PLUGIN_FILE' ) ) {
-    define( 'RB_PLUGIN_FILE', __FILE__ );
-}
-
-if ( ! defined( 'RB_PLUGIN_DIR' ) ) {
-    define( 'RB_PLUGIN_DIR', RESTAURANT_BOOKING_PATH );
-}
-
-if ( ! defined( 'RB_PLUGIN_URL' ) ) {
-    define( 'RB_PLUGIN_URL', RESTAURANT_BOOKING_URL );
-}
-
-if ( ! defined( 'RB_PLUGIN_BASENAME' ) ) {
-    define( 'RB_PLUGIN_BASENAME', RESTAURANT_BOOKING_BASENAME );
-}
-
-// Check if plugin loader exists
-if ( ! file_exists( RESTAURANT_BOOKING_PATH . 'includes/class-plugin-loader.php' ) ) {
-    add_action( 'admin_notices', function() {
-        echo '<div class="notice notice-error"><p>';
-        echo __( 'Restaurant Booking Manager: Missing plugin loader file. Please reinstall the plugin.', 'restaurant-booking' );
-        echo '</p></div>';
-    });
-    return;
-}
-
-// Load plugin core classes
-require_once RESTAURANT_BOOKING_PATH . 'includes/class-plugin-loader.php';
-require_once RESTAURANT_BOOKING_PATH . 'includes/class-plugin-manager.php';
-
-/**
- * Initialize the plugin
- */
-function restaurant_booking_init() {
-    // Initialize plugin manager
-    $plugin = Restaurant_Booking_Plugin_Manager::instance();
-    $plugin->run();
-
-    if ( function_exists( 'restaurant_booking_add_role_capabilities' ) ) {
-        restaurant_booking_add_role_capabilities();
+if ( ! function_exists( 'restaurant_booking_define_constant' ) ) {
+    /**
+     * Safely define a constant.
+     *
+     * @param string $name  Constant name.
+     * @param mixed  $value Constant value.
+     */
+    function restaurant_booking_define_constant( $name, $value ) {
+        if ( ! defined( $name ) ) {
+            define( $name, $value );
+        }
     }
 }
 
-// Hook into WordPress initialization
-add_action( 'plugins_loaded', 'restaurant_booking_init', 10 );
+if ( ! function_exists( 'restaurant_booking_setup_constants' ) ) {
+    /**
+     * Register plugin constants used across the codebase.
+     */
+    function restaurant_booking_setup_constants() {
+        restaurant_booking_define_constant( 'RESTAURANT_BOOKING_VERSION', '2.0.0' );
+        restaurant_booking_define_constant( 'RESTAURANT_BOOKING_FILE', __FILE__ );
+        restaurant_booking_define_constant( 'RESTAURANT_BOOKING_PATH', plugin_dir_path( __FILE__ ) );
+        restaurant_booking_define_constant( 'RESTAURANT_BOOKING_URL', plugin_dir_url( __FILE__ ) );
+        restaurant_booking_define_constant( 'RESTAURANT_BOOKING_BASENAME', plugin_basename( __FILE__ ) );
 
-/**
- * Plugin activation hook
- */
-function restaurant_booking_activate() {
-    if ( ! file_exists( RESTAURANT_BOOKING_PATH . 'includes/class-plugin-activator.php' ) ) {
-        wp_die( __( 'Restaurant Booking Manager: Missing activator file. Cannot activate plugin.', 'restaurant-booking' ) );
+        // Legacy aliases for backward compatibility with earlier releases.
+        restaurant_booking_define_constant( 'RB_PLUGIN_VERSION', RESTAURANT_BOOKING_VERSION );
+        restaurant_booking_define_constant( 'RB_PLUGIN_FILE', RESTAURANT_BOOKING_FILE );
+        restaurant_booking_define_constant( 'RB_PLUGIN_DIR', RESTAURANT_BOOKING_PATH );
+        restaurant_booking_define_constant( 'RB_PLUGIN_URL', RESTAURANT_BOOKING_URL );
+        restaurant_booking_define_constant( 'RB_PLUGIN_BASENAME', RESTAURANT_BOOKING_BASENAME );
     }
-    
-    require_once RESTAURANT_BOOKING_PATH . 'includes/class-plugin-activator.php';
-    Restaurant_Booking_Plugin_Activator::activate();
+}
+
+restaurant_booking_setup_constants();
+
+if ( ! function_exists( 'restaurant_booking_register_missing_file_notice' ) ) {
+    /**
+     * Register an admin notice for missing plugin files.
+     *
+     * @param string $relative_path File path relative to the plugin root.
+     */
+    function restaurant_booking_register_missing_file_notice( $relative_path ) {
+        $message = sprintf(
+            /* translators: %s: Missing file path. */
+            __( 'Restaurant Booking Manager: Missing required file %s. Please reinstall the plugin.', 'restaurant-booking' ),
+            $relative_path
+        );
+
+        error_log( sprintf( 'Restaurant Booking Manager missing file: %s', $relative_path ) );
+
+        add_action(
+            'admin_notices',
+            function () use ( $message ) {
+                printf(
+                    '<div class="notice notice-error"><p>%s</p></div>',
+                    esc_html( $message )
+                );
+            }
+        );
+    }
+}
+
+if ( ! function_exists( 'restaurant_booking_include' ) ) {
+    /**
+     * Safely include a plugin file relative to the plugin directory.
+     *
+     * @param string $relative_path File path relative to the plugin root.
+     *
+     * @return mixed False on failure, otherwise the included file's return.
+     */
+    function restaurant_booking_include( $relative_path ) {
+        $relative_path = ltrim( $relative_path, '/' );
+        $full_path     = RESTAURANT_BOOKING_PATH . $relative_path;
+
+        if ( file_exists( $full_path ) ) {
+            return require_once $full_path;
+        }
+
+        restaurant_booking_register_missing_file_notice( $relative_path );
+
+        return false;
+    }
+}
+
+if ( ! function_exists( 'restaurant_booking_load_dependencies' ) ) {
+    /**
+     * Load the core plugin dependencies.
+     *
+     * @return bool True on success, false when a dependency is missing.
+     */
+    function restaurant_booking_load_dependencies() {
+        static $loaded = false;
+
+        if ( $loaded ) {
+            return true;
+        }
+
+        $core_files = array(
+            'includes/class-plugin-loader.php',
+            'includes/class-plugin-manager.php',
+        );
+
+        foreach ( $core_files as $file ) {
+            if ( false === restaurant_booking_include( $file ) ) {
+                return false;
+            }
+        }
+
+        $loaded = true;
+
+        return true;
+    }
+}
+
+if ( ! function_exists( 'restaurant_booking_load_textdomain' ) ) {
+    /**
+     * Load the plugin text domain for translations.
+     */
+    function restaurant_booking_load_textdomain() {
+        load_plugin_textdomain(
+            'restaurant-booking',
+            false,
+            dirname( RB_PLUGIN_BASENAME ) . '/languages/'
+        );
+    }
+}
+add_action( 'plugins_loaded', 'restaurant_booking_load_textdomain', 0 );
+
+if ( ! function_exists( 'restaurant_booking_init_plugin' ) ) {
+    /**
+     * Bootstrap the plugin once WordPress has loaded.
+     */
+    function restaurant_booking_init_plugin() {
+        if ( ! restaurant_booking_load_dependencies() ) {
+            return;
+        }
+
+        $plugin = Restaurant_Booking_Plugin_Manager::instance();
+        $plugin->run();
+
+        if ( function_exists( 'restaurant_booking_add_role_capabilities' ) ) {
+            restaurant_booking_add_role_capabilities();
+        }
+    }
+}
+add_action( 'plugins_loaded', 'restaurant_booking_init_plugin', 5 );
+
+if ( ! function_exists( 'restaurant_booking_activate' ) ) {
+    /**
+     * Plugin activation hook.
+     */
+    function restaurant_booking_activate() {
+        if ( false === restaurant_booking_include( 'includes/class-plugin-activator.php' ) ) {
+            wp_die( esc_html__( 'Restaurant Booking Manager: Missing activator file. Cannot activate plugin.', 'restaurant-booking' ) );
+        }
+
+        if ( class_exists( 'Restaurant_Booking_Plugin_Activator' ) ) {
+            Restaurant_Booking_Plugin_Activator::activate();
+        }
+    }
 }
 register_activation_hook( __FILE__, 'restaurant_booking_activate' );
 
-/**
- * Plugin deactivation hook
- */
-function restaurant_booking_deactivate() {
-    if ( file_exists( RESTAURANT_BOOKING_PATH . 'includes/class-plugin-deactivator.php' ) ) {
-        require_once RESTAURANT_BOOKING_PATH . 'includes/class-plugin-deactivator.php';
-        Restaurant_Booking_Plugin_Deactivator::deactivate();
+if ( ! function_exists( 'restaurant_booking_deactivate' ) ) {
+    /**
+     * Plugin deactivation hook.
+     */
+    function restaurant_booking_deactivate() {
+        if ( false !== restaurant_booking_include( 'includes/class-plugin-deactivator.php' ) && class_exists( 'Restaurant_Booking_Plugin_Deactivator' ) ) {
+            Restaurant_Booking_Plugin_Deactivator::deactivate();
+        }
     }
 }
 register_deactivation_hook( __FILE__, 'restaurant_booking_deactivate' );
