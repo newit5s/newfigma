@@ -334,6 +334,12 @@ if ( ! class_exists( 'RB_Modern_Booking_Widget' ) ) {
                 $notification_service->send_booking_confirmation( $booking );
             }
 
+            $notification_service = $this->get_notification_service();
+
+            if ( $notification_service ) {
+                $notification_service->send_booking_confirmation( $booking );
+            }
+
             $this->send_json_success(
                 array(
                     'message' => __( 'Booking confirmed! Check your email.', 'restaurant-booking' ),
