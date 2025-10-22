@@ -159,7 +159,42 @@
   min-height: 72px;
   padding: var(--rb-space-3);
   cursor: grab;
+  box-sizing: border-box;
+  touch-action: none;
+  user-select: none;
   transition: transform var(--rb-transition-fast), box-shadow var(--rb-transition-fast);
+}
+
+.rb-floor-table::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translate(-50%, 8px);
+  background: var(--rb-bg-primary);
+  color: var(--rb-text-primary);
+  padding: 6px 10px;
+  border-radius: var(--rb-radius-sm);
+  border: 1px solid var(--rb-border);
+  box-shadow: var(--rb-shadow-sm);
+  font-size: var(--rb-text-xs);
+  line-height: 1.4;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--rb-transition-fast), transform var(--rb-transition-fast);
+  z-index: 5;
+}
+
+.rb-floor-table:hover::after,
+.rb-floor-table:focus-visible::after {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.rb-floor-table:focus-visible {
+  outline: 2px solid var(--rb-primary-500);
+  outline-offset: 2px;
 }
 
 .rb-floor-table:active {
@@ -190,6 +225,31 @@
 .rb-floor-table.rb-selected {
   transform: scale(1.05);
   border-color: var(--rb-primary-500);
+}
+
+.rb-resize-handle {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--rb-radius-sm);
+  border: 1px solid var(--rb-border-strong);
+  background: var(--rb-bg-primary);
+  box-shadow: var(--rb-shadow-xs);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: nwse-resize;
+}
+
+.rb-resize-handle::after {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--rb-border-strong);
+  border-top: 2px solid var(--rb-border-strong);
+  transform: rotate(45deg);
 }
 
 .rb-table-label {

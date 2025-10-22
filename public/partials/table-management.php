@@ -40,6 +40,12 @@ if ( empty( $locations ) ) {
 }
 
 $is_embed = isset( $is_embed ) ? (bool) $is_embed : false;
+$status_labels = array(
+    'available' => __( 'Available', 'restaurant-booking' ),
+    'reserved'  => __( 'Reserved', 'restaurant-booking' ),
+    'occupied'  => __( 'Occupied', 'restaurant-booking' ),
+    'cleaning'  => __( 'Cleaning', 'restaurant-booking' ),
+);
 ?>
 <?php if ( ! $is_embed ) : ?>
 <!DOCTYPE html>
@@ -99,14 +105,44 @@ $is_embed = isset( $is_embed ) ? (bool) $is_embed : false;
             <div class="rb-floor-plan-canvas" data-floor-canvas role="application" aria-label="<?php esc_attr_e( 'Table floor plan editor', 'restaurant-booking' ); ?>">
                 <div class="rb-floor-plan-grid" aria-hidden="true"></div>
                 <?php foreach ( $tables as $table ) :
-                    $label = isset( $table['label'] ) ? $table['label'] : ( $table['name'] ?? __( 'Table', 'restaurant-booking' ) );
+                    $label    = isset( $table['label'] ) ? $table['label'] : ( $table['name'] ?? __( 'Table', 'restaurant-booking' ) );
                     $capacity = isset( $table['capacity'] ) ? (int) $table['capacity'] : 0;
-                    $status = isset( $table['status'] ) ? $table['status'] : 'available';
-                    $shape = isset( $table['shape'] ) ? $table['shape'] : 'rectangle';
-                    $left = isset( $table['position_x'] ) ? (int) $table['position_x'] : 120;
-                    $top  = isset( $table['position_y'] ) ? (int) $table['position_y'] : 120;
+                    $status   = isset( $table['status'] ) ? $table['status'] : 'available';
+                    $shape    = isset( $table['shape'] ) ? $table['shape'] : 'rectangle';
+                    $left     = isset( $table['position_x'] ) ? (int) $table['position_x'] : 120;
+                    $top      = isset( $table['position_y'] ) ? (int) $table['position_y'] : 120;
+                    $width    = isset( $table['width'] ) ? (int) $table['width'] : 0;
+                    $height   = isset( $table['height'] ) ? (int) $table['height'] : 0;
+
+                    if ( $width <= 0 ) {
+                        $width = 120;
+                    }
+
+                    if ( $height <= 0 ) {
+                        $height = 120;
+                    }
+
+                    $status_label = isset( $status_labels[ $status ] ) ? $status_labels[ $status ] : ucfirst( $status );
+                    $tooltip_parts = array(
+                        $label,
+                        sprintf( _n( '%d seat', '%d seats', $capacity, 'restaurant-booking' ), $capacity ),
+                        $status_label,
+                    );
+                    $tooltip = implode( ' • ', array_filter( $tooltip_parts ) );
+
+                    $style = sprintf( 'left: %1$dpx; top: %2$dpx; width: %3$dpx; height: %4$dpx;', $left, $top, $width, $height );
                     ?>
-                    <button type="button" class="rb-floor-table" data-table-id="<?php echo esc_attr( $table['id'] ); ?>" data-status="<?php echo esc_attr( $status ); ?>" data-shape="<?php echo esc_attr( $shape ); ?>" style="left: <?php echo esc_attr( $left ); ?>px; top: <?php echo esc_attr( $top ); ?>px;">
+                    <button
+                        type="button"
+                        class="rb-floor-table"
+                        data-table-id="<?php echo esc_attr( $table['id'] ); ?>"
+                        data-status="<?php echo esc_attr( $status ); ?>"
+                        data-shape="<?php echo esc_attr( $shape ); ?>"
+                        data-tooltip="<?php echo esc_attr( $tooltip ); ?>"
+                        style="<?php echo esc_attr( $style ); ?>"
+                        title="<?php echo esc_attr( $tooltip ); ?>"
+                        aria-label="<?php echo esc_attr( $tooltip ); ?>"
+                    >
                         <span class="rb-table-label"><?php echo esc_html( $label ); ?></span>
                         <span class="rb-table-capacity"><?php echo esc_html( sprintf( _n( '%d seat', '%d seats', $capacity, 'restaurant-booking' ), $capacity ) ); ?></span>
                     </button>
@@ -141,13 +177,14 @@ $is_embed = isset( $is_embed ) ? (bool) $is_embed : false;
                         <th scope="col"><?php esc_html_e( 'Status', 'restaurant-booking' ); ?></th>
                         <th scope="col"><?php esc_html_e( 'Position', 'restaurant-booking' ); ?></th>
                         <th scope="col"><?php esc_html_e( 'Shape', 'restaurant-booking' ); ?></th>
+                        <th scope="col"><?php esc_html_e( 'Dimensions', 'restaurant-booking' ); ?></th>
                         <th scope="col" class="rb-text-right"><?php esc_html_e( 'Actions', 'restaurant-booking' ); ?></th>
                     </tr>
                 </thead>
                 <tbody data-table-list>
                 <?php if ( empty( $tables ) ) : ?>
                     <tr>
-                        <td colspan="6"><?php esc_html_e( 'No tables have been configured for this location yet.', 'restaurant-booking' ); ?></td>
+                        <td colspan="7"><?php esc_html_e( 'No tables have been configured for this location yet.', 'restaurant-booking' ); ?></td>
                     </tr>
                 <?php else : ?>
                     <?php foreach ( $tables as $table ) :
@@ -156,13 +193,22 @@ $is_embed = isset( $is_embed ) ? (bool) $is_embed : false;
                         $status = isset( $table['status'] ) ? $table['status'] : 'available';
                         $position = sprintf( '%d, %d', (int) ( $table['position_x'] ?? 0 ), (int) ( $table['position_y'] ?? 0 ) );
                         $shape = isset( $table['shape'] ) ? $table['shape'] : 'rectangle';
+                        $width = isset( $table['width'] ) ? (int) $table['width'] : 0;
+                        $height = isset( $table['height'] ) ? (int) $table['height'] : 0;
+                        if ( $width <= 0 ) {
+                            $width = 120;
+                        }
+                        if ( $height <= 0 ) {
+                            $height = 120;
+                        }
                         ?>
                         <tr data-table-row="<?php echo esc_attr( $table['id'] ); ?>">
                             <td><?php echo esc_html( $label ); ?></td>
                             <td><?php echo esc_html( $capacity ); ?></td>
-                            <td><span class="rb-table-status-badge <?php echo esc_attr( 'rb-status-' . $status ); ?>"><?php echo esc_html( ucfirst( $status ) ); ?></span></td>
+                            <td><span class="rb-table-status-badge <?php echo esc_attr( 'rb-status-' . $status ); ?>"><?php echo esc_html( isset( $status_labels[ $status ] ) ? $status_labels[ $status ] : ucfirst( $status ) ); ?></span></td>
                             <td><?php echo esc_html( $position ); ?></td>
                             <td><?php echo esc_html( ucfirst( $shape ) ); ?></td>
+                            <td><?php echo esc_html( sprintf( '%d × %d px', $width, $height ) ); ?></td>
                             <td class="rb-text-right">
                                 <button type="button" class="rb-btn rb-btn-xs rb-btn-outline" data-action="focus" data-table="<?php echo esc_attr( $table['id'] ); ?>"><?php esc_html_e( 'Focus', 'restaurant-booking' ); ?></button>
                             </td>
