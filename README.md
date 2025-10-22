@@ -283,6 +283,7 @@ wp_send_json_success( [ 'data' => $result ] );
 - Plugin tự động thêm capability `manage_bookings` cho vai trò **Administrator** và **Editor** mỗi khi khởi tạo.
 - Administrator vẫn có thể vào menu và shortcode dù bị mất capability tùy chỉnh nhờ fallback `manage_options` mới (filter `map_meta_cap`).
 - Người dùng không đủ quyền sẽ thấy thông báo kèm liên kết đăng nhập portal (`/portal/` hoặc URL tùy chỉnh qua filter `rb_portal_login_url`).
+- Có thể whitelist tạm thời vai trò hoặc user ID để truy cập trang **Settings** trong giai đoạn khóa admin thông qua các filter `restaurant_booking_testing_allowed_roles` và `restaurant_booking_testing_allowed_user_ids`; plugin sẽ tự cấp capability `manage_bookings` (hoặc capability tùy chỉnh) cho những tài khoản này.
 - Có thể điều chỉnh trang đăng nhập bằng cách thêm vào theme/plugin:
 - Trang **Settings** giờ chạy trực tiếp trong backend WordPress thông qua Settings API với slug admin `restaurant-booking-settings`, xuất hiện cả trong menu **Bookings** của plugin lẫn mục **Settings → Restaurant Booking**. Có thể đổi slug bằng filter `restaurant_booking_settings_page_slug`; các URL cũ `admin.php?page=rb-settings` sẽ tự động chuyển hướng.
 - Toàn bộ tùy chọn được lưu trong option `restaurant_booking_settings`, có thể truy cập qua helper `restaurant_booking_get_setting()` / `restaurant_booking_get_settings()` hoặc đổi giá trị mặc định bằng filter `restaurant_booking_default_settings`.

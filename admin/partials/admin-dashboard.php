@@ -15,6 +15,14 @@ $settings_slug = function_exists( 'restaurant_booking_get_settings_page_slug' )
 $settings_url = function_exists( 'restaurant_booking_get_settings_page_url' )
     ? restaurant_booking_get_settings_page_url()
     : admin_url( 'admin.php?page=' . $settings_slug );
+
+$bookings_url = function_exists( 'restaurant_booking_get_admin_page_url' )
+    ? restaurant_booking_get_admin_page_url( 'rb-bookings' )
+    : admin_url( 'admin.php?page=rb-bookings' );
+
+$locations_url = function_exists( 'restaurant_booking_get_admin_page_url' )
+    ? restaurant_booking_get_admin_page_url( 'rb-locations' )
+    : admin_url( 'admin.php?page=rb-locations' );
 ?>
 <div class="rb-admin-wrapper">
     <aside class="rb-admin-sidebar" aria-label="<?php esc_attr_e( 'Quick statistics', 'restaurant-booking' ); ?>">
@@ -46,14 +54,14 @@ $settings_url = function_exists( 'restaurant_booking_get_settings_page_url' )
                 <h2><?php esc_html_e( 'Quick actions', 'restaurant-booking' ); ?></h2>
             </header>
             <div class="rb-admin-card-list">
-                <a class="rb-admin-activity-item" href="<?php echo esc_url( admin_url( 'admin.php?page=rb-bookings' ) ); ?>">
+                <a class="rb-admin-activity-item" href="<?php echo esc_url( $bookings_url ); ?>">
                     <div class="rb-admin-activity-icon" aria-hidden="true">✅</div>
                     <div>
                         <div class="rb-admin-stat-label"><?php esc_html_e( 'Confirm bookings', 'restaurant-booking' ); ?></div>
                         <div class="rb-admin-activity-meta"><?php esc_html_e( 'Review pending reservations awaiting approval.', 'restaurant-booking' ); ?></div>
                     </div>
                 </a>
-                <a class="rb-admin-activity-item" href="<?php echo esc_url( admin_url( 'admin.php?page=rb-locations' ) ); ?>">
+                <a class="rb-admin-activity-item" href="<?php echo esc_url( $locations_url ); ?>">
                     <div class="rb-admin-activity-icon" aria-hidden="true">📍</div>
                     <div>
                         <div class="rb-admin-stat-label"><?php esc_html_e( 'Manage locations', 'restaurant-booking' ); ?></div>
