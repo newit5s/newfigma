@@ -6,6 +6,89 @@
 (function () {
   'use strict';
 
+  const dashboardAPI = initializeDashboardHooks();
+
+  function initializeDashboardHooks() {
+    if (typeof window === 'undefined') {
+      return null;
+    }
+
+    const globalObject = window.rbDashboard = window.rbDashboard || {};
+    globalObject.__hooks = globalObject.__hooks || {};
+
+    if (typeof globalObject.addHook !== 'function') {
+      globalObject.addHook = function addHook(eventName, callback, priority = 10) {
+        if (!eventName || typeof callback !== 'function') {
+          return () => {};
+        }
+
+        const hooks = globalObject.__hooks;
+        const key = String(eventName);
+        hooks[key] = hooks[key] || [];
+
+        const priorityNumber = Number(priority);
+        const normalizedPriority = isNaN(priorityNumber) ? 10 : priorityNumber;
+
+        hooks[key].push({ callback, priority: normalizedPriority });
+        hooks[key].sort((a, b) => a.priority - b.priority);
+
+        return () => {
+          globalObject.removeHook(key, callback);
+        };
+      };
+    }
+
+    if (typeof globalObject.removeHook !== 'function') {
+      globalObject.removeHook = function removeHook(eventName, callback) {
+        const hooks = globalObject.__hooks;
+        const key = String(eventName);
+
+        if (!hooks[key] || hooks[key].length === 0) {
+          return;
+        }
+
+        if (typeof callback !== 'function') {
+          hooks[key] = [];
+          return;
+        }
+
+        hooks[key] = hooks[key].filter((hook) => hook.callback !== callback);
+      };
+    }
+
+    if (typeof globalObject.doHook !== 'function') {
+      globalObject.doHook = function doHook(eventName, ...args) {
+        const hooks = globalObject.__hooks;
+        const key = String(eventName);
+        const handlers = hooks[key];
+
+        if (!handlers || handlers.length === 0) {
+          return;
+        }
+
+        handlers.slice().forEach((hook) => {
+          try {
+            hook.callback(...args);
+          } catch (error) {
+            console.error('rbDashboard hook error:', eventName, error);
+          }
+        });
+      };
+    }
+
+    return globalObject;
+  }
+
+  function triggerDashboardHook(eventName, ...args) {
+    if (!eventName) {
+      return;
+    }
+
+    if (dashboardAPI && typeof dashboardAPI.doHook === 'function') {
+      dashboardAPI.doHook(eventName, ...args);
+    }
+  }
+
   class PortalDashboard {
     constructor() {
       this.currentLocation = (typeof rbDashboard !== 'undefined' && rbDashboard.current_location) ? rbDashboard.current_location : '';
@@ -86,6 +169,7 @@
           this.schedule.loadSchedule(locationId),
           this.charts ? this.charts.loadChartData(locationId) : Promise.resolve()
         ]);
+        triggerDashboardHook('locationChange', locationId);
       } catch (error) {
         console.error('Failed to change location:', error);
         this.showError(this.getString('error') || 'Failed to load location data');
@@ -164,11 +248,16 @@
     }
 
     toggleTheme() {
+      if (window.rbThemeManager && typeof window.rbThemeManager.toggleTheme === 'function') {
+        window.rbThemeManager.toggleTheme();
+        return;
+      }
+
       const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
       const nextTheme = currentTheme === 'dark' ? 'light' : 'dark';
       document.documentElement.setAttribute('data-theme', nextTheme);
       try {
-        window.localStorage.setItem('rb_theme', nextTheme);
+        window.localStorage.setItem('rb_theme_preference', nextTheme);
       } catch (error) {
         console.warn('Unable to persist theme preference:', error);
       }
@@ -214,6 +303,7 @@
       this.nonce = (typeof rbDashboard !== 'undefined') ? rbDashboard.nonce : '';
       this.currentLocation = (typeof rbDashboard !== 'undefined' && rbDashboard.current_location) ? rbDashboard.current_location : '';
       this.metricPeriods = this.loadStoredPeriods();
+      this.latestMetrics = {};
 
       this.bindEvents();
     }
@@ -244,24 +334,35 @@
 
     async refreshMetrics(showLoading = true) {
       const metrics = Object.keys(this.metricPeriods);
-      const promises = metrics.map((metric) => this.updateMetric(metric, this.metricPeriods[metric], showLoading));
-      await Promise.all(promises);
+      const promises = metrics.map((metric) => this.updateMetric(metric, this.metricPeriods[metric], showLoading, false));
+      const results = await Promise.all(promises);
+
+      results.forEach((data, index) => {
+        if (data) {
+          this.latestMetrics[metrics[index]] = data;
+        }
+      });
+
+      this.emitStatsLoaded();
+
+      return { ...this.latestMetrics };
     }
 
-    async updateMetric(metric, period, showLoading) {
+    async updateMetric(metric, period, showLoading, emitEvent = true) {
       const card = document.querySelector(`.rb-stat-card[data-metric="${metric}"]`);
       if (!card) {
-        return;
+        return null;
       }
 
       if (!this.ajaxUrl) {
-        return;
+        return null;
       }
 
       if (showLoading) {
         this.toggleCardLoading(card, true);
       }
 
+      let metricData = null;
       try {
         const response = await fetch(this.ajaxUrl, {
           method: 'POST',
@@ -279,7 +380,9 @@
 
         const payload = await response.json();
         if (payload && payload.success && payload.data) {
-          this.renderMetric(card, payload.data);
+          metricData = payload.data;
+          this.latestMetrics[metric] = metricData;
+          this.renderMetric(card, metricData);
         } else {
           console.error('Failed to update metric', metric, payload);
         }
@@ -290,6 +393,12 @@
           this.toggleCardLoading(card, false);
         }
       }
+
+      if (emitEvent && metricData) {
+        this.emitStatsLoaded();
+      }
+
+      return metricData;
     }
 
     renderMetric(card, data) {
@@ -408,6 +517,14 @@
       } catch (error) {
         console.warn('Unable to persist dashboard periods:', error);
       }
+    }
+
+    emitStatsLoaded() {
+      if (!this.latestMetrics || Object.keys(this.latestMetrics).length === 0) {
+        return;
+      }
+
+      triggerDashboardHook('statsLoaded', { ...this.latestMetrics });
     }
   }
 
