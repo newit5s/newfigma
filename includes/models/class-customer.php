@@ -30,6 +30,13 @@ if ( ! class_exists( 'RB_Customer' ) ) {
         protected static $cache = null;
 
         /**
+         * Cached table existence check.
+         *
+         * @var bool|null
+         */
+        protected static $table_exists_cache = null;
+
+        /**
          * Retrieve all customers with optional filters.
          *
          * @param array $args Filter arguments.
@@ -103,6 +110,30 @@ if ( ! class_exists( 'RB_Customer' ) ) {
                 return false;
             }
 
+            if ( self::customers_table_exists() ) {
+                global $wpdb;
+
+                $status = sanitize_key( $status );
+
+                if ( ! in_array( $status, array( 'vip', 'regular', 'blacklist' ), true ) ) {
+                    $status = 'regular';
+                }
+
+                $table  = self::get_table_name();
+                $result = $wpdb->update(
+                    $table,
+                    array(
+                        'status'     => $status,
+                        'updated_at' => current_time( 'mysql', true ),
+                    ),
+                    array( 'id' => $customer_id ),
+                    array( '%s', '%s' ),
+                    array( '%d' )
+                );
+
+                return false !== $result;
+            }
+
             $status = sanitize_key( $status );
 
             if ( ! in_array( $status, array( 'vip', 'regular', 'blacklist' ), true ) ) {
@@ -118,6 +149,82 @@ if ( ! class_exists( 'RB_Customer' ) ) {
         }
 
         /**
+         * Insert or update a customer record from booking payload.
+         *
+         * @param array $data Booking payload.
+         *
+         * @return int Customer identifier.
+         */
+        public static function upsert_customer_from_booking( $data ) {
+            if ( ! self::customers_table_exists() ) {
+                return 0;
+            }
+
+            global $wpdb;
+
+            $table      = self::get_table_name();
+            $email      = sanitize_email( $data['email'] ?? ( $data['customer_email'] ?? '' ) );
+            $phone      = sanitize_text_field( $data['phone'] ?? ( $data['customer_phone'] ?? '' ) );
+            $first_name = sanitize_text_field( $data['first_name'] ?? '' );
+            $last_name  = sanitize_text_field( $data['last_name'] ?? '' );
+            $full_name  = sanitize_text_field( $data['customer_name'] ?? trim( $first_name . ' ' . $last_name ) );
+
+            if ( '' === $first_name && '' === $last_name && '' !== $full_name ) {
+                $parts      = preg_split( '/\s+/', $full_name, 2 );
+                $first_name = $parts[0] ?? '';
+                $last_name  = $parts[1] ?? '';
+            }
+
+            $existing_id = 0;
+
+            if ( $email ) {
+                $existing_id = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT id FROM ' . $table . ' WHERE email = %s LIMIT 1', $email ) );
+            } elseif ( $phone ) {
+                $existing_id = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT id FROM ' . $table . ' WHERE phone = %s LIMIT 1', $phone ) );
+            }
+
+            $payload = array(
+                'first_name' => $first_name ? $first_name : ( $full_name ? $full_name : __( 'Guest', 'restaurant-booking' ) ),
+                'last_name'  => $last_name,
+                'email'      => $email,
+                'phone'      => $phone,
+                'status'     => 'regular',
+            );
+
+            if ( $existing_id ) {
+                $payload['updated_at'] = current_time( 'mysql', true );
+
+                $wpdb->update(
+                    $table,
+                    $payload,
+                    array( 'id' => $existing_id ),
+                    array( '%s', '%s', '%s', '%s', '%s', '%s' ),
+                    array( '%d' )
+                );
+
+                return $existing_id;
+            }
+
+            $timestamp            = current_time( 'mysql', true );
+            $payload['notes']     = '';
+            $payload['preferences'] = '';
+            $payload['created_at'] = $timestamp;
+            $payload['updated_at'] = $timestamp;
+
+            $result = $wpdb->insert(
+                $table,
+                $payload,
+                array( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s' )
+            );
+
+            if ( false === $result ) {
+                return 0;
+            }
+
+            return (int) $wpdb->insert_id;
+        }
+
+        /**
          * Persist the full customer dataset.
          *
          * @param array $customers Customer list keyed by identifier.
@@ -125,6 +232,38 @@ if ( ! class_exists( 'RB_Customer' ) ) {
         protected static function save_customers( $customers ) {
             self::$cache = $customers;
             update_option( self::OPTION_KEY, $customers, false );
+        }
+
+        /**
+         * Retrieve the database table name.
+         *
+         * @return string
+         */
+        protected static function get_table_name() {
+            global $wpdb;
+
+            return $wpdb->prefix . 'rb_customers';
+        }
+
+        /**
+         * Determine if the customers table exists.
+         *
+         * @return bool
+         */
+        protected static function customers_table_exists() {
+            if ( null !== self::$table_exists_cache ) {
+                return self::$table_exists_cache;
+            }
+
+            global $wpdb;
+
+            $table = self::get_table_name();
+            $query = $wpdb->prepare( 'SHOW TABLES LIKE %s', $table );
+            $found = $wpdb->get_var( $query );
+
+            self::$table_exists_cache = ( $found === $table );
+
+            return self::$table_exists_cache;
         }
 
         /**

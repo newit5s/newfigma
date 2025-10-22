@@ -785,3 +785,8 @@ button.rb-admin-activity-item {
   box-shadow: var(--rb-shadow-md);
   border-color: var(--rb-primary-200);
 }
+
+.rb-admin-location-card.is-selected {
+  border-color: var(--rb-primary-400);
+  box-shadow: var(--rb-shadow-lg);
+}

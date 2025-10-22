@@ -270,12 +270,6 @@ if ( ! class_exists( 'RB_Modern_Booking_Widget' ) ) {
         public function ajax_create_booking() {
             $this->verify_ajax_nonce();
 
-            $repository = $this->get_booking_repository();
-
-            if ( ! $repository ) {
-                $this->send_json_error( __( 'Booking service temporarily unavailable.', 'restaurant-booking' ), 501 );
-            }
-
             $payload = array(
                 'first_name'        => isset( $_POST['first_name'] ) ? sanitize_text_field( wp_unslash( $_POST['first_name'] ) ) : '',
                 'last_name'         => isset( $_POST['last_name'] ) ? sanitize_text_field( wp_unslash( $_POST['last_name'] ) ) : '',
@@ -306,10 +300,38 @@ if ( ! class_exists( 'RB_Modern_Booking_Widget' ) ) {
 
             $payload['party_size'] = max( 1, $payload['party_size'] );
 
-            $booking = $repository->add_booking( $payload );
+            $booking = array();
+
+            if ( class_exists( 'RB_Booking' ) && method_exists( 'RB_Booking', 'create_booking' ) ) {
+                $booking = RB_Booking::create_booking(
+                    array_merge(
+                        $payload,
+                        array(
+                            'status'        => 'pending',
+                            'customer_name' => trim( $payload['first_name'] . ' ' . $payload['last_name'] ),
+                        )
+                    )
+                );
+            }
 
             if ( empty( $booking ) ) {
-                $this->send_json_error( __( 'Unable to complete your reservation. Please try again later.', 'restaurant-booking' ), 500 );
+                $repository = $this->get_booking_repository();
+
+                if ( ! $repository ) {
+                    $this->send_json_error( __( 'Booking service temporarily unavailable.', 'restaurant-booking' ), 501 );
+                }
+
+                $booking = $repository->add_booking( $payload );
+
+                if ( empty( $booking ) ) {
+                    $this->send_json_error( __( 'Unable to complete your reservation. Please try again later.', 'restaurant-booking' ), 500 );
+                }
+            }
+
+            $notification_service = $this->get_notification_service();
+
+            if ( $notification_service ) {
+                $notification_service->send_booking_confirmation( $booking );
             }
 
             $notification_service = $this->get_notification_service();
