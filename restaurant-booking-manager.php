@@ -169,6 +169,10 @@ if ( ! function_exists( 'restaurant_booking_init_plugin' ) ) {
             $plugin->bootstrap_admin_components();
         }
 
+        if ( function_exists( 'restaurant_booking_register_roles' ) ) {
+            restaurant_booking_register_roles();
+        }
+
         if ( function_exists( 'restaurant_booking_add_role_capabilities' ) ) {
             restaurant_booking_add_role_capabilities();
         }
@@ -592,6 +596,41 @@ function restaurant_booking_get_manage_capability() {
 
     return $capability;
 }
+
+/**
+ * Ensure the "Restaurant Manager" role exists with the correct capabilities.
+ */
+function restaurant_booking_register_roles() {
+    if ( ! function_exists( 'add_role' ) || ! function_exists( 'get_role' ) ) {
+        return;
+    }
+
+    $role_name    = 'restaurant_manager';
+    $display_name = __( 'Restaurant Manager', 'restaurant-booking' );
+
+    $role = get_role( $role_name );
+
+    $capability   = restaurant_booking_get_manage_capability();
+    $capabilities = array(
+        'read'            => true,
+        'manage_bookings' => true,
+    );
+
+    if ( ! empty( $capability ) && 'manage_bookings' !== $capability ) {
+        $capabilities[ $capability ] = true;
+    }
+
+    if ( $role && method_exists( $role, 'add_cap' ) ) {
+        foreach ( $capabilities as $cap => $granted ) {
+            if ( $granted ) {
+                $role->add_cap( $cap );
+            }
+        }
+    } else {
+        add_role( $role_name, $display_name, $capabilities );
+    }
+}
+add_action( 'init', 'restaurant_booking_register_roles', 4 );
 
 /**
  * Resolve the required management capability for the current user context.
@@ -1224,7 +1263,7 @@ function restaurant_booking_add_role_capabilities() {
 
     $roles = apply_filters(
         'restaurant_booking_manage_capability_roles',
-        array( 'administrator', 'editor' )
+        array( 'administrator', 'editor', 'restaurant_manager' )
     );
 
     foreach ( $roles as $role_name ) {
@@ -1245,7 +1284,7 @@ function restaurant_booking_remove_role_capabilities() {
 
     $roles = apply_filters(
         'restaurant_booking_manage_capability_roles',
-        array( 'administrator', 'editor' )
+        array( 'administrator', 'editor', 'restaurant_manager' )
     );
 
     foreach ( $roles as $role_name ) {

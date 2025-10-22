@@ -11,6 +11,9 @@ if ( ! class_exists( 'Restaurant_Booking_Plugin_Activator' ) ) {
             self::create_tables();
             update_option( 'restaurant_booking_version', RESTAURANT_BOOKING_VERSION );
             self::set_default_options();
+            if ( function_exists( 'restaurant_booking_register_roles' ) ) {
+                restaurant_booking_register_roles();
+            }
             if ( function_exists( 'restaurant_booking_add_role_capabilities' ) ) {
                 restaurant_booking_add_role_capabilities();
             }

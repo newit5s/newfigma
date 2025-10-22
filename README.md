@@ -281,9 +281,11 @@ wp_send_json_success( [ 'data' => $result ] );
 ### 🔐 Quyền truy cập & thông báo đăng nhập
 
 - Plugin tự động thêm capability `manage_bookings` cho vai trò **Administrator** và **Editor** mỗi khi khởi tạo.
+- Khi kích hoạt plugin sẽ tự tạo vai trò **Restaurant Manager** với các quyền `read`, `manage_bookings` (và capability tùy chỉnh nếu được cấu hình) để làm tài khoản QA khi admin/super admin bị khóa trang.
 - Administrator vẫn có thể vào menu và shortcode dù bị mất capability tùy chỉnh nhờ fallback `manage_options` mới (filter `map_meta_cap`).
 - Người dùng không đủ quyền sẽ thấy thông báo kèm liên kết đăng nhập portal (`/portal/` hoặc URL tùy chỉnh qua filter `rb_portal_login_url`).
 - Có thể whitelist tạm thời vai trò hoặc user ID để truy cập trang **Settings** trong giai đoạn khóa admin thông qua các filter `restaurant_booking_testing_allowed_roles` và `restaurant_booking_testing_allowed_user_ids`; plugin sẽ tự cấp capability `manage_bookings` (hoặc capability tùy chỉnh) cho những tài khoản này.
+- Có thể định nghĩa whitelist/blacklist trực tiếp qua option `restaurant_booking_settings_lockdown` (các key `enabled`, `blocked_roles`, `blocked_user_ids`, `testing_roles`, `testing_user_ids`, `block_super_admins`) hoặc thông qua hằng số/biến môi trường nếu cần thao tác nhanh trên staging.
 - Có thể điều chỉnh trang đăng nhập bằng cách thêm vào theme/plugin:
 - Trang **Settings** giờ chạy trực tiếp trong backend WordPress thông qua Settings API với slug admin `restaurant-booking-settings`, xuất hiện cả trong menu **Bookings** của plugin lẫn mục **Settings → Restaurant Booking**. Có thể đổi slug bằng filter `restaurant_booking_settings_page_slug`; các URL cũ `admin.php?page=rb-settings` sẽ tự động chuyển hướng.
 - Toàn bộ tùy chọn được lưu trong option `restaurant_booking_settings`, có thể truy cập qua helper `restaurant_booking_get_setting()` / `restaurant_booking_get_settings()` hoặc đổi giá trị mặc định bằng filter `restaurant_booking_default_settings`.
@@ -300,6 +302,20 @@ add_filter( 'restaurant_booking_settings_page_slug', function( $slug ) {
     return 'nha-hang-settings';
 } );
 ```
+
+#### Cấu hình khóa trang Settings nhanh
+
+| Biến cấu hình | Mô tả |
+|---------------|-------|
+| Option `restaurant_booking_settings_lockdown` | Lưu trữ cấu hình chính (bật/tắt, danh sách khóa, whitelist, khóa super admin). Có thể cập nhật bằng WP-CLI: `wp option update restaurant_booking_settings_lockdown '{"enabled":true,"testing_user_ids":[123]}'`. |
+| Hằng số `RESTAURANT_BOOKING_TESTING_ALLOWED_USER_IDS` / `RESTAURANT_BOOKING_TESTING_ALLOWED_USERS` | Danh sách ID người dùng (phân cách bằng dấu phẩy) được phép truy cập trang Settings dù admin đang bị khóa. |
+| Hằng số `RESTAURANT_BOOKING_TESTING_ALLOWED_ROLES` | Danh sách role slug được whitelist thêm ngoài option. |
+| Hằng số `RESTAURANT_BOOKING_BLOCKED_SETTINGS_ROLES` | Ghi đè thêm danh sách role bị khóa ngoài giá trị mặc định (`administrator`). |
+| Hằng số `RESTAURANT_BOOKING_BLOCKED_SETTINGS_USERS` | Khóa riêng từng user ID. |
+| Hằng số `RESTAURANT_BOOKING_SETTINGS_LOCKDOWN_ENABLED` | Bật/tắt cưỡng bức cơ chế khóa bất kể option. |
+| Hằng số `RESTAURANT_BOOKING_DISABLE_SETTINGS_LOCKDOWN` | Đặt `true` để bỏ qua hoàn toàn cơ chế khóa trong môi trường cần debug. |
+| Hằng số `RESTAURANT_BOOKING_BLOCK_SUPER_ADMINS` | Đặt `false` nếu muốn super admin luôn được phép truy cập Settings. |
+| Biến môi trường `RB_*` tương ứng (`RB_TESTING_ALLOWED_USER_IDS`, `RB_TESTING_ALLOWED_ROLES`, `RB_BLOCKED_SETTINGS_ROLES`, `RB_DISABLE_SETTINGS_LOCKDOWN`, ... ) | Alias phục vụ `.env`/hosting panel; ưu tiên thấp hơn hằng số nhưng cao hơn option. |
 
 ## 🔧 Cấu hình Design System
 
