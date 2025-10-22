@@ -392,6 +392,15 @@ function restaurant_booking_get_settings() {
     $settings = array_merge( $defaults, $options );
 
     /**
+     * Filter the resolved settings using the public plugin alias.
+     *
+     * @since 2.0.0
+     *
+     * @param array $settings Resolved settings values.
+     */
+    $settings = apply_filters( 'rb_booking_settings', $settings );
+
+    /**
      * Filter the resolved restaurant booking settings.
      *
      * @since 2.0.0
