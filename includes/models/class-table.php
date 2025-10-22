@@ -717,11 +717,11 @@ if ( ! class_exists( 'RB_Table' ) ) {
                 'table_number' => $number,
                 'capacity'     => max( 1, (int) ( $table['capacity'] ?? 0 ) ),
                 'status'       => sanitize_key( $table['status'] ?? 'available' ),
-                'position_x'   => isset( $table['position_x'] ) ? (int) $table['position_x'] : 0,
-                'position_y'   => isset( $table['position_y'] ) ? (int) $table['position_y'] : 0,
+                'position_x'   => isset( $table['position_x'] ) ? max( 0, (int) $table['position_x'] ) : 0,
+                'position_y'   => isset( $table['position_y'] ) ? max( 0, (int) $table['position_y'] ) : 0,
                 'shape'        => $shape,
-                'width'        => isset( $table['width'] ) ? (int) $table['width'] : 120,
-                'height'       => isset( $table['height'] ) ? (int) $table['height'] : 120,
+                'width'        => isset( $table['width'] ) ? max( 60, (int) $table['width'] ) : 120,
+                'height'       => isset( $table['height'] ) ? max( 60, (int) $table['height'] ) : 120,
                 'rotation'     => isset( $table['rotation'] ) ? (int) $table['rotation'] : 0,
             );
         }

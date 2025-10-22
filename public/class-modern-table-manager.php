@@ -216,6 +216,7 @@ if ( ! class_exists( 'RB_Modern_Table_Manager' ) ) {
                         'status'          => __( 'Status', 'restaurant-booking' ),
                         'position'        => __( 'Position', 'restaurant-booking' ),
                         'shape'           => __( 'Shape', 'restaurant-booking' ),
+                        'dimensions'      => __( 'Dimensions', 'restaurant-booking' ),
                         'table_properties_title' => __( 'Table properties', 'restaurant-booking' ),
                         'no_table_selected'      => __( 'No table selected', 'restaurant-booking' ),
                     ),
@@ -582,6 +583,17 @@ if ( ! class_exists( 'RB_Modern_Table_Manager' ) ) {
         protected function normalize_table_record( $record ) {
             $record = (array) $record;
 
+            $width  = isset( $record['width'] ) ? (int) $record['width'] : ( isset( $record['table_width'] ) ? (int) $record['table_width'] : 0 );
+            $height = isset( $record['height'] ) ? (int) $record['height'] : ( isset( $record['table_height'] ) ? (int) $record['table_height'] : 0 );
+
+            if ( $width <= 0 ) {
+                $width = 120;
+            }
+
+            if ( $height <= 0 ) {
+                $height = 120;
+            }
+
             return array(
                 'id'          => $record['id'] ?? ( $record['table_id'] ?? uniqid( 'table_', true ) ),
                 'name'        => $record['name'] ?? ( $record['label'] ?? __( 'Table', 'restaurant-booking' ) ),
@@ -591,9 +603,9 @@ if ( ! class_exists( 'RB_Modern_Table_Manager' ) ) {
                 'shape'       => $record['shape'] ?? 'rectangle',
                 'position_x'  => (int) ( $record['position_x'] ?? ( $record['x'] ?? 120 ) ),
                 'position_y'  => (int) ( $record['position_y'] ?? ( $record['y'] ?? 120 ) ),
-                'width'       => isset( $record['width'] ) ? (int) $record['width'] : null,
-                'height'      => isset( $record['height'] ) ? (int) $record['height'] : null,
-                'rotation'    => isset( $record['rotation'] ) ? (int) $record['rotation'] : 0,
+                'width'       => $width,
+                'height'      => $height,
+                'rotation'    => isset( $record['rotation'] ) ? (int) $record['rotation'] : ( isset( $record['angle'] ) ? (int) $record['angle'] : 0 ),
             );
         }
 
@@ -642,6 +654,9 @@ if ( ! class_exists( 'RB_Modern_Table_Manager' ) ) {
                     'shape'      => 'rectangle',
                     'position_x' => 120,
                     'position_y' => 80,
+                    'width'      => 120,
+                    'height'     => 120,
+                    'rotation'   => 0,
                 ),
                 array(
                     'id'         => 2,
@@ -652,6 +667,9 @@ if ( ! class_exists( 'RB_Modern_Table_Manager' ) ) {
                     'shape'      => 'round',
                     'position_x' => 280,
                     'position_y' => 120,
+                    'width'      => 110,
+                    'height'     => 110,
+                    'rotation'   => 0,
                 ),
                 array(
                     'id'         => 3,
@@ -662,6 +680,9 @@ if ( ! class_exists( 'RB_Modern_Table_Manager' ) ) {
                     'shape'      => 'rectangle',
                     'position_x' => 160,
                     'position_y' => 260,
+                    'width'      => 140,
+                    'height'     => 100,
+                    'rotation'   => 0,
                 ),
                 array(
                     'id'         => 4,
@@ -672,6 +693,9 @@ if ( ! class_exists( 'RB_Modern_Table_Manager' ) ) {
                     'shape'      => 'rectangle',
                     'position_x' => 360,
                     'position_y' => 260,
+                    'width'      => 160,
+                    'height'     => 120,
+                    'rotation'   => 0,
                 ),
             );
         }
