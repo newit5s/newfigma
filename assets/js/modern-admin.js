@@ -48,6 +48,57 @@
     return `${today.getFullYear()}-${month}-${day}`;
   };
 
+  const getQueryParam = (key) => {
+    if (!key || typeof window === 'undefined' || !window.location) {
+      return '';
+    }
+
+    const search = window.location.search || '';
+
+    if (!search) {
+      return '';
+    }
+
+    if (typeof URLSearchParams === 'function') {
+      const params = new URLSearchParams(search);
+      const value = params.get(key);
+      return value === null ? '' : value;
+    }
+
+    return search
+      .replace(/^\?/, '')
+      .split('&')
+      .reduce((found, pair) => {
+        if (found || !pair) {
+          return found;
+        }
+        const parts = pair.split('=');
+        const rawKey = parts.length > 0 ? parts[0] : '';
+        const rawValue = parts.length > 1 ? parts.slice(1).join('=') : '';
+
+        let decodedKey = rawKey;
+        let decodedValue = rawValue;
+
+        try {
+          decodedKey = decodeURIComponent(rawKey.replace(/\+/g, ' '));
+        } catch (error) {
+          decodedKey = rawKey;
+        }
+
+        if (decodedKey !== key) {
+          return '';
+        }
+
+        try {
+          decodedValue = decodeURIComponent(rawValue.replace(/\+/g, ' '));
+        } catch (error) {
+          decodedValue = rawValue;
+        }
+
+        return decodedValue;
+      }, '');
+  };
+
   class ModernAdmin {
     constructor() {
       const defaults = {
@@ -725,6 +776,7 @@
       this.locationNoticeDefault = this.$locationUnsaved && this.$locationUnsaved.length
         ? this.$locationUnsaved.text()
         : '';
+      this.focusLocationId = (getQueryParam('focus') || '').trim();
 
       if (this.$locationUnsaved && this.$locationUnsaved.length) {
         this.$locationUnsaved.attr('hidden', 'hidden');
@@ -775,6 +827,10 @@
 
       this.locationsDirectory = { locations, summary };
 
+      const focusId = this.focusLocationId && !this.locationFormDirty
+        ? String(this.focusLocationId)
+        : '';
+
       let dashboardData = dashboard;
       if (!dashboardData && directory.dashboard) {
         dashboardData = directory.dashboard;
@@ -793,6 +849,13 @@
       this.updateLocationSummary(summary);
 
       if (!this.locationFormDirty && locations.length) {
+        if (focusId) {
+          const focusedLocation = locations.find((location) => String(location.id) === focusId);
+          if (focusedLocation) {
+            this.activeLocation = Object.assign({}, focusedLocation);
+          }
+        }
+
         if (!this.activeLocation || typeof this.activeLocation.id === 'undefined') {
           this.populateLocationForm(locations[0], false);
         } else {
@@ -805,6 +868,10 @@
         }
       } else if (!this.locationFormDirty && !locations.length) {
         this.populateLocationForm(this.getEmptyLocation(), false);
+      }
+
+      if (focusId) {
+        this.focusLocationId = '';
       }
     }
 
