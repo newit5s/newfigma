@@ -729,6 +729,51 @@ button.rb-admin-activity-item {
   color: var(--rb-error);
 }
 
+.rb-admin-settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rb-space-4);
+}
+
+.rb-admin-settings-sections .form-table {
+  width: 100%;
+  margin-top: 0;
+}
+
+.rb-admin-settings-sections .form-table th {
+  width: 240px;
+  padding: var(--rb-space-3) var(--rb-space-4) var(--rb-space-3) 0;
+  font-weight: var(--rb-font-semibold);
+  color: var(--rb-text-secondary);
+}
+
+.rb-admin-settings-sections .form-table td {
+  padding: var(--rb-space-3) 0;
+}
+
+.rb-admin-settings-sections .form-table input[type="text"],
+.rb-admin-settings-sections .form-table input[type="number"],
+.rb-admin-settings-sections .form-table input[type="email"],
+.rb-admin-settings-sections .form-table input[type="tel"],
+.rb-admin-settings-sections .form-table select,
+.rb-admin-settings-sections .form-table textarea {
+  width: 100%;
+  max-width: 420px;
+}
+
+.rb-admin-settings-sections .form-table textarea {
+  min-height: 140px;
+}
+
+.rb-admin-settings-sections .description {
+  margin-top: var(--rb-space-2);
+  color: var(--rb-text-secondary);
+}
+
+.rb-admin-alert + .rb-admin-alert {
+  margin-top: var(--rb-space-3);
+}
+
 .rb-admin-location-card {
   cursor: pointer;
   transition: transform var(--rb-admin-transition), box-shadow var(--rb-admin-transition), border-color var(--rb-admin-transition);
