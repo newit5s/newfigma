@@ -97,7 +97,7 @@ if ( ! class_exists( 'RB_Fallback_Booking_Repository' ) ) {
                 'created_at'      => $now,
                 'updated_at'      => $now,
                 'total_amount'    => 0.0,
-                'source'          => 'fallback',
+                'source'          => sanitize_key( $data['source'] ?? 'fallback' ),
             );
 
             $bookings[ $id ] = $booking;
@@ -515,6 +515,7 @@ if ( ! class_exists( 'RB_Fallback_Booking_Repository' ) ) {
                     'date_from' => '',
                     'date_to'   => '',
                     'search'    => '',
+                    'source'    => '',
                 )
             );
 
@@ -524,16 +525,24 @@ if ( ! class_exists( 'RB_Fallback_Booking_Repository' ) ) {
             $date_to    = $filters['date_to'] ? $this->sanitize_date( $filters['date_to'] ) : '';
             $search_raw = isset( $filters['search'] ) ? wp_strip_all_tags( $filters['search'] ) : '';
             $search     = $search_raw ? strtolower( $search_raw ) : '';
+            $source     = sanitize_key( $filters['source'] );
 
             $result = array_filter(
                 $bookings,
-                function ( $booking ) use ( $status, $location, $date_from, $date_to, $search ) {
+                function ( $booking ) use ( $status, $location, $date_from, $date_to, $search, $source ) {
                     if ( $status && ( ! isset( $booking['status'] ) || $booking['status'] !== $status ) ) {
                         return false;
                     }
 
                     if ( $location && (int) ( $booking['location_id'] ?? 0 ) !== $location ) {
                         return false;
+                    }
+
+                    if ( $source ) {
+                        $booking_source = sanitize_key( $booking['source'] ?? '' );
+                        if ( $booking_source !== $source ) {
+                            return false;
+                        }
                     }
 
                     $booking_date = isset( $booking['booking_date'] ) ? $booking['booking_date'] : '';
@@ -655,6 +664,7 @@ if ( ! class_exists( 'RB_Fallback_Booking_Repository' ) ) {
                         'completed' => 0,
                         'cancelled' => 0,
                     ),
+                    'source_counts'      => array(),
                 );
             }
 
@@ -666,6 +676,7 @@ if ( ! class_exists( 'RB_Fallback_Booking_Repository' ) ) {
                 'completed' => 0,
                 'cancelled' => 0,
             );
+            $source_counts = array();
 
             foreach ( $records as $booking ) {
                 $total_guests += isset( $booking['party_size'] ) ? (int) $booking['party_size'] : 0;
@@ -673,6 +684,14 @@ if ( ! class_exists( 'RB_Fallback_Booking_Repository' ) ) {
                 $status = isset( $booking['status'] ) ? $booking['status'] : 'pending';
                 if ( isset( $status_counts[ $status ] ) ) {
                     $status_counts[ $status ]++;
+                }
+
+                $source = isset( $booking['source'] ) ? sanitize_key( $booking['source'] ) : '';
+                if ( '' !== $source ) {
+                    if ( ! isset( $source_counts[ $source ] ) ) {
+                        $source_counts[ $source ] = 0;
+                    }
+                    $source_counts[ $source ]++;
                 }
             }
 
@@ -687,6 +706,7 @@ if ( ! class_exists( 'RB_Fallback_Booking_Repository' ) ) {
                 'party_size_change'  => 0.0,
                 'pending_total'      => $status_counts['pending'],
                 'status_counts'      => $status_counts,
+                'source_counts'      => $source_counts,
             );
         }
 

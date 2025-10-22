@@ -26,6 +26,7 @@ if ( ! function_exists( 'restaurant_booking_get_schema_definitions' ) ) {
             booking_datetime datetime NOT NULL,
             party_size int(11) NOT NULL DEFAULT 2,
             status varchar(20) NOT NULL DEFAULT 'pending',
+            source varchar(50) NOT NULL DEFAULT 'online',
             total_amount decimal(12,2) NOT NULL DEFAULT 0,
             special_requests text NULL,
             customer_name varchar(190) NOT NULL DEFAULT '',

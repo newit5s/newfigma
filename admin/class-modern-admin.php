@@ -47,6 +47,7 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
             add_action( 'wp_ajax_rb_admin_get_locations', array( $this, 'ajax_get_locations' ) );
             add_action( 'wp_ajax_rb_admin_save_location', array( $this, 'ajax_save_location' ) );
             add_action( 'wp_ajax_rb_admin_delete_location', array( $this, 'ajax_delete_location' ) );
+            add_action( 'wp_ajax_rb_admin_update_booking_status', array( $this, 'ajax_update_booking_status' ) );
         }
 
         public function register_settings() {
@@ -619,6 +620,9 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
                         'locationReset'   => __( 'Location form reset.', 'restaurant-booking' ),
                         'peakTime'        => __( 'Peak dining time', 'restaurant-booking' ),
                         'sentiment'       => __( 'Guest sentiment', 'restaurant-booking' ),
+                        'statusUpdated'   => __( 'Booking status updated.', 'restaurant-booking' ),
+                        'statusUpdateFailed' => __( 'Unable to update booking status.', 'restaurant-booking' ),
+                        'unknownSource'   => __( 'Unknown source', 'restaurant-booking' ),
                     ),
                     'bookings' => array(
                         'perPage'      => 20,
@@ -628,6 +632,7 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
                             'completed' => __( 'Completed', 'restaurant-booking' ),
                             'cancelled' => __( 'Cancelled', 'restaurant-booking' ),
                         ),
+                        'sourceLabels' => $this->get_booking_sources(),
                     ),
                     'currency' => array(
                         'code'   => $currency_code,
@@ -1268,12 +1273,14 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
                 $per_page  = isset( $_POST['per_page'] ) ? max( 1, min( 100, (int) $_POST['per_page'] ) ) : 20;
                 $sort_by   = sanitize_key( wp_unslash( $_POST['sort_by'] ?? '' ) );
                 $sort_order = sanitize_key( wp_unslash( $_POST['sort_order'] ?? '' ) );
+                $source    = sanitize_key( wp_unslash( $_POST['source'] ?? '' ) );
 
                 $args = array(
                     'search'    => $search,
                     'date_from' => $date_from,
                     'date_to'   => $date_to,
                     'per_page'  => $per_page,
+                    'source'    => $source,
                 );
 
                 if ( ! empty( $sort_by ) ) {
@@ -1297,6 +1304,68 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
                 error_log( 'RB Admin AJAX Error [ajax_get_bookings]: ' . $exception->getMessage() );
 
                 $status = $exception->getCode() ?: 400;
+                wp_send_json_error(
+                    array( 'message' => $exception->getMessage() ),
+                    $status
+                );
+            }
+        }
+
+        public function ajax_update_booking_status() {
+            try {
+                $this->verify_admin_ajax_request();
+
+                if ( ! class_exists( 'RB_Booking' ) ) {
+                    throw new Exception( __( 'Booking service unavailable.', 'restaurant-booking' ), 501 );
+                }
+
+                $booking_id = isset( $_POST['booking_id'] ) ? absint( $_POST['booking_id'] ) : 0;
+                $status     = isset( $_POST['status'] ) ? sanitize_key( wp_unslash( $_POST['status'] ) ) : '';
+
+                if ( ! $booking_id || '' === $status ) {
+                    throw new Exception( __( 'Invalid booking data.', 'restaurant-booking' ), 400 );
+                }
+
+                $booking = new RB_Booking( $booking_id );
+
+                if ( ! $booking->exists() ) {
+                    throw new Exception( __( 'Booking not found.', 'restaurant-booking' ), 404 );
+                }
+
+                if ( ! $booking->update_status( $status ) ) {
+                    throw new Exception( __( 'Unable to update booking status.', 'restaurant-booking' ), 500 );
+                }
+
+                if ( 'confirmed' === $status && method_exists( $booking, 'send_confirmation_email' ) ) {
+                    $booking->send_confirmation_email();
+                } elseif ( 'cancelled' === $status && method_exists( $booking, 'send_cancellation_email' ) ) {
+                    $booking->send_cancellation_email();
+                }
+
+                $data = method_exists( $booking, 'get_data' ) ? $booking->get_data() : array();
+
+                if ( class_exists( 'RB_Logger' ) && method_exists( 'RB_Logger', 'log' ) ) {
+                    RB_Logger::log(
+                        'rb_admin_booking_status_changed',
+                        array(
+                            'booking_id' => $booking_id,
+                            'status'     => $status,
+                            'user_id'    => get_current_user_id(),
+                        )
+                    );
+                }
+
+                wp_send_json_success(
+                    array(
+                        'message' => __( 'Booking status updated.', 'restaurant-booking' ),
+                        'booking' => $data,
+                    )
+                );
+            } catch ( Exception $exception ) {
+                error_log( 'RB Admin AJAX Error [ajax_update_booking_status]: ' . $exception->getMessage() );
+
+                $status = $exception->getCode() ?: 400;
+
                 wp_send_json_error(
                     array( 'message' => $exception->getMessage() ),
                     $status
@@ -1559,6 +1628,43 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
             if ( ! $allowed ) {
                 throw new Exception( __( 'You do not have permission to perform this action.', 'restaurant-booking' ), 403 );
             }
+        }
+
+        protected function get_booking_sources() {
+            $sources = array(
+                'online'   => __( 'Online', 'restaurant-booking' ),
+                'phone'    => __( 'Phone', 'restaurant-booking' ),
+                'walk-in'  => __( 'Walk-in', 'restaurant-booking' ),
+                'partner'  => __( 'Partner', 'restaurant-booking' ),
+                'internal' => __( 'Internal', 'restaurant-booking' ),
+                'fallback' => __( 'Demo', 'restaurant-booking' ),
+            );
+
+            $sources = apply_filters( 'rb_admin_booking_sources', $sources );
+
+            if ( ! is_array( $sources ) ) {
+                return array();
+            }
+
+            $normalized = array();
+
+            foreach ( $sources as $key => $label ) {
+                $key = sanitize_key( $key );
+
+                if ( '' === $key ) {
+                    continue;
+                }
+
+                if ( is_string( $label ) ) {
+                    $normalized[ $key ] = $label;
+                } elseif ( is_scalar( $label ) ) {
+                    $normalized[ $key ] = (string) $label;
+                } else {
+                    $normalized[ $key ] = ucwords( str_replace( array( '-', '_' ), ' ', $key ) );
+                }
+            }
+
+            return $normalized;
         }
 
         protected function include_partial( $file ) {

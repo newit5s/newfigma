@@ -112,6 +112,12 @@ require __DIR__ . '/shared/header.php';
                         <option value=""><?php esc_html_e( 'All locations', 'restaurant-booking' ); ?></option>
                     </select>
                 </div>
+                <div class="rb-admin-filter-group">
+                    <label for="rb-bookings-source-filter"><?php esc_html_e( 'Source', 'restaurant-booking' ); ?></label>
+                    <select id="rb-bookings-source-filter" class="rb-select">
+                        <option value=""><?php esc_html_e( 'All sources', 'restaurant-booking' ); ?></option>
+                    </select>
+                </div>
                 <div class="rb-admin-filter-group rb-admin-filter-group--search">
                     <label for="rb-bookings-search-filter" class="screen-reader-text"><?php esc_html_e( 'Search bookings', 'restaurant-booking' ); ?></label>
                     <span class="dashicons dashicons-search" aria-hidden="true"></span>
@@ -139,12 +145,14 @@ require __DIR__ . '/shared/header.php';
                             <th scope="col"><?php esc_html_e( 'Party size', 'restaurant-booking' ); ?></th>
                             <th scope="col"><?php esc_html_e( 'Table', 'restaurant-booking' ); ?></th>
                             <th scope="col"><?php esc_html_e( 'Location', 'restaurant-booking' ); ?></th>
+                            <th scope="col"><?php esc_html_e( 'Source', 'restaurant-booking' ); ?></th>
                             <th scope="col"><?php esc_html_e( 'Status', 'restaurant-booking' ); ?></th>
                             <th scope="col" class="rb-admin-column-actions"><?php esc_html_e( 'Actions', 'restaurant-booking' ); ?></th>
                         </tr>
                     </thead>
                     <tbody id="rb-admin-bookings-body">
                         <tr class="rb-admin-skeleton-row">
+                            <td><span class="rb-admin-skeleton-bar"></span></td>
                             <td><span class="rb-admin-skeleton-bar"></span></td>
                             <td><span class="rb-admin-skeleton-bar"></span></td>
                             <td><span class="rb-admin-skeleton-bar"></span></td>
