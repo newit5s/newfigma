@@ -32,13 +32,12 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
             add_action( 'admin_menu', array( $this, 'remove_restricted_settings_menu' ), 99 );
             add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ) );
             add_action( 'admin_init', array( $this, 'maybe_block_settings_access' ), 5 );
+            add_action( 'admin_init', array( $this, 'register_settings' ), 20 );
             add_filter( 'user_has_cap', array( $this, 'maybe_grant_testing_manage_capability' ), 20, 4 );
 
             add_action( 'wp_ajax_rb_admin_get_dashboard', array( $this, 'ajax_get_dashboard' ) );
             add_action( 'wp_ajax_rb_admin_get_bookings', array( $this, 'ajax_get_bookings' ) );
             add_action( 'wp_ajax_rb_admin_get_locations', array( $this, 'ajax_get_locations' ) );
-
-            $this->register_settings();
         }
 
         public function register_settings() {
@@ -47,6 +46,14 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
             }
 
             $this->settings_registered = true;
+
+            if ( ! function_exists( 'register_setting' ) ) {
+                require_once ABSPATH . 'wp-admin/includes/plugin.php';
+            }
+
+            if ( ! function_exists( 'add_settings_section' ) ) {
+                require_once ABSPATH . 'wp-admin/includes/template.php';
+            }
 
             $default_settings = function_exists( 'restaurant_booking_get_default_settings' )
                 ? restaurant_booking_get_default_settings()
