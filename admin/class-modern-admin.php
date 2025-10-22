@@ -1286,10 +1286,9 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
 
                 wp_send_json_success(
                     array(
-                        'items'      => $results['items'] ?? array(),
-                        'total'      => $results['total'] ?? 0,
-                        'totalPages' => $results['total_pages'] ?? 1,
-                        'page'       => $page,
+                        'items'      => isset( $results['items'] ) ? $results['items'] : array(),
+                        'pagination' => isset( $results['pagination'] ) ? $results['pagination'] : array(),
+                        'summary'    => isset( $results['summary'] ) ? $results['summary'] : array(),
                     )
                 );
             } catch ( Exception $exception ) {
