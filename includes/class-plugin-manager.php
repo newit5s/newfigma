@@ -75,6 +75,7 @@ if ( ! class_exists( 'Restaurant_Booking_Plugin_Manager' ) ) {
                 'includes/class-plugin-activator.php',
                 'includes/class-plugin-deactivator.php',
                 'includes/traits/trait-rb-asset-loader.php',
+                'includes/services/class-fallback-booking-repository.php',
                 'includes/models/class-booking.php',
                 'includes/models/class-location.php',
                 'includes/models/class-table.php',
