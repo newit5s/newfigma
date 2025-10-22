@@ -889,60 +889,124 @@
       if (!this.$settingsForm.length) {
         return;
       }
+
       this.$settingsSave = $('#rb-settings-save');
       this.$settingsReset = $('#rb-settings-reset');
       this.$settingsNotice = $('#rb-settings-unsaved');
+      this.settingsDefaultNotice = this.$settingsNotice && this.$settingsNotice.length
+        ? this.$settingsNotice.data('defaultMessage') || this.$settingsNotice.text()
+        : '';
+      this.settingsNoticeTimeout = null;
 
       this.$settingsForm.on('input change', 'input, textarea, select', () => {
         this.setSettingsDirty(true);
         this.updateSettingsSummary();
       });
 
-      this.$settingsForm.on('submit', (event) => {
-        event.preventDefault();
-        this.setSettingsDirty(false);
-        this.showSettingsNotice(this.strings.settingsSaved);
-      });
-
-      this.$settingsReset.on('click', (event) => {
-        event.preventDefault();
-        this.$settingsForm[0].reset();
-        this.updateSettingsSummary();
-        this.setSettingsDirty(false);
-        this.showSettingsNotice(this.strings.settingsReset);
-      });
+      if (this.$settingsReset && this.$settingsReset.length) {
+        this.$settingsReset.on('click', (event) => {
+          event.preventDefault();
+          if (this.$settingsForm.length && this.$settingsForm[0]) {
+            this.$settingsForm[0].reset();
+          }
+          this.updateSettingsSummary();
+          this.setSettingsDirty(false);
+          this.showSettingsNotice(this.strings.settingsReset);
+        });
+      }
 
       this.updateSettingsSummary();
+      this.setSettingsDirty(false);
     }
 
     setSettingsDirty(isDirty) {
-      this.$settingsSave.prop('disabled', !isDirty);
-      this.$settingsReset.prop('disabled', !isDirty);
+      if (this.$settingsSave && this.$settingsSave.length) {
+        this.$settingsSave.prop('disabled', !isDirty);
+      }
+      if (this.$settingsReset && this.$settingsReset.length) {
+        this.$settingsReset.prop('disabled', !isDirty);
+      }
+      if (!this.$settingsNotice || !this.$settingsNotice.length) {
+        return;
+      }
+
+      if (this.settingsNoticeTimeout) {
+        clearTimeout(this.settingsNoticeTimeout);
+        this.settingsNoticeTimeout = null;
+      }
+
       if (isDirty) {
+        if (this.settingsDefaultNotice) {
+          this.$settingsNotice.text(this.settingsDefaultNotice);
+        }
         this.$settingsNotice.removeAttr('hidden');
       } else {
         this.$settingsNotice.attr('hidden', 'hidden');
+        if (this.settingsDefaultNotice) {
+          this.$settingsNotice.text(this.settingsDefaultNotice);
+        }
       }
     }
 
     showSettingsNotice(message) {
-      if (!message) {
+      if (!this.$settingsNotice || !this.$settingsNotice.length || !message) {
         return;
       }
+
+      if (this.settingsNoticeTimeout) {
+        clearTimeout(this.settingsNoticeTimeout);
+      }
+
       this.$settingsNotice.removeClass('is-error');
       this.$settingsNotice.text(message).removeAttr('hidden');
-      setTimeout(() => {
+
+      this.settingsNoticeTimeout = setTimeout(() => {
+        if (this.settingsDefaultNotice) {
+          this.$settingsNotice.text(this.settingsDefaultNotice);
+        }
         this.$settingsNotice.attr('hidden', 'hidden');
+        this.settingsNoticeTimeout = null;
       }, 2500);
     }
 
     updateSettingsSummary() {
-      const leadTime = $('#rb-setting-buffer').val() || '0';
-      const maxParty = $('#rb-setting-max-party').val() || '0';
-      const reminders = $('#rb-setting-reminder-hours').val() || '0';
-      $('#rb-policy-lead-time').text(`${leadTime} min buffer`);
-      $('#rb-policy-party-size').text(`${maxParty} guests`);
-      $('#rb-policy-reminders').text(`${reminders} hrs prior`);
+      if (!this.$settingsForm || !this.$settingsForm.length) {
+        return;
+      }
+
+      const leadTimeField = this.$settingsForm.find('#restaurant_booking_settings_buffer_time');
+      const maxPartyField = this.$settingsForm.find('#restaurant_booking_settings_max_party_size');
+      const remindersField = this.$settingsForm.find('#restaurant_booking_settings_reminder_hours');
+
+      const buildLabel = (field, singularKey, pluralKey) => {
+        if (!field || !field.length) {
+          return '';
+        }
+        const value = field.val();
+        const number = toNumber(value, 0);
+        const format = number === 1
+          ? (this.strings[singularKey] || '%s')
+          : (this.strings[pluralKey] || '%s');
+        return format.replace('%s', formatNumber(number));
+      };
+
+      const leadTimeText = buildLabel(leadTimeField, 'bufferSingular', 'bufferPlural');
+      const maxPartyText = buildLabel(maxPartyField, 'guestSingular', 'guestPlural');
+      const remindersText = buildLabel(remindersField, 'reminderSingular', 'reminderPlural');
+
+      const $lead = $('#rb-policy-lead-time');
+      const $party = $('#rb-policy-party-size');
+      const $reminders = $('#rb-policy-reminders');
+
+      if ($lead.length && leadTimeText) {
+        $lead.text(leadTimeText);
+      }
+      if ($party.length && maxPartyText) {
+        $party.text(maxPartyText);
+      }
+      if ($reminders.length && remindersText) {
+        $reminders.text(remindersText);
+      }
     }
 
     /* --------------------------------------------------------------------- */

@@ -550,7 +550,11 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
         }
 
         public function enqueue_admin_assets( $hook ) {
-            if ( strpos( $hook, 'rb-' ) === false ) {
+            $settings_slug = function_exists( 'restaurant_booking_get_settings_page_slug' )
+                ? restaurant_booking_get_settings_page_slug()
+                : 'restaurant-booking-settings';
+
+            if ( strpos( $hook, 'rb-' ) === false && strpos( $hook, $settings_slug ) === false ) {
                 return;
             }
 
@@ -586,6 +590,12 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
                         'locationsEmpty'  => __( 'No locations available yet.', 'restaurant-booking' ),
                         'settingsSaved'   => __( 'Settings saved successfully.', 'restaurant-booking' ),
                         'settingsReset'   => __( 'Settings restored to defaults.', 'restaurant-booking' ),
+                        'bufferSingular'  => __( '%s minute buffer', 'restaurant-booking' ),
+                        'bufferPlural'    => __( '%s minutes buffer', 'restaurant-booking' ),
+                        'guestSingular'   => __( '%s guest', 'restaurant-booking' ),
+                        'guestPlural'     => __( '%s guests', 'restaurant-booking' ),
+                        'reminderSingular' => __( '%s hour prior', 'restaurant-booking' ),
+                        'reminderPlural'   => __( '%s hours prior', 'restaurant-booking' ),
                         'locationSaved'   => __( 'Location details saved.', 'restaurant-booking' ),
                         'locationReset'   => __( 'Location form reset.', 'restaurant-booking' ),
                         'peakTime'        => __( 'Peak dining time', 'restaurant-booking' ),
