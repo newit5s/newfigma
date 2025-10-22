@@ -180,7 +180,7 @@ if ( ! class_exists( 'RB_Location' ) ) {
             $table = self::get_table_name();
 
             if ( ! self::table_exists( $table ) ) {
-                return null;
+                return self::get_default_location_by_id( $location_id );
             }
 
             $sql = self::prepare(
@@ -191,7 +191,7 @@ if ( ! class_exists( 'RB_Location' ) ) {
             $record = $wpdb->get_row( $sql );
 
             if ( ! $record ) {
-                return null;
+                return self::get_default_location_by_id( $location_id );
             }
 
             $location           = new self( $record->id, $record->name );
@@ -210,11 +210,45 @@ if ( ! class_exists( 'RB_Location' ) ) {
          * @return array
          */
         protected static function get_default_locations() {
-            $default = new self( 1, __( 'Main Dining Room', 'restaurant-booking' ) );
-            $default->address = __( '123 Example Street', 'restaurant-booking' );
-            $default->status  = 'active';
+            $main = new self( 1, __( 'Main Dining Room', 'restaurant-booking' ) );
+            $main->address  = __( '123 Market Street, Downtown', 'restaurant-booking' );
+            $main->phone    = '+1 (555) 010-3700';
+            $main->email    = 'main@modernrestaurant.example';
+            $main->capacity = 64;
+            $main->status   = 'active';
 
-            return array( $default );
+            $terrace = new self( 2, __( 'Rooftop Terrace', 'restaurant-booking' ) );
+            $terrace->address  = __( '200 Skyline Avenue, Level 12', 'restaurant-booking' );
+            $terrace->phone    = '+1 (555) 010-3705';
+            $terrace->email    = 'terrace@modernrestaurant.example';
+            $terrace->capacity = 48;
+            $terrace->status   = 'active';
+
+            $loft = new self( 3, __( 'Private Dining Loft', 'restaurant-booking' ) );
+            $loft->address  = __( '45 Artisan Way, Suite 4B', 'restaurant-booking' );
+            $loft->phone    = '+1 (555) 010-3710';
+            $loft->email    = 'events@modernrestaurant.example';
+            $loft->capacity = 24;
+            $loft->status   = 'active';
+
+            return array( $main, $terrace, $loft );
+        }
+
+        /**
+         * Locate a default location by identifier.
+         *
+         * @param int $location_id Location identifier.
+         *
+         * @return RB_Location|null
+         */
+        protected static function get_default_location_by_id( $location_id ) {
+            foreach ( self::get_default_locations() as $location ) {
+                if ( (int) $location->id === (int) $location_id ) {
+                    return $location;
+                }
+            }
+
+            return null;
         }
 
         /**

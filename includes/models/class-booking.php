@@ -64,6 +64,13 @@ if ( ! class_exists( 'RB_Booking' ) ) {
         protected $columns = null;
 
         /**
+         * Notification service instance cache.
+         *
+         * @var RB_Notification_Service|null
+         */
+        protected $notification_service = null;
+
+        /**
          * Constructor.
          *
          * @param int $id Optional booking identifier.
@@ -107,6 +114,84 @@ if ( ! class_exists( 'RB_Booking' ) ) {
             $this->load();
 
             return is_array( $this->data ) ? $this->data : array();
+        }
+
+        /**
+         * Retrieve the current booking status.
+         *
+         * @return string
+         */
+        public function get_status() {
+            $data = $this->get_data();
+
+            return isset( $data['status'] ) ? (string) $data['status'] : '';
+        }
+
+        /**
+         * Retrieve the customer's email address.
+         *
+         * @return string
+         */
+        public function get_customer_email() {
+            $data = $this->get_data();
+
+            return isset( $data['customer_email'] ) ? (string) $data['customer_email'] : '';
+        }
+
+        /**
+         * Retrieve the customer's display name.
+         *
+         * @return string
+         */
+        public function get_customer_name() {
+            $data = $this->get_data();
+
+            return isset( $data['customer_name'] ) ? (string) $data['customer_name'] : '';
+        }
+
+        /**
+         * Trigger confirmation email delivery.
+         *
+         * @return bool
+         */
+        public function send_confirmation_email() {
+            $service = $this->get_notification_service();
+
+            if ( ! $service ) {
+                return false;
+            }
+
+            return $service->send_booking_confirmation( $this->get_data() );
+        }
+
+        /**
+         * Trigger cancellation email delivery.
+         *
+         * @return bool
+         */
+        public function send_cancellation_email() {
+            $service = $this->get_notification_service();
+
+            if ( ! $service ) {
+                return false;
+            }
+
+            return $service->send_booking_cancellation( $this->get_data() );
+        }
+
+        /**
+         * Trigger reminder email delivery.
+         *
+         * @return bool
+         */
+        public function send_reminder_email() {
+            $service = $this->get_notification_service();
+
+            if ( ! $service ) {
+                return false;
+            }
+
+            return $service->send_booking_reminder( $this->get_data() );
         }
 
         /**
@@ -1223,6 +1308,25 @@ if ( ! class_exists( 'RB_Booking' ) ) {
             }
 
             return gmdate( 'Y-m-d', $timestamp );
+        }
+
+        /**
+         * Retrieve the notification service instance.
+         *
+         * @return RB_Notification_Service|null
+         */
+        protected function get_notification_service() {
+            if ( $this->notification_service instanceof RB_Notification_Service ) {
+                return $this->notification_service;
+            }
+
+            if ( class_exists( 'RB_Notification_Service' ) ) {
+                $this->notification_service = new RB_Notification_Service();
+
+                return $this->notification_service;
+            }
+
+            return null;
         }
 
         /**
