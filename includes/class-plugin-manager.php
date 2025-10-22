@@ -29,6 +29,13 @@ if ( ! class_exists( 'Restaurant_Booking_Plugin_Manager' ) ) {
         protected $public_bootstrapped = false;
 
         /**
+         * Tracks whether the admin components have been initialised.
+         *
+         * @var bool
+         */
+        protected $admin_bootstrapped = false;
+
+        /**
          * Booking manager instance.
          *
          * @var RB_Modern_Booking_Manager|null
@@ -189,12 +196,17 @@ if ( ! class_exists( 'Restaurant_Booking_Plugin_Manager' ) ) {
         }
 
         public function bootstrap_admin_components() {
+            if ( $this->admin_bootstrapped ) {
+                return;
+            }
+
             if ( ! is_admin() ) {
                 return;
             }
 
             if ( class_exists( 'RB_Modern_Admin' ) ) {
                 new RB_Modern_Admin();
+                $this->admin_bootstrapped = true;
             }
         }
 

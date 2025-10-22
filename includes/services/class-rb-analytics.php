@@ -270,7 +270,9 @@ if ( ! class_exists( 'RB_Analytics' ) ) {
                         ),
                         (int) $stats['pending']
                     ),
-                    'action_url' => admin_url( 'admin.php?page=rb-bookings&status=pending' ),
+                    'action_url' => function_exists( 'restaurant_booking_get_admin_page_url' )
+                        ? restaurant_booking_get_admin_page_url( 'rb-bookings', array( 'status' => 'pending' ) )
+                        : admin_url( 'admin.php?page=rb-bookings&status=pending' ),
                 );
             }
 

@@ -27,15 +27,24 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
          */
         protected $settings_registered = false;
 
+        /**
+         * Cached configuration describing how the settings lockdown behaves.
+         *
+         * @var array|null
+         */
+        protected $settings_lockdown_config = null;
+
         public function __construct() {
             add_action( 'admin_menu', array( $this, 'add_admin_pages' ) );
+            add_action( 'admin_menu', array( $this, 'remove_restricted_settings_menu' ), 99 );
             add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ) );
+            add_action( 'admin_init', array( $this, 'maybe_block_settings_access' ), 5 );
+            add_action( 'admin_init', array( $this, 'register_settings' ), 20 );
+            add_filter( 'user_has_cap', array( $this, 'maybe_grant_testing_manage_capability' ), 20, 4 );
 
             add_action( 'wp_ajax_rb_admin_get_dashboard', array( $this, 'ajax_get_dashboard' ) );
             add_action( 'wp_ajax_rb_admin_get_bookings', array( $this, 'ajax_get_bookings' ) );
             add_action( 'wp_ajax_rb_admin_get_locations', array( $this, 'ajax_get_locations' ) );
-
-            $this->register_settings();
         }
 
         public function register_settings() {
@@ -44,6 +53,14 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
             }
 
             $this->settings_registered = true;
+
+            if ( ! function_exists( 'register_setting' ) ) {
+                require_once ABSPATH . 'wp-admin/includes/plugin.php';
+            }
+
+            if ( ! function_exists( 'add_settings_section' ) ) {
+                require_once ABSPATH . 'wp-admin/includes/template.php';
+            }
 
             $default_settings = function_exists( 'restaurant_booking_get_default_settings' )
                 ? restaurant_booking_get_default_settings()
@@ -550,7 +567,11 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
         }
 
         public function enqueue_admin_assets( $hook ) {
-            if ( strpos( $hook, 'rb-' ) === false ) {
+            $settings_slug = function_exists( 'restaurant_booking_get_settings_page_slug' )
+                ? restaurant_booking_get_settings_page_slug()
+                : 'restaurant-booking-settings';
+
+            if ( strpos( $hook, 'rb-' ) === false && strpos( $hook, $settings_slug ) === false ) {
                 return;
             }
 
@@ -586,6 +607,12 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
                         'locationsEmpty'  => __( 'No locations available yet.', 'restaurant-booking' ),
                         'settingsSaved'   => __( 'Settings saved successfully.', 'restaurant-booking' ),
                         'settingsReset'   => __( 'Settings restored to defaults.', 'restaurant-booking' ),
+                        'bufferSingular'  => __( '%s minute buffer', 'restaurant-booking' ),
+                        'bufferPlural'    => __( '%s minutes buffer', 'restaurant-booking' ),
+                        'guestSingular'   => __( '%s guest', 'restaurant-booking' ),
+                        'guestPlural'     => __( '%s guests', 'restaurant-booking' ),
+                        'reminderSingular' => __( '%s hour prior', 'restaurant-booking' ),
+                        'reminderPlural'   => __( '%s hours prior', 'restaurant-booking' ),
                         'locationSaved'   => __( 'Location details saved.', 'restaurant-booking' ),
                         'locationReset'   => __( 'Location form reset.', 'restaurant-booking' ),
                         'peakTime'        => __( 'Peak dining time', 'restaurant-booking' ),
@@ -627,6 +654,575 @@ if ( ! class_exists( 'RB_Modern_Admin' ) ) {
 
         public function render_settings() {
             $this->include_partial( 'settings-panel.php' );
+        }
+
+        /**
+         * Remove the settings menu entry for restricted users.
+         */
+        public function remove_restricted_settings_menu() {
+            if ( ! $this->is_settings_lockdown_enabled() ) {
+                return;
+            }
+
+            if ( ! $this->is_settings_access_restricted() ) {
+                return;
+            }
+
+            $settings_slug = function_exists( 'restaurant_booking_get_settings_page_slug' )
+                ? restaurant_booking_get_settings_page_slug()
+                : 'restaurant-booking-settings';
+
+            remove_submenu_page( 'rb-dashboard', $settings_slug );
+            remove_submenu_page( 'options-general.php', $settings_slug );
+        }
+
+        /**
+         * Block direct access to the settings screen when restricted.
+         */
+        public function maybe_block_settings_access() {
+            if ( ! is_admin() ) {
+                return;
+            }
+
+            if ( ! $this->is_settings_lockdown_enabled() ) {
+                return;
+            }
+
+            if ( wp_doing_ajax() ) {
+                return;
+            }
+
+            if ( ! isset( $_GET['page'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+                return;
+            }
+
+            $requested_page = sanitize_key( wp_unslash( $_GET['page'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+
+            $settings_slug = function_exists( 'restaurant_booking_get_settings_page_slug' )
+                ? restaurant_booking_get_settings_page_slug()
+                : 'restaurant-booking-settings';
+
+            if ( $requested_page !== $settings_slug ) {
+                return;
+            }
+
+            if ( ! $this->is_settings_access_restricted() ) {
+                return;
+            }
+
+            $message = apply_filters(
+                'restaurant_booking_restricted_settings_message',
+                __( 'Restaurant Booking settings are temporarily unavailable while internal testing is in progress.', 'restaurant-booking' )
+            );
+
+            wp_die(
+                wp_kses_post( $message ),
+                esc_html__( 'Access restricted', 'restaurant-booking' ),
+                array(
+                    'response'  => 403,
+                    'back_link' => true,
+                )
+            );
+        }
+
+        /**
+         * Determine whether the current user should be blocked from accessing settings.
+         *
+         * @return bool
+         */
+        protected function is_settings_access_restricted() {
+            if ( ! $this->is_settings_lockdown_enabled() ) {
+                return false;
+            }
+
+            if ( ! function_exists( 'wp_get_current_user' ) ) {
+                return false;
+            }
+
+            $user = wp_get_current_user();
+
+            if ( ! $user instanceof WP_User || 0 === $user->ID ) {
+                return false;
+            }
+
+            $config = $this->get_settings_lockdown_config();
+
+            $blocked_roles = apply_filters( 'restaurant_booking_restricted_settings_roles', $config['blocked_roles'] );
+            $blocked_roles = $this->normalize_config_list( $blocked_roles, 'sanitize_key' );
+
+            $blocked_user_ids = apply_filters( 'restaurant_booking_restricted_settings_user_ids', $config['blocked_user_ids'] );
+            $blocked_user_ids = $this->normalize_config_list(
+                $blocked_user_ids,
+                'intval',
+                function ( $value ) {
+                    return $value > 0;
+                }
+            );
+
+            $restricted = false;
+
+            if ( ! empty( $config['block_super_admins'] ) && function_exists( 'is_super_admin' ) && is_super_admin( $user->ID ) ) {
+                $restricted = true;
+            }
+
+            $testing_overrides   = $this->get_testing_access_overrides();
+            $is_testing_override = $this->user_matches_testing_override( $user, $testing_overrides );
+
+            if ( $is_testing_override ) {
+                $restricted = false;
+            } else {
+                if ( ! $restricted && ! empty( $blocked_roles ) && is_array( $user->roles ) ) {
+                    $sanitized_roles = array_map( 'sanitize_key', (array) $user->roles );
+                    $restricted      = (bool) array_intersect( $blocked_roles, $sanitized_roles );
+                }
+
+                if ( ! $restricted && ! empty( $blocked_user_ids ) ) {
+                    $restricted = in_array( (int) $user->ID, $blocked_user_ids, true );
+                }
+            }
+
+            return (bool) apply_filters( 'restaurant_booking_is_settings_access_restricted', $restricted, $user );
+        }
+
+        /**
+         * Grant the manage capability to testing accounts while administrators are blocked.
+         *
+         * Ensures that QA users defined via the restaurant_booking_testing_allowed_* filters
+         * keep access to the settings screen even if their role normally lacks the
+         * `manage_bookings` capability.
+         *
+         * @param array   $allcaps All the capabilities of the user.
+         * @param array   $caps    Required primitive capabilities for the requested capability.
+         * @param array   $args    Arguments that accompany the capability check.
+         * @param WP_User $user    User object being evaluated.
+         *
+         * @return array
+         */
+        public function maybe_grant_testing_manage_capability( $allcaps, $caps, $args, $user ) {
+            if ( empty( $args ) || ! isset( $args[0] ) ) {
+                return $allcaps;
+            }
+
+            $requested_cap = $args[0];
+            if ( ! $user instanceof WP_User ) {
+                return $allcaps;
+            }
+
+            $user_id = (int) $user->ID;
+
+            if ( $user_id <= 0 ) {
+                return $allcaps;
+            }
+
+            $testing_overrides = $this->get_testing_access_overrides();
+
+            if ( empty( $testing_overrides['roles'] ) && empty( $testing_overrides['user_ids'] ) ) {
+                return $allcaps;
+            }
+
+            $target_capabilities = array( 'manage_bookings' );
+
+            if ( function_exists( 'restaurant_booking_get_manage_capability' ) ) {
+                $manage_capability = restaurant_booking_get_manage_capability();
+
+                if (
+                    ! empty( $manage_capability )
+                    && 'manage_options' !== $manage_capability
+                    && ! in_array( $manage_capability, $target_capabilities, true )
+                ) {
+                    $target_capabilities[] = $manage_capability;
+                }
+            }
+
+            if ( ! in_array( $requested_cap, $target_capabilities, true ) ) {
+                return $allcaps;
+            }
+
+            if ( ! $this->user_matches_testing_override( $user, $testing_overrides ) ) {
+                return $allcaps;
+            }
+
+            foreach ( $target_capabilities as $capability ) {
+                $allcaps[ $capability ] = true;
+            }
+
+            return $allcaps;
+        }
+
+        /**
+         * Retrieve sanitized testing override configuration.
+         *
+         * @return array{
+         *     roles: string[],
+         *     user_ids: int[],
+         * }
+         */
+        protected function get_testing_access_overrides() {
+            $config = $this->get_settings_lockdown_config();
+
+            $roles = apply_filters( 'restaurant_booking_testing_allowed_roles', $config['testing_roles'] );
+            $roles = $this->normalize_config_list( $roles, 'sanitize_key' );
+
+            $user_ids = apply_filters( 'restaurant_booking_testing_allowed_user_ids', $config['testing_user_ids'] );
+            $user_ids = $this->normalize_config_list(
+                $user_ids,
+                'intval',
+                function ( $value ) {
+                    return $value > 0;
+                }
+            );
+
+            return array(
+                'roles'    => array_values( array_unique( $roles ) ),
+                'user_ids' => array_values( array_unique( $user_ids ) ),
+            );
+        }
+
+        /**
+         * Determine whether the current environment should enforce the settings lockdown.
+         *
+         * @return bool
+         */
+        protected function is_settings_lockdown_enabled() {
+            $config  = $this->get_settings_lockdown_config();
+            $enabled = ! empty( $config['enabled'] );
+
+            return (bool) apply_filters( 'restaurant_booking_settings_lockdown_enabled', $enabled, $config );
+        }
+
+        /**
+         * Retrieve consolidated lockdown configuration from options, environment, and filters.
+         *
+         * @return array{
+         *     enabled: bool,
+         *     blocked_roles: string[],
+         *     blocked_user_ids: int[],
+         *     testing_roles: string[],
+         *     testing_user_ids: int[],
+         *     block_super_admins: bool,
+         * }
+         */
+        protected function get_settings_lockdown_config() {
+            if ( null !== $this->settings_lockdown_config ) {
+                return $this->settings_lockdown_config;
+            }
+
+            $config = array(
+                'enabled'            => true,
+                'blocked_roles'      => array( 'administrator' ),
+                'blocked_user_ids'   => array(),
+                'testing_roles'      => array(),
+                'testing_user_ids'   => array(),
+                'block_super_admins' => true,
+            );
+
+            if ( function_exists( 'get_option' ) ) {
+                $option = get_option( 'restaurant_booking_settings_lockdown', null );
+
+                if ( is_array( $option ) ) {
+                    if ( array_key_exists( 'enabled', $option ) ) {
+                        $config['enabled'] = $this->normalize_boolean_flag( $option['enabled'], $config['enabled'] );
+                    }
+
+                    if ( array_key_exists( 'blocked_roles', $option ) ) {
+                        $config['blocked_roles'] = $this->normalize_config_list( $option['blocked_roles'], 'sanitize_key' );
+                    }
+
+                    if ( array_key_exists( 'blocked_user_ids', $option ) ) {
+                        $config['blocked_user_ids'] = $this->normalize_config_list(
+                            $option['blocked_user_ids'],
+                            'intval',
+                            function ( $value ) {
+                                return $value > 0;
+                            }
+                        );
+                    }
+
+                    if ( array_key_exists( 'testing_roles', $option ) ) {
+                        $config['testing_roles'] = $this->normalize_config_list( $option['testing_roles'], 'sanitize_key' );
+                    }
+
+                    if ( array_key_exists( 'testing_user_ids', $option ) ) {
+                        $config['testing_user_ids'] = $this->normalize_config_list(
+                            $option['testing_user_ids'],
+                            'intval',
+                            function ( $value ) {
+                                return $value > 0;
+                            }
+                        );
+                    }
+
+                    if ( array_key_exists( 'block_super_admins', $option ) ) {
+                        $config['block_super_admins'] = $this->normalize_boolean_flag( $option['block_super_admins'], $config['block_super_admins'] );
+                    }
+                }
+            }
+
+            $config['blocked_roles'] = $this->merge_config_lists(
+                $config['blocked_roles'],
+                array(
+                    defined( 'RESTAURANT_BOOKING_BLOCKED_SETTINGS_ROLES' ) ? RESTAURANT_BOOKING_BLOCKED_SETTINGS_ROLES : null,
+                    $this->get_environment_value( array( 'RESTAURANT_BOOKING_BLOCKED_SETTINGS_ROLES', 'RB_BLOCKED_SETTINGS_ROLES' ) ),
+                ),
+                'sanitize_key'
+            );
+
+            $config['blocked_user_ids'] = $this->merge_config_lists(
+                $config['blocked_user_ids'],
+                array(
+                    defined( 'RESTAURANT_BOOKING_BLOCKED_SETTINGS_USERS' ) ? RESTAURANT_BOOKING_BLOCKED_SETTINGS_USERS : null,
+                    $this->get_environment_value( array( 'RESTAURANT_BOOKING_BLOCKED_SETTINGS_USERS', 'RB_BLOCKED_SETTINGS_USERS' ) ),
+                ),
+                'intval',
+                function ( $value ) {
+                    return $value > 0;
+                }
+            );
+
+            $config['testing_roles'] = $this->merge_config_lists(
+                $config['testing_roles'],
+                array(
+                    defined( 'RESTAURANT_BOOKING_TESTING_ALLOWED_ROLES' ) ? RESTAURANT_BOOKING_TESTING_ALLOWED_ROLES : null,
+                    $this->get_environment_value( array( 'RESTAURANT_BOOKING_TESTING_ALLOWED_ROLES', 'RB_TESTING_ALLOWED_ROLES' ) ),
+                ),
+                'sanitize_key'
+            );
+
+            $config['testing_user_ids'] = $this->merge_config_lists(
+                $config['testing_user_ids'],
+                array(
+                    defined( 'RESTAURANT_BOOKING_TESTING_ALLOWED_USER_IDS' ) ? RESTAURANT_BOOKING_TESTING_ALLOWED_USER_IDS : ( defined( 'RESTAURANT_BOOKING_TESTING_ALLOWED_USERS' ) ? RESTAURANT_BOOKING_TESTING_ALLOWED_USERS : null ),
+                    $this->get_environment_value( array( 'RESTAURANT_BOOKING_TESTING_ALLOWED_USER_IDS', 'RESTAURANT_BOOKING_TESTING_ALLOWED_USERS', 'RB_TESTING_ALLOWED_USER_IDS', 'RB_TESTING_ALLOWED_USERS' ) ),
+                ),
+                'intval',
+                function ( $value ) {
+                    return $value > 0;
+                }
+            );
+
+            if ( defined( 'RESTAURANT_BOOKING_SETTINGS_LOCKDOWN_ENABLED' ) ) {
+                $config['enabled'] = $this->normalize_boolean_flag( RESTAURANT_BOOKING_SETTINGS_LOCKDOWN_ENABLED, $config['enabled'] );
+            }
+
+            $env_enabled = $this->get_environment_value( array( 'RESTAURANT_BOOKING_SETTINGS_LOCKDOWN_ENABLED', 'RB_SETTINGS_LOCKDOWN_ENABLED' ) );
+            if ( null !== $env_enabled ) {
+                $config['enabled'] = $this->normalize_boolean_flag( $env_enabled, $config['enabled'] );
+            }
+
+            if ( defined( 'RESTAURANT_BOOKING_DISABLE_SETTINGS_LOCKDOWN' ) ) {
+                if ( $this->normalize_boolean_flag( RESTAURANT_BOOKING_DISABLE_SETTINGS_LOCKDOWN, false ) ) {
+                    $config['enabled'] = false;
+                }
+            }
+
+            $env_disable = $this->get_environment_value( array( 'RESTAURANT_BOOKING_DISABLE_SETTINGS_LOCKDOWN', 'RB_DISABLE_SETTINGS_LOCKDOWN' ) );
+            if ( null !== $env_disable && $this->normalize_boolean_flag( $env_disable, false ) ) {
+                $config['enabled'] = false;
+            }
+
+            if ( defined( 'RESTAURANT_BOOKING_BLOCK_SUPER_ADMINS' ) ) {
+                $config['block_super_admins'] = $this->normalize_boolean_flag( RESTAURANT_BOOKING_BLOCK_SUPER_ADMINS, $config['block_super_admins'] );
+            }
+
+            $env_block_super_admins = $this->get_environment_value( array( 'RESTAURANT_BOOKING_BLOCK_SUPER_ADMINS', 'RB_BLOCK_SUPER_ADMINS' ) );
+            if ( null !== $env_block_super_admins ) {
+                $config['block_super_admins'] = $this->normalize_boolean_flag( $env_block_super_admins, $config['block_super_admins'] );
+            }
+
+            $config = apply_filters( 'restaurant_booking_settings_lockdown_config', $config );
+
+            $config['blocked_roles'] = $this->normalize_config_list( $config['blocked_roles'], 'sanitize_key' );
+            $config['blocked_user_ids'] = $this->normalize_config_list(
+                $config['blocked_user_ids'],
+                'intval',
+                function ( $value ) {
+                    return $value > 0;
+                }
+            );
+            $config['testing_roles'] = $this->normalize_config_list( $config['testing_roles'], 'sanitize_key' );
+            $config['testing_user_ids'] = $this->normalize_config_list(
+                $config['testing_user_ids'],
+                'intval',
+                function ( $value ) {
+                    return $value > 0;
+                }
+            );
+            $config['block_super_admins'] = $this->normalize_boolean_flag( $config['block_super_admins'], true );
+            $config['enabled']            = $this->normalize_boolean_flag( $config['enabled'], true );
+
+            $this->settings_lockdown_config = $config;
+
+            return $this->settings_lockdown_config;
+        }
+
+        /**
+         * Determine whether the given user is whitelisted for settings access overrides.
+         *
+         * @param WP_User $user       WordPress user object.
+         * @param array   $overrides  Override configuration with `roles` and `user_ids` keys.
+         *
+         * @return bool
+         */
+        protected function user_matches_testing_override( $user, $overrides ) {
+            if ( ! $user instanceof WP_User ) {
+                return false;
+            }
+
+            $user_id = (int) $user->ID;
+
+            if ( $user_id > 0 && ! empty( $overrides['user_ids'] ) && in_array( $user_id, $overrides['user_ids'], true ) ) {
+                return true;
+            }
+
+            if ( empty( $overrides['roles'] ) || ! is_array( $user->roles ) ) {
+                return false;
+            }
+
+            $sanitized_roles = array_map( 'sanitize_key', (array) $user->roles );
+
+            return ! empty( array_intersect( $overrides['roles'], $sanitized_roles ) );
+        }
+
+        /**
+         * Normalize a list-like value into a sanitized array.
+         *
+         * @param mixed    $source    Input configuration.
+         * @param callable $sanitize  Sanitization callback applied to each value.
+         * @param callable $validator Optional validator returning true for allowed values.
+         *
+         * @return array
+         */
+        protected function normalize_config_list( $source, $sanitize, $validator = null ) {
+            $values = array();
+
+            if ( null === $source ) {
+                return $values;
+            }
+
+            if ( is_string( $source ) ) {
+                $source = trim( $source );
+
+                if ( '' === $source ) {
+                    return $values;
+                }
+
+                if ( function_exists( 'wp_parse_list' ) ) {
+                    $source = wp_parse_list( $source );
+                } else {
+                    $source = preg_split( '/[\s,]+/', $source );
+                }
+            } elseif ( is_object( $source ) ) {
+                $source = (array) $source;
+            } elseif ( ! is_array( $source ) ) {
+                $source = array( $source );
+            }
+
+            foreach ( $source as $item ) {
+                if ( is_string( $item ) ) {
+                    $item = trim( $item );
+                }
+
+                if ( '' === $item || null === $item ) {
+                    continue;
+                }
+
+                $sanitized = call_user_func( $sanitize, $item );
+
+                if ( '' === $sanitized || null === $sanitized ) {
+                    continue;
+                }
+
+                if ( null !== $validator && ! call_user_func( $validator, $sanitized ) ) {
+                    continue;
+                }
+
+                $values[] = $sanitized;
+            }
+
+            return $values;
+        }
+
+        /**
+         * Merge multiple list-like sources into a sanitized array.
+         *
+         * @param array    $base      Base array to extend.
+         * @param array    $sources   Additional values to merge.
+         * @param callable $sanitize  Sanitization callback.
+         * @param callable $validator Optional validator callback.
+         *
+         * @return array
+         */
+        protected function merge_config_lists( array $base, array $sources, $sanitize, $validator = null ) {
+            $merged = $base;
+
+            foreach ( $sources as $source ) {
+                if ( null === $source || '' === $source ) {
+                    continue;
+                }
+
+                $merged = array_merge( $merged, $this->normalize_config_list( $source, $sanitize, $validator ) );
+            }
+
+            if ( empty( $merged ) ) {
+                return array();
+            }
+
+            return array_values( array_unique( $merged ) );
+        }
+
+        /**
+         * Convert loose truthy/falsey configuration values into booleans.
+         *
+         * @param mixed $value   Raw value from options, constants, or environment.
+         * @param bool  $default Default when the value cannot be interpreted.
+         *
+         * @return bool
+         */
+        protected function normalize_boolean_flag( $value, $default = true ) {
+            if ( is_bool( $value ) ) {
+                return $value;
+            }
+
+            if ( is_numeric( $value ) ) {
+                return (bool) (int) $value;
+            }
+
+            if ( is_string( $value ) ) {
+                $normalized = strtolower( trim( $value ) );
+
+                if ( in_array( $normalized, array( '1', 'true', 'yes', 'on' ), true ) ) {
+                    return true;
+                }
+
+                if ( in_array( $normalized, array( '0', 'false', 'no', 'off' ), true ) ) {
+                    return false;
+                }
+            }
+
+            return (bool) $default;
+        }
+
+        /**
+         * Retrieve the first available environment variable value for the provided keys.
+         *
+         * @param string[] $keys Environment variable names ordered by priority.
+         *
+         * @return string|null
+         */
+        protected function get_environment_value( array $keys ) {
+            foreach ( $keys as $key ) {
+                if ( empty( $key ) ) {
+                    continue;
+                }
+
+                $value = getenv( $key );
+
+                if ( false !== $value && '' !== $value ) {
+                    return $value;
+                }
+            }
+
+            return null;
         }
 
         public function render_reports() {

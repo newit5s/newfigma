@@ -73,9 +73,12 @@ $theme_toggle_id = isset( $theme_toggle_id ) ? $theme_toggle_id : 'rb-admin-them
             <?php foreach ( $menu_items as $slug => $item ) :
                 $is_active = $slug === $current_page;
                 $badge     = isset( $badge_counts[ $slug ] ) ? (int) $badge_counts[ $slug ] : 0;
+                $menu_url  = function_exists( 'restaurant_booking_get_admin_page_url' )
+                    ? restaurant_booking_get_admin_page_url( $slug )
+                    : admin_url( 'admin.php?page=' . $slug );
                 ?>
                 <li class="rb-admin-menu-entry">
-                    <a href="<?php echo esc_url( admin_url( 'admin.php?page=' . $slug ) ); ?>" class="rb-admin-menu-item<?php echo $is_active ? ' rb-active' : ''; ?>" data-menu-item="<?php echo esc_attr( $slug ); ?>"<?php echo $is_active ? ' aria-current="page"' : ''; ?>>
+                    <a href="<?php echo esc_url( $menu_url ); ?>" class="rb-admin-menu-item<?php echo $is_active ? ' rb-active' : ''; ?>" data-menu-item="<?php echo esc_attr( $slug ); ?>"<?php echo $is_active ? ' aria-current="page"' : ''; ?>>
                         <span class="rb-admin-menu-icon dashicons <?php echo esc_attr( $item['icon'] ); ?>" aria-hidden="true"></span>
                         <span class="rb-admin-menu-label"><?php echo esc_html( $item['label'] ); ?></span>
                         <?php if ( $badge > 0 ) : ?>
